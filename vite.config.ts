@@ -15,6 +15,15 @@ export default defineConfig(() => {
       },
     },
     server: {
+      // Render preview host plus optional comma-separated extra hosts.
+      // Keep this explicit rather than using allowedHosts: true.
+      allowedHosts: [
+        'sage-auto.onrender.com',
+        ...(process.env.ALLOWED_HOSTS || '')
+          .split(',')
+          .map((host) => host.trim())
+          .filter(Boolean),
+      ],
       // HMR is disabled in AI Studio via DISABLE_HMR env var.
       // Do not modifyâfile watching is disabled to prevent flickering during agent edits.
       hmr: process.env.DISABLE_HMR !== 'true',
@@ -26,6 +35,15 @@ export default defineConfig(() => {
           changeOrigin: true,
         },
       },
+    },
+    preview: {
+      allowedHosts: [
+        'sage-auto.onrender.com',
+        ...(process.env.ALLOWED_HOSTS || '')
+          .split(',')
+          .map((host) => host.trim())
+          .filter(Boolean),
+      ],
     },
   };
 });
