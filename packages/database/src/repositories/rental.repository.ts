@@ -15,6 +15,7 @@ import type {
   RentalExtension,
   RentalReturnRecord,
   RentalFinalCalculation,
+  RentalIncident,
 } from "@carhire/types";
 import {
   RecordNotFoundError,
@@ -154,6 +155,19 @@ export interface IRentalRepository {
     tenantId: string,
     tx?: TransactionContext
   ): Promise<RentalExtension[]>;
+
+  recordIncident(
+    rentalId: string,
+    tenantId: string,
+    incident: Omit<RentalIncident, "id" | "rentalId">,
+    tx?: TransactionContext
+  ): Promise<RentalIncident>;
+
+  getIncidents(
+    rentalId: string,
+    tenantId: string,
+    tx?: TransactionContext
+  ): Promise<RentalIncident[]>;
 
   saveFinalCalculation(
     tenantId: string,
@@ -556,6 +570,45 @@ export class RentalRepository implements IRentalRepository {
       (e) => e.rentalId === rentalId && (e.tenantId === tenantId || !e.tenantId)
     );
     return JSON.parse(JSON.stringify(exts));
+  }
+
+  async recordIncident(
+    rentalId: string,
+    tenantId: string,
+    incident: Omit<RentalIncident, "id" | "rentalId">,
+    _tx?: TransactionContext
+  ): Promise<RentalIncident> {
+    const rental = await this.findById(rentalId, tenantId);
+    if (!rental) {
+      throw new RentalNotFoundError(rentalId);
+    }
+
+    const record: RentalIncident = {
+      ...incident,
+      id: `inc-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      rentalId,
+      reportedAt: incident.reportedAt || new Date().toISOString(),
+      estimatedCost: incident.estimatedCost ?? 0,
+      resolved: incident.resolved ?? false,
+    };
+
+    await this.update(rentalId, tenantId, {
+      incidents: [record, ...(rental.incidents || [])],
+    });
+
+    return JSON.parse(JSON.stringify(record));
+  }
+
+  async getIncidents(
+    rentalId: string,
+    tenantId: string,
+    _tx?: TransactionContext
+  ): Promise<RentalIncident[]> {
+    const rental = await this.findById(rentalId, tenantId);
+    if (!rental) {
+      throw new RentalNotFoundError(rentalId);
+    }
+    return JSON.parse(JSON.stringify(rental.incidents || []));
   }
 
   async saveFinalCalculation(
