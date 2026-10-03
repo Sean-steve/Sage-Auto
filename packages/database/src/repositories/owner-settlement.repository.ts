@@ -118,9 +118,14 @@ export class OwnerSettlementRepository implements IOwnerSettlementRepository {
     const rentalLines = OwnerSettlementRepository.rentalLines.get(id) || [];
     const expenseLines = OwnerSettlementRepository.expenseLines.get(id) || [];
     const adjustments = OwnerSettlementRepository.adjustmentLines.get(id) || [];
-    const payable = Array.from(OwnerSettlementRepository.payables.values()).find(
-      (p) => p.settlementId === id && p.tenantId === settlement.tenantId
-    );
+    const payable = Array.from(OwnerSettlementRepository.payables.values())
+      .filter((p) => p.settlementId === id && p.tenantId === settlement.tenantId)
+      .sort((a, b) => {
+        const activeRank = (p: OwnerSettlementPayable) => p.status === "CANCELLED" ? 1 : 0;
+        const rank = activeRank(a) - activeRank(b);
+        if (rank !== 0) return rank;
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      })[0];
 
     return {
       ...settlement,
@@ -426,12 +431,15 @@ export class OwnerSettlementRepository implements IOwnerSettlementRepository {
   }
 
   async findPayableBySettlementId(settlementId: string, tenantId: string): Promise<OwnerSettlementPayable | null> {
-    for (const payable of OwnerSettlementRepository.payables.values()) {
-      if (payable.settlementId === settlementId && payable.tenantId === tenantId) {
-        return { ...payable };
-      }
-    }
-    return null;
+    const candidates = Array.from(OwnerSettlementRepository.payables.values())
+      .filter((payable) => payable.settlementId === settlementId && payable.tenantId === tenantId)
+      .sort((a, b) => {
+        const activeRank = (p: OwnerSettlementPayable) => p.status === "CANCELLED" ? 1 : 0;
+        const rank = activeRank(a) - activeRank(b);
+        if (rank !== 0) return rank;
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      });
+    return candidates[0] ? { ...candidates[0] } : null;
   }
 
   async listPayables(
@@ -446,6 +454,6 @@ export class OwnerSettlementRepository implements IOwnerSettlementRepository {
       if (filter?.status && payable.status !== filter.status) continue;
       results.push({ ...payable });
     }
-    return results;
+    return results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }
 }
