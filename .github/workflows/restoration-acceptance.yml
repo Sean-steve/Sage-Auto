@@ -52,6 +52,9 @@ jobs:
       - name: Fleet experience contract regression
         run: pnpm test:fleet-experience
 
+      - name: Customers and Drivers experience contract regression
+        run: pnpm test:people-experience
+
       - name: Account and 20-role access regression
         run: pnpm test:access
 
