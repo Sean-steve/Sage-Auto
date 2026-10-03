@@ -285,10 +285,24 @@ async function runTests() {
     {
       scheduledReturnAt: "2026-09-07T10:00:00Z",
       scheduledReturnLocationId: "branch-nairobi-hq",
+      idempotencyKey: "return-schedule-rnt-16001",
     },
     actor
   );
   assert.equal(scheduledRental.state, "RETURN_SCHEDULED");
+  const scheduledReplay = await service.scheduleReturn(
+    tenantId,
+    rental.id,
+    {
+      scheduledReturnAt: "2026-09-07T10:00:00Z",
+      scheduledReturnLocationId: "branch-nairobi-hq",
+      idempotencyKey: "return-schedule-rnt-16001",
+    },
+    actor
+  );
+  assert.equal(scheduledReplay.id, scheduledRental.id);
+  assert.equal(scheduledReplay.state, "RETURN_SCHEDULED");
+  console.log("✓ Return scheduling is idempotent under retry.");
 
   // Test odometer regression validation
   await assert.rejects(
@@ -337,6 +351,7 @@ async function runTests() {
       returnFuelLevel: 60,
       receivedAt: "2026-09-07T12:00:00Z",
       conditionNotes: "Vehicle returned with light dust and minor scratches on rear bumper.",
+      idempotencyKey: "return-receipt-rnt-16001",
     },
     actor
   );
@@ -344,6 +359,20 @@ async function runTests() {
   assert.equal(receivedRental.state, "VEHICLE_RECEIVED");
   assert.equal(receivedRental.returnOdometer, 46600);
   assert.equal(receivedRental.returnFuelLevel, 60);
+  const receivedReplay = await service.receiveReturnedVehicle(
+    tenantId,
+    rental.id,
+    {
+      returnOdometer: 46600,
+      returnFuelLevel: 60,
+      receivedAt: "2026-09-07T12:00:00Z",
+      conditionNotes: "Vehicle returned with light dust and minor scratches on rear bumper.",
+      idempotencyKey: "return-receipt-rnt-16001",
+    },
+    actor
+  );
+  assert.equal(receivedReplay.id, receivedRental.id);
+  assert.equal(receivedReplay.state, "VEHICLE_RECEIVED");
   const mergedReturnRecord = await rentalRepo.getReturnRecord(rental.id, tenantId);
   assert.equal(mergedReturnRecord?.scheduledReturnAt, "2026-09-07T10:00:00Z");
   assert.equal(mergedReturnRecord?.actualReturnAt, "2026-09-07T12:00:00Z");
@@ -542,12 +571,27 @@ async function runTests() {
     {
       releaseVehicleToStatus: "AVAILABLE",
       notes: "Rental fully completed, customer signed off, vehicle released.",
+      idempotencyKey: "return-complete-rnt-16001",
     },
     actor
   );
 
   assert.equal(completedRental.state, "COMPLETED");
   assert.ok(completedRental.completedAt);
+
+  const completedReplay = await service.completeRental(
+    tenantId,
+    rental.id,
+    {
+      releaseVehicleToStatus: "AVAILABLE",
+      notes: "Rental fully completed, customer signed off, vehicle released.",
+      idempotencyKey: "return-complete-rnt-16001",
+    },
+    actor
+  );
+  assert.equal(completedReplay.id, completedRental.id);
+  assert.equal(completedReplay.state, "COMPLETED");
+  console.log("✓ Final completion is idempotent under retry.");
 
   const finalBooking = await bookingRepo.findById(booking.id, tenantId);
   assert.equal(finalBooking?.status, "COMPLETED");
