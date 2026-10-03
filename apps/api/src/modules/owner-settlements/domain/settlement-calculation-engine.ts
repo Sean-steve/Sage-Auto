@@ -105,6 +105,19 @@ export class SettlementCalculationEngine {
       );
     }
 
+    const unsupportedFixedTerms = input.ownerships.find(
+      (o) =>
+        o.ownerId === input.owner.id &&
+        o.startDate <= input.periodEnd &&
+        (!o.endDate || o.endDate >= input.periodStart) &&
+        o.fixedMonthlyPayout != null
+    );
+    if (unsupportedFixedTerms) {
+      throw new Error(
+        `Ownership agreement ${unsupportedFixedTerms.id} uses fixedMonthlyPayout. A fixed/minimum/tier settlement strategy must be explicitly modeled before calculation; percentage revenue share cannot be substituted.`
+      );
+    }
+
     const termsSnapshot: OwnerSettlementTermsSnapshot = {
       ownershipId: primaryOwnership.id,
       ownershipType: primaryOwnership.ownershipType,
