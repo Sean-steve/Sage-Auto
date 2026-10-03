@@ -15,12 +15,14 @@ import { TransactionContext } from "../transaction-manager";
 export interface ListDepositPositionsFilter {
   customerId?: string;
   rentalId?: string;
+  bookingId?: string;
   status?: DepositPositionStatus;
 }
 
 export interface IDepositPositionRepository {
   findById(id: string, tenantId?: string, tx?: TransactionContext): Promise<DepositPosition | null>;
   findByRentalId(rentalId: string, tenantId: string, tx?: TransactionContext): Promise<DepositPosition | null>;
+  findByBookingId(bookingId: string, tenantId: string, tx?: TransactionContext): Promise<DepositPosition | null>;
   listByTenant(tenantId: string, filter?: ListDepositPositionsFilter, tx?: TransactionContext): Promise<DepositPosition[]>;
   create(
     data: Omit<DepositPosition, "id" | "version" | "createdAt" | "updatedAt">,
@@ -60,12 +62,22 @@ export class DepositPositionRepository implements IDepositPositionRepository {
     return null;
   }
 
+  async findByBookingId(bookingId: string, tenantId: string): Promise<DepositPosition | null> {
+    for (const pos of DepositPositionRepository.store.values()) {
+      if (pos.tenantId === tenantId && pos.bookingId === bookingId) {
+        return JSON.parse(JSON.stringify(pos));
+      }
+    }
+    return null;
+  }
+
   async listByTenant(tenantId: string, filter?: ListDepositPositionsFilter): Promise<DepositPosition[]> {
     const results: DepositPosition[] = [];
     for (const pos of DepositPositionRepository.store.values()) {
       if (pos.tenantId !== tenantId) continue;
       if (filter?.customerId && pos.customerId !== filter.customerId) continue;
       if (filter?.rentalId && pos.rentalId !== filter.rentalId) continue;
+      if (filter?.bookingId && pos.bookingId !== filter.bookingId) continue;
       if (filter?.status && pos.status !== filter.status) continue;
       results.push(JSON.parse(JSON.stringify(pos)));
     }
@@ -113,7 +125,8 @@ export class DepositPositionRepository implements IDepositPositionRepository {
       ...updates,
       id: existing.id,
       tenantId: existing.tenantId,
-      rentalId: existing.rentalId,
+      rentalId: updates.rentalId ?? existing.rentalId,
+      bookingId: updates.bookingId ?? existing.bookingId,
       version: existing.version + 1,
       updatedAt: new Date().toISOString(),
     };
