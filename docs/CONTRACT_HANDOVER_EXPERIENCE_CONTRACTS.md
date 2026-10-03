@@ -46,8 +46,8 @@ The Contract/Handover UI orchestrates verified records from these domains but do
 ## CONTRACT-HANDOVER-003 — Permissions
 
 ### Contract
-- list/detail/send: \`contract.read\`
-- generate/amend: \`contract.generate\`
+- list/detail: \`contract.read\`
+- generate/send/amend: \`contract.generate\`
 - sign / Handover signature checkpoint: \`contract.sign\`
 
 ### Handover
