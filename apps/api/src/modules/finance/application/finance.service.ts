@@ -279,6 +279,9 @@ export class FinanceService {
     if (!rental) {
       throw new RentalNotFoundError(dto.rentalId);
     }
+    if (!["COMPLETED", "RETURN_COMPLETED"].includes(rental.state)) {
+      throw new Error(`Rental ${rental.rentalNumber} must complete the Return & Final Calculation lifecycle before invoicing.`);
+    }
 
     // 3. Fetch customer & corporate account if any
     const customer = await this.customerRepo.findById(rental.customerId, tenantId);
@@ -377,26 +380,9 @@ export class FinanceService {
     const taxTotalNum = lines.reduce((s, l) => s + num(l.taxAmount), 0);
     const grossTotalNum = subtotalNum + taxTotalNum;
 
-    // 5. Check deposit position on rental and handle reconciliation
-    let depositPosition = await this.depositPositionRepo.findByRentalId(rental.id, tenantId);
-    if (!depositPosition && startSnapshot?.depositRequirement && startSnapshot.depositRequirement > 0) {
-      depositPosition = await this.depositPositionRepo.create({
-        tenantId,
-        rentalId: rental.id,
-        bookingId: rental.bookingId,
-        customerId: rental.customerId,
-        currency,
-        requiredAmount: to4Dec(startSnapshot.depositRequirement),
-        receivedAmount: to4Dec(startSnapshot.depositRequirement),
-        heldAmount: to4Dec(startSnapshot.depositRequirement),
-        appliedAmount: "0.0000",
-        refundDueAmount: "0.0000",
-        refundedAmount: "0.0000",
-        forfeitedAmount: "0.0000",
-        status: "HELD",
-        notes: `Pre-authorized deposit for rental ${rental.rentalNumber}`,
-      });
-    }
+    // 5. Reconcile only an authoritative deposit position.
+    // A deposit requirement from the Rental start snapshot is NOT evidence that money was received.
+    const depositPosition = await this.depositPositionRepo.findByRentalId(rental.id, tenantId);
 
     let appliedDepositNum = 0;
     const shouldApplyDeposit = dto.applyDepositDeduction !== false;
