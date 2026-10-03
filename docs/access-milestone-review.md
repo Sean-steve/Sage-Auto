@@ -78,3 +78,21 @@ Configure `EMAIL_PROVIDER=sendgrid`, `SENDGRID_API_KEY`, `SENDGRID_FROM` (a veri
 | Named driver/owner records | `GET /api/v1/access/link-options?tenantId=...` |
 | Audited support sessions | `GET/POST /api/v1/platform/support/sessions`, `POST /api/v1/platform/support/sessions/:id/end`, `GET /api/v1/access/support/:id/records` |
 | Verify guest booking ownership | `POST /api/v1/access/claim-booking` |
+
+
+## Restoration hardening controls added after this review
+
+The original-interface restoration is now governed by `docs/restoration-hardening-controls.md` and `docs/restoration-screen-action-matrix.md`.
+
+Important consequences:
+
+- a Git baseline branch protects the pre-hardening source state;
+- a local-only consistent SQLite checkpoint command records counts, stable keys and checksums without reseeding;
+- every restored legacy company screen is read-only until its mutation acceptance gate passes;
+- Fleet, Bookings and Customers currently have verified saved-data reads; other original operational screens remain layout/reference only unless separately proven;
+- leaving a workspace, losing access, session expiry or logout clears the selected tenant context;
+- personal Driver, Vehicle Owner and Renter portals remain outside the broad company loader;
+- the prototype `SaaSControlPlaneView` is not treated as authoritative merely because its layout exists; platform actions remain governed by the new server-backed access/control-plane foundation;
+- real staging email delivery remains an external acceptance dependency.
+
+This hardening does not silently start the subsequent Fleet → Customers → Booking → Rental implementation phase.
