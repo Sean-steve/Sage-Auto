@@ -150,6 +150,7 @@ export class OwnerSettlementsService {
     const updated = await this.periodRepo.update(periodId, tenantId, {
       status: "CLOSED",
       closedAt: new Date().toISOString(),
+      closedBy: actor.userId,
     });
 
     return updated;
@@ -410,8 +411,16 @@ export class OwnerSettlementsService {
         );
         generatedSettlements.push(settlement);
       } catch (err: any) {
-        // Log & proceed if owner had no rentals or valid agreement
-        console.warn(`[SettlementBatch] Skipping owner ${owner.id}:`, err.message);
+        const message = String(err?.message || "");
+        // An owner with no settled revenue in the period is a legitimate zero-work
+        // outcome. Integrity failures (missing historical terms, mixed currencies,
+        // unsupported commercial strategy, etc.) must fail the batch visibly.
+        if (/No paid\/settled Tenant Finance revenue facts exist/i.test(message)) {
+          console.info(`[SettlementBatch] No eligible settled revenue for owner ${owner.id}; skipped.`);
+          continue;
+        }
+        await this.periodRepo.update(period.id, tenantId, { status: "OPEN" });
+        throw err;
       }
     }
 
