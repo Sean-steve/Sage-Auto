@@ -13,6 +13,7 @@ import { AvailabilityExperienceView } from "./AvailabilityExperienceView";
 import { BookingExperienceView } from "./BookingExperienceView";
 import { ContractHandoverExperienceView } from "./ContractHandoverExperienceView";
 import { CompanyOverviewView } from "./CompanyOverviewView";
+import { TeamWorkspaceView } from "./TeamWorkspaceView";
 
 const RentalsView=lazy(()=>import("./RentalsView").then(m=>({default:m.RentalsView})));
 const ReturnFinalCalculationView=lazy(()=>import("./ReturnFinalCalculationView").then(m=>({default:m.ReturnFinalCalculationView})));
@@ -28,7 +29,7 @@ const WorkspaceSettingsView=lazy(()=>import("./WorkspaceSettingsView").then(m=>(
 const icons:Record<string,React.ElementType>={
   overview:LayoutDashboard,fleet:CarFront,bookings:BookOpenCheck,handover:ClipboardCheck,availability:CalendarRange,
   customers:UsersRound,rentals:Gauge,returns:ArrowLeftRight,inspections:ClipboardCheck,maintenance:Wrench,
-  compliance:ShieldCheck,owners:Building2,pricing:Tags,finance:WalletCards,settlements:Banknote,website:Globe2,settings:Settings2
+  compliance:ShieldCheck,owners:Building2,pricing:Tags,finance:WalletCards,settlements:Banknote,website:Globe2,team:UsersRound,settings:Settings2
 };
 const descriptions:Record<string,string>={
   overview:"Live operational command center",
@@ -47,6 +48,7 @@ const descriptions:Record<string,string>={
   finance:"Invoices, payments, deposits, expenses and reconciliation",
   settlements:"Owner earnings, approvals and provider payouts",
   website:"Public storefront and online-booking content",
+  team:"Membership, roles, invitations and record-scoped access",
   settings:"Company configuration and governance"
 };
 const groupDefs=[
@@ -54,7 +56,7 @@ const groupDefs=[
   {label:"Operations",ids:["bookings","handover","availability","rentals","returns"]},
   {label:"Fleet & people",ids:["fleet","customers","inspections","maintenance","compliance","owners"]},
   {label:"Commercial",ids:["pricing","finance","settlements"]},
-  {label:"Workspace",ids:["website","settings"]},
+  {label:"Workspace",ids:["website","team","settings"]},
 ];
 
 function WorkspaceScreen({section,portal}:{section:string;portal:AccessPortal}) {
@@ -66,6 +68,7 @@ function WorkspaceScreen({section,portal}:{section:string;portal:AccessPortal}) 
   if(section==="availability") return <AvailabilityExperienceView portal={portal}/>;
   if(section==="bookings") return <BookingExperienceView portal={portal}/>;
   if(section==="handover") return <ContractHandoverExperienceView portal={portal}/>;
+  if(section==="team") return <TeamWorkspaceView portal={portal}/>;
   const views:Record<string,React.ElementType>={
     rentals:RentalsView,returns:ReturnFinalCalculationView,inspections:InspectionsView,maintenance:MaintenanceView,
     compliance:ComplianceView,owners:VehicleOwnersView,finance:FinanceView,settlements:SettlementsView,
