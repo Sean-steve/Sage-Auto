@@ -28,14 +28,14 @@ jobs:
       - name: Checkout Source Code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js 20 & pnpm 9.15.9
+      - name: Setup Node.js 24 & pnpm 9.15.9
         uses: pnpm/action-setup@v3
         with:
           version: 9.15.9
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: 'pnpm'
 
       - name: Install Dependencies (Frozen Lockfile)
@@ -58,14 +58,14 @@ jobs:
       - name: Checkout Source Code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js 20 & pnpm 9.15.9
+      - name: Setup Node.js 24 & pnpm 9.15.9
         uses: pnpm/action-setup@v3
         with:
           version: 9.15.9
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: 'pnpm'
 
       - name: Install Dependencies
@@ -85,14 +85,14 @@ jobs:
       - name: Checkout Source Code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js 20 & pnpm 9.15.9
+      - name: Setup Node.js 24 & pnpm 9.15.9
         uses: pnpm/action-setup@v3
         with:
           version: 9.15.9
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: 'pnpm'
 
       - name: Install Dependencies
