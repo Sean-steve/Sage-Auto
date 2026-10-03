@@ -1072,6 +1072,11 @@ export class PaymentService {
     }
 
     const providerName = dto.provider || "FAKE_PROVIDER";
+    if (this.isProductionLike() && providerName === "STRIPE_CARD") {
+      throw new Error(
+        "Stripe owner payout is not production-certified in this deployment. Configure a real outbound transfer adapter or use M-Pesa B2C."
+      );
+    }
     const provider = this.providerRegistry.get(providerName);
 
     await this.settlementRepo.updatePayableStatus(payable.id, tenantId, "PROCESSING");
