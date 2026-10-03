@@ -4034,7 +4034,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode; access?:{context
         switchTenant,
         provisionNewTenant,
         workspaceLoading,
-        restoration: Boolean(access),
+        restoration: false,
         hasPermission: (permission: string) => Boolean(access && permits(access.portal, permission)),
         workspaceError,
         // Sprint 11 Pricing & Rate Engine
