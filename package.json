@@ -79,7 +79,8 @@
     "review:api": "tsx scripts/access-review.ts",
     "review:web": "VITE_API_PROXY_TARGET=http://127.0.0.1:3511 vite --host 127.0.0.1 --port 3510 --strictPort",
     "test:restoration": "tsx packages/database/test/restoration-hardening.test.ts",
-    "restoration:checkpoint": "tsx scripts/restoration-checkpoint.ts"
+    "restoration:checkpoint": "tsx scripts/restoration-checkpoint.ts",
+    "test:fleet-experience": "tsx packages/database/test/fleet-experience-contract.test.ts"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
