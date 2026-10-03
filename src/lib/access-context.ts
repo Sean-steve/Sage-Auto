@@ -28,7 +28,7 @@ export const RESTORATION_SCREEN_CONNECTIONS: Record<string, RestorationScreenCon
   owners:{status:'UNCONNECTED',readSource:'Not loaded by restoration provider',mutationsEnabled:false,note:'Layout preserved only.'},
   finance:{status:'UNCONNECTED',readSource:'Not loaded by restoration provider',mutationsEnabled:false,note:'Layout preserved only; no local financial totals are authoritative.'},
   settlements:{status:'UNCONNECTED',readSource:'Not loaded by restoration provider',mutationsEnabled:false,note:'Layout preserved only.'},
-  pricing:{status:'UNCONNECTED',readSource:'Not loaded by restoration provider',mutationsEnabled:false,note:'Layout preserved only; local quote logic is not authoritative in restoration mode.'},
+  pricing:{status:'PARTIAL',readSource:'Pricing REST API: rate plans, matrices, assignments, rules, fees, promos and server quote calculation',mutationsEnabled:true,note:'Pricing uses a reconstructed server-backed experience. The legacy local quote calculator is no longer reachable; Availability/Booking handoff remains separate.'},
   availability:{status:'UNCONNECTED',readSource:'Not loaded by restoration provider',mutationsEnabled:false,note:'Layout preserved only.'},
   website:{status:'UNCONNECTED',readSource:'Not loaded by restoration provider',mutationsEnabled:false,note:'Layout preserved only.'},
   settings:{status:'UNCONNECTED',readSource:'Not loaded by restoration provider',mutationsEnabled:false,note:'Layout preserved only.'},
