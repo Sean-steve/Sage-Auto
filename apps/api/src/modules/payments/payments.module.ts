@@ -13,6 +13,7 @@ import {
   WebhookRepository,
   OperationalInvoiceRepository,
   DepositPositionRepository,
+  BookingRepository,
   OwnerSettlementRepository,
   AuditRepository,
   OutboxRepository,
@@ -43,6 +44,7 @@ export class PaymentsModule {
       webhookRepo?: WebhookRepository;
       invoiceRepo?: OperationalInvoiceRepository;
       depositPositionRepo?: DepositPositionRepository;
+      bookingRepo?: BookingRepository;
       settlementRepo?: OwnerSettlementRepository;
       auditRepo?: AuditRepository;
       outboxRepo?: OutboxRepository;
@@ -57,6 +59,7 @@ export class PaymentsModule {
     const webhookRepo = overrides?.webhookRepo || new WebhookRepository();
     const invoiceRepo = overrides?.invoiceRepo || new OperationalInvoiceRepository();
     const depositPositionRepo = overrides?.depositPositionRepo || new DepositPositionRepository();
+    const bookingRepo = overrides?.bookingRepo || new BookingRepository();
     const settlementRepo = overrides?.settlementRepo || new OwnerSettlementRepository();
     const auditRepo = overrides?.auditRepo || new AuditRepository();
     const outboxRepo = overrides?.outboxRepo || new OutboxRepository();
@@ -75,6 +78,7 @@ export class PaymentsModule {
       webhookRepo,
       invoiceRepo,
       depositPositionRepo,
+      bookingRepo,
       settlementRepo,
       auditRepo,
       outboxRepo
