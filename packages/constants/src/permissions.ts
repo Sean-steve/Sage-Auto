@@ -180,6 +180,7 @@ export const TENANT_PERMISSIONS = {
   REFUND_READ: "refund.read",
   REFUND_CREATE: "refund.create",
   REFUND_APPROVE: "refund.approve",
+  REFUND_EXECUTE: "refund.execute",
 
   // Invoices & Operational Finance
   INVOICE_READ: "invoice.read",
@@ -1060,6 +1061,15 @@ export const ALL_PERMISSION_DEFINITIONS: PermissionDefinition[] = [
     action: "approve",
     name: "Approve Refund Payout",
     description: "Authorize financial disbursement of refund to customer",
+    scope: "TENANT",
+    riskLevel: "CRITICAL",
+  },
+  {
+    key: TENANT_PERMISSIONS.REFUND_EXECUTE,
+    resource: "refund",
+    action: "execute",
+    name: "Execute Approved Refund",
+    description: "Disburse an authorized refund through the configured payment provider",
     scope: "TENANT",
     riskLevel: "CRITICAL",
   },
