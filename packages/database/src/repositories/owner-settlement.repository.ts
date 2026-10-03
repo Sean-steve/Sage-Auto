@@ -295,6 +295,43 @@ export class OwnerSettlementRepository implements IOwnerSettlementRepository {
       updatedAt: new Date().toISOString(),
     };
 
+    // Nested settlement lines are part of the aggregate calculation snapshot.
+    // Recalculation must replace them atomically with the new totals rather than
+    // leave stale line stores attached to the updated header.
+    if (updates.rentalLines) {
+      OwnerSettlementRepository.rentalLines.set(
+        id,
+        updates.rentalLines.map((line, idx) => ({
+          ...line,
+          id: line.id || `srl_${Date.now()}_${idx}_${Math.random().toString(36).substring(2, 6)}`,
+          settlementId: id,
+          sortOrder: line.sortOrder ?? idx,
+        }))
+      );
+    }
+    if (updates.expenseLines) {
+      OwnerSettlementRepository.expenseLines.set(
+        id,
+        updates.expenseLines.map((line, idx) => ({
+          ...line,
+          id: line.id || `sel_${Date.now()}_${idx}_${Math.random().toString(36).substring(2, 6)}`,
+          settlementId: id,
+          sortOrder: line.sortOrder ?? idx,
+        }))
+      );
+    }
+    if (updates.adjustmentLines) {
+      OwnerSettlementRepository.adjustmentLines.set(
+        id,
+        updates.adjustmentLines.map((line, idx) => ({
+          ...line,
+          id: line.id || `sadj_${Date.now()}_${idx}_${Math.random().toString(36).substring(2, 6)}`,
+          settlementId: id,
+          createdAt: line.createdAt || new Date().toISOString(),
+        }))
+      );
+    }
+
     OwnerSettlementRepository.store.set(id, updated);
     return (await this.findById(id, tenantId))!;
   }
