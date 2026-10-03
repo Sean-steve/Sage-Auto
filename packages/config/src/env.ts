@@ -34,6 +34,7 @@ export const EnvSchema = z.object({
   POSTMARK_FROM: z.string().optional(),
   POSTMARK_MESSAGE_STREAM: z.string().default("outbound"),
   APP_PUBLIC_URL: z.string().url().optional(),
+  DEV_AUTO_VERIFY_EMAILS: z.string().optional(),
   AWS_ACCESS_KEY_ID: z.string().optional(),
   AWS_SECRET_ACCESS_KEY: z.string().optional(),
   AWS_REGION: z.string().default("af-south-1"),
