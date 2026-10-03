@@ -1153,13 +1153,13 @@ export class RentalService {
     if (!rental.returnInspectionId) {
       throw new Error("Final calculation requires a completed return inspection.");
     }
-    if (rental.state !== "DAMAGE_ASSESSMENT" && rental.state !== "FINAL_CALCULATION") {
-      throw new Error(`Final calculation cannot run while rental is in state '${rental.state}'. Complete vehicle receipt and return inspection first.`);
-    }
 
     const existingCalculation = await this.rentalRepo.getFinalCalculation(rentalId, tenantId);
     if (existingCalculation?.isImmutable) {
       return { calculation: existingCalculation, rental };
+    }
+    if (rental.state !== "DAMAGE_ASSESSMENT" && rental.state !== "FINAL_CALCULATION") {
+      throw new Error(`Final calculation cannot run while rental is in state '${rental.state}'. Complete vehicle receipt and return inspection first.`);
     }
 
     const startSnapshot = await this.rentalRepo.getStartSnapshot(rentalId, tenantId);
