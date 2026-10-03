@@ -523,7 +523,10 @@ async function runFleetAndVehicleOwnersTestSuite() {
     assert(digitalTwin.recentMileage.length >= 2, "Mileage telemetry logs attached");
     assert(digitalTwin.recentFuel.length >= 1, "Fuel telemetry logs attached");
     assert(digitalTwin.statusHistory.length >= 4, "State transition audit trail attached");
-    assert(digitalTwin.stats.utilizationRatePercent > 0, "Fleet utilization metrics computed");
+    assert(digitalTwin.stats.totalRentals === 0, "Rental count reflects canonical repository history");
+    assert(digitalTwin.stats.totalDaysOnRent === 0, "Rental days reflect canonical repository history");
+    assert(digitalTwin.stats.utilizationRatePercent === null, "Utilization stays unavailable until a canonical measurement window is defined");
+    assert(digitalTwin.stats.totalRevenue === null, "Revenue stays unavailable until a canonical finance-backed metric is defined");
   });
 
   // --------------------------------------------------------------------------
