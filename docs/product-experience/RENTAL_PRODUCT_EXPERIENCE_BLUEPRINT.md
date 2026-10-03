@@ -219,12 +219,20 @@ Terminal Rental states cannot accept extension or incident mutations.
 
 ## 11. Permissions
 
-- `rental.read` — list/dossier/readiness
+- `rental.read` — tenant operational list/dossier/readiness
 - `rental.start` — dispatch
 - `rental.extend` — extension request/decision
 - `rental.incident_report` — incident reporting
-- `rental.update` — operational return scheduling
-- `rental.complete` — final completion in the downstream Return experience
+- `rental.return_schedule` — handoff into Return & Final Calculation
+
+Downstream Return authority is intentionally separate:
+- `rental.return_receive`
+- `rental.return_inspection_link`
+- `rental.final_calculate`
+- `rental.final_settle`
+- `rental.final_complete`
+
+Default role allocation is governed by `RENTAL_RETURN_AUTHORIZATION_MATRIX.md`.
 
 ## 12. Responsive UX
 
