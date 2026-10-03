@@ -37,7 +37,7 @@ export default function AccessApp({site}:{site?:string}) {
   useEffect(()=>{setSection(portal?.sections[0]?.id||'');},[portalId,context?.portals.map(p=>p.roles.join(',')).join('|')]);
   useEffect(()=>{if(context&&portalId&&!portal)clearPortalContext();},[context,portalId,portal]);
   useEffect(()=>{if(!context)return;const onFocus=()=>{void refresh();};window.addEventListener('focus',onFocus);const timer=setInterval(onFocus,30000);return()=>{window.removeEventListener('focus',onFocus);clearInterval(timer);};},[context?.user.id]);
-  async function signOut() {await apiClient.auth.logout(false,apiClient.getRefreshToken());apiClient.setToken(null);apiClient.setRefreshToken(null);clearPortalContext();setContext(null);hydratedUser.current='';}
+  async function signOut() {try{await apiClient.auth.logout(false,apiClient.getRefreshToken());}finally{apiClient.setToken(null);apiClient.setRefreshToken(null);clearPortalContext();setContext(null);hydratedUser.current='';}}
   async function auth(event:React.FormEvent<HTMLFormElement>) {
     event.preventDefault();const data=Object.fromEntries(new FormData(event.currentTarget));
     await action(async()=>{
