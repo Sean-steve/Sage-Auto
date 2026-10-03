@@ -508,8 +508,8 @@ export const BookingDetailsModal: React.FC = () => {
                   Prompt M-Pesa STK
                 </button>
                 <button
-                  onClick={() => {
-                    const rental = createRentalFromBooking(b.id);
+                  onClick={async () => {
+                    const rental = await createRentalFromBooking(b.id);
                     if (rental) {
                       setSelectedBookingId(null);
                     }
