@@ -269,7 +269,7 @@ export function createRentalController(
 
   router.post(
     "/:id/receive",
-    guard(TENANT_PERMISSIONS.RENTAL_UPDATE || "rental.update"),
+    guard(TENANT_PERMISSIONS.RENTAL_COMPLETE || "rental.complete"),
     async (req: Request, res: Response, next: NextFunction) => {
       try {
         const tenantId = getTenantId(req);
@@ -286,7 +286,7 @@ export function createRentalController(
 
   router.post(
     "/:id/return-inspection",
-    guard(TENANT_PERMISSIONS.RENTAL_UPDATE || "rental.update"),
+    guard(TENANT_PERMISSIONS.RENTAL_COMPLETE || "rental.complete"),
     async (req: Request, res: Response, next: NextFunction) => {
       try {
         const tenantId = getTenantId(req);
@@ -320,7 +320,7 @@ export function createRentalController(
   // --------------------------------------------------------------------------
   router.post(
     "/:id/calculate-final",
-    guard(TENANT_PERMISSIONS.RENTAL_UPDATE || "rental.update"),
+    guard(TENANT_PERMISSIONS.RENTAL_COMPLETE || "rental.complete"),
     async (req: Request, res: Response, next: NextFunction) => {
       try {
         const tenantId = getTenantId(req);
@@ -351,7 +351,7 @@ export function createRentalController(
 
   router.post(
     "/:id/deposit-settlement",
-    guard(TENANT_PERMISSIONS.RENTAL_UPDATE || "rental.update"),
+    guard(TENANT_PERMISSIONS.RENTAL_COMPLETE || "rental.complete"),
     async (req: Request, res: Response, next: NextFunction) => {
       try {
         const tenantId = getTenantId(req);
