@@ -3,17 +3,12 @@ import {
   AlertTriangle,
   ArrowDownLeft,
   ArrowRightLeft,
-  Banknote,
-  CheckCircle2,
   CircleDollarSign,
-  Clock3,
-  CreditCard,
   FileCheck2,
   FileText,
   Landmark,
   Loader2,
   Plus,
-  ReceiptText,
   RefreshCw,
   RotateCcw,
   Scale,
@@ -275,16 +270,9 @@ export const FinanceView: React.FC = () => {
       if (recorded.error || !recorded.data) throw new Error(recorded.error?.message || "Payment could not be recorded.");
 
       const payment = recorded.data as Payment;
-      const allocationAmount = Math.min(amount, money(selectedInvoice.amountOutstanding));
-      const allocated = await apiClient.payments.allocate(payment.id, {
-        sourceType: "CUSTOMER_INVOICE",
-        sourceId: selectedInvoice.id,
-        amount: String(allocationAmount),
-        notes: `Allocated to ${selectedInvoice.invoiceNumber}`,
-      });
-      if (allocated.error) {
+      if (money(payment.unallocatedAmount) > 0) {
         showNotification(
-          `Payment ${payment.paymentNumber} was recorded, but allocation requires attention: ${allocated.error.message}`,
+          `Payment ${payment.paymentNumber} was recorded, but ${formatMoney(payment.unallocatedAmount, payment.currency)} remains unallocated and requires Finance review.`,
           "error"
         );
       } else {
