@@ -5,6 +5,7 @@
 import { Router, Request, Response, NextFunction } from "express";
 import {
   DriverRepository,
+  CustomerRepository,
   PartyDocumentRepository,
   AuditRepository,
   OutboxRepository,
@@ -20,6 +21,7 @@ export class DriversModule {
     permissionGuard: (perm: string) => (req: Request, res: Response, next: NextFunction) => void
   ) {
     const driverRepo = new DriverRepository();
+    const customerRepo = new CustomerRepository();
     const docRepo = new PartyDocumentRepository();
     const auditRepo = new AuditRepository();
     const outboxRepo = new OutboxRepository();
@@ -28,7 +30,8 @@ export class DriversModule {
       driverRepo,
       docRepo,
       auditRepo,
-      outboxRepo
+      outboxRepo,
+      customerRepo
     );
 
     this.router = createDriversController(this.driversService, permissionGuard);
