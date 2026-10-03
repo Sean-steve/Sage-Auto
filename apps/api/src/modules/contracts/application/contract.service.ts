@@ -297,21 +297,9 @@ export class ContractService {
       );
     }
 
-    // Add signature record
-    const sig = await this.contractRepo.addSignature(tenantId, contractId, {
-      contractId,
-      contractVersion: contract.contractVersion,
-      signerType: dto.signerType,
-      signerId: dto.signerId,
-      signerName: dto.signerName,
-      signatureMethod: dto.signatureMethod,
-      signatureReference: dto.signatureReference,
-      ipAddress: dto.ipAddress || "127.0.0.1",
-      userAgent: dto.userAgent || "CarHireOS-App",
-      signedAt: new Date().toISOString(),
-    });
-
-    // Transition state to SIGNED if currently GENERATED or SENT
+    // Claim the aggregate version before writing signature evidence. This prevents
+    // a stale signer from leaving an orphan signature if another mutation wins
+    // between the initial read and the status/version write.
     let updatedContract = contract;
     if (contract.status === "GENERATED" || contract.status === "SENT") {
       ContractStateMachine.validateTransition(contract.status, "SIGNED");
@@ -322,7 +310,7 @@ export class ContractService {
           status: "SIGNED",
           signedAt: new Date().toISOString(),
         },
-        dto.expectedVersion
+        dto.expectedVersion ?? contract.version
       );
 
       await this.contractRepo.appendStatusHistory(tenantId, {
@@ -336,9 +324,30 @@ export class ContractService {
         reason: `Contract digitally signed by ${dto.signerName} (${dto.signerType}) via ${dto.signatureMethod}`,
         occurredAt: new Date().toISOString(),
       });
+    } else if (dto.expectedVersion !== undefined) {
+      // SIGNED contracts can collect additional signatures, but each signer still
+      // claims the exact aggregate revision they read.
+      updatedContract = await this.contractRepo.update(
+        contractId,
+        tenantId,
+        {},
+        dto.expectedVersion
+      );
     }
 
-    // Emit outbox event
+    const sig = await this.contractRepo.addSignature(tenantId, contractId, {
+      contractId,
+      contractVersion: updatedContract.contractVersion,
+      signerType: dto.signerType,
+      signerId: dto.signerId,
+      signerName: dto.signerName,
+      signatureMethod: dto.signatureMethod,
+      signatureReference: dto.signatureReference,
+      ipAddress: dto.ipAddress || "127.0.0.1",
+      userAgent: dto.userAgent || "CarHireOS-App",
+      signedAt: new Date().toISOString(),
+    });
+
     await this.outboxRepo.record({
       tenantId,
       eventType: "contract.signed",
@@ -351,11 +360,12 @@ export class ContractService {
         signerId: dto.signerId,
         signerName: dto.signerName,
         signatureMethod: dto.signatureMethod,
+        signatureId: sig.id,
+        contractVersion: updatedContract.contractVersion,
         isFullySigned: true,
       },
     });
 
-    // Audit log
     await this.auditRepo.record({
       tenantId,
       actorType: toAuditActorType(actor?.actorType),
@@ -365,12 +375,13 @@ export class ContractService {
       resourceId: contract.id,
       metadata: {
         contractNumber: contract.contractNumber,
+        contractVersion: updatedContract.contractVersion,
         signerType: dto.signerType,
         signatureMethod: dto.signatureMethod,
       },
     });
 
-    return updatedContract;
+    return this.getContractById(tenantId, contractId);
   }
 
   /**
