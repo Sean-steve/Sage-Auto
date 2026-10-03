@@ -400,10 +400,48 @@ class ApiClient {
 
   // 12. Vehicle Owner Settlements Context
   public ownerSettlements = {
-    listSettlements: () => this.get<any[]>('/owner-settlements'),
+    listPeriods: (params?: Record<string, any>) => {
+      const q = new URLSearchParams(
+        Object.entries(params || {}).filter(([, value]) => value !== undefined && value !== null && value !== '') as [string, string][]
+      ).toString();
+      return this.get<any[]>(`/owner-settlements/periods${q ? `?${q}` : ''}`);
+    },
+    createPeriod: (dto: any) => this.post('/owner-settlements/periods', dto),
+    closePeriod: (id: string) => this.post(`/owner-settlements/periods/${id}/close`, {}),
+    listBatches: (periodId?: string) =>
+      this.get<any[]>(`/owner-settlements/batches${periodId ? `?periodId=${encodeURIComponent(periodId)}` : ''}`),
+    generateBatch: (dto: any) => this.post('/owner-settlements/batches', dto),
+
+    listSettlements: (params?: Record<string, any>) => {
+      const q = new URLSearchParams(
+        Object.entries(params || {}).filter(([, value]) => value !== undefined && value !== null && value !== '') as [string, string][]
+      ).toString();
+      return this.get<any[]>(`/owner-settlements${q ? `?${q}` : ''}`);
+    },
+    getSettlement: (id: string) => this.get(`/owner-settlements/${id}`),
     calculateSettlement: (dto: any) => this.post('/owner-settlements/calculate', dto),
-    approveSettlement: (id: string) => this.post(`/owner-settlements/${id}/approve`),
-    paySettlement: (id: string, payoutRef: string) => this.post(`/owner-settlements/${id}/pay`, { payoutRef }),
+    getStatement: (id: string) => this.get(`/owner-settlements/${id}/statement`),
+    approveSettlement: (id: string, dto: any = {}) => this.post(`/owner-settlements/${id}/approve`, dto),
+    disputeSettlement: (id: string, reason: string) => this.post(`/owner-settlements/${id}/dispute`, { reason }),
+    resolveDispute: (id: string, dto: any) => this.post(`/owner-settlements/${id}/resolve-dispute`, dto),
+    addAdjustment: (id: string, dto: any) => this.post(`/owner-settlements/${id}/adjustments`, dto),
+    listPayables: (params?: Record<string, any>) => {
+      const q = new URLSearchParams(
+        Object.entries(params || {}).filter(([, value]) => value !== undefined && value !== null && value !== '') as [string, string][]
+      ).toString();
+      return this.get<any[]>(`/owner-settlements/payables/list${q ? `?${q}` : ''}`);
+    },
+    getProfitability: (params: { startDate: string; endDate: string; vehicleId?: string }) => {
+      const q = new URLSearchParams(
+        Object.entries(params).filter(([, value]) => value !== undefined && value !== null && value !== '') as [string, string][]
+      ).toString();
+      return this.get(`/owner-settlements/reports/profitability?${q}`);
+    },
+
+    // Resource-scoped Vehicle Owner self-service.
+    listMine: () => this.get<any[]>('/owner-settlements/mine'),
+    getMyStatement: (id: string) => this.get(`/owner-settlements/mine/${id}/statement`),
+    disputeMine: (id: string, reason: string) => this.post(`/owner-settlements/mine/${id}/dispute`, { reason }),
   };
 
   // 13. Payments & Provider Integration Context
@@ -451,6 +489,12 @@ class ApiClient {
     listReconciliationIssues: (resolved?: boolean) =>
       this.get<any[]>(`/payments/reconciliation/issues${resolved === undefined ? '' : `?resolved=${resolved}`}`),
     resolveReconciliationIssue: (id: string) => this.post(`/payments/reconciliation/issues/${id}/resolve`),
+    executeOwnerPayout: (dto: {
+      settlementPayableId: string;
+      provider?: string;
+      idempotencyKey?: string;
+      notes?: string;
+    }) => this.post('/payments/payouts/owner-settlement', dto),
   };
 
   // 14. Fleet Maintenance & Servicing Context
