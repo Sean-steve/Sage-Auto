@@ -10,7 +10,7 @@ Status meanings:
 | Screen | Read state | Authoritative read/API | Mutation state | Permission basis | Current acceptance note |
 |---|---|---|---|---|---|
 | Overview | UNCONNECTED | No verified dashboard aggregate | DISABLED | server portal/navigation | Preserve layout only; do not treat prototype totals as business truth |
-| Fleet | READ_VERIFIED | `GET /api/v1/fleet/vehicles` | DISABLED | `vehicle.read` | Saved vehicles display; original create/edit/status actions remain quarantined |
+| Fleet | PARTIAL / RECONSTRUCTED | Fleet REST API + digital twin + linked domain reads | ENABLED FOR VERIFIED FLEET COMMANDS | Fleet/ownership permissions per action | New Fleet experience is server-backed for list, register, edit, status, telemetry, ownership and Fleet documents; Maintenance/Compliance/Inspection execution remains in dedicated modules |
 | Bookings | READ_VERIFIED | `GET /api/v1/bookings` | DISABLED | `booking.read` | Saved bookings display; original workflow mutations remain quarantined |
 | Customers | READ_VERIFIED | `GET /api/v1/customers` | DISABLED | `customer.read` | Saved customers display; original mutations remain quarantined |
 | Rentals | UNCONNECTED | Not loaded by restored provider | DISABLED | `rental.read` | Layout only |
