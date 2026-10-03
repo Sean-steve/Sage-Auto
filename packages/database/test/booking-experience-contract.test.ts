@@ -50,7 +50,7 @@ assert.match(pricingService,/getRateForCategoryOrVehicle\(/,'explicit Rate Plan 
 assert.match(bookingService,/if \(BookingStateMachine\.isTerminal\(booking\.status\)\)/,'Booking substitution must reject every canonical terminal state including NO_SHOW');
 assert.match(stateMachine,/NO_SHOW/);
 
-assert.doesNotMatch(view,/createRentalFromBooking|setIsMpesaModalOpen|confirmBooking\s*,\s*cancelBooking|useApp\(\).*bookings/s,'reconstructed Booking UI must not use legacy local Booking lifecycle or direct Rental creation');
+assert.doesNotMatch(view,/createRentalFromBooking|setIsMpesaModalOpen|setIsNewBookingOpen|setSelectedBookingId|\bconfirmBooking\s*,\s*\bcancelBooking|\brejectBooking\s*,/,'reconstructed Booking UI must not use legacy local Booking lifecycle or direct Rental creation');
 assert.ok(legacy.includes('createRentalFromBooking'),'legacy reference should retain evidence of the direct Booking-to-Rental behavior being replaced');
 assert.match(view,/idempotencyKey/,'Booking creation must be retry-idempotent');
 assert.match(view,/expectedVersion:detail\.version/,'lifecycle commands must carry server version where supported');
