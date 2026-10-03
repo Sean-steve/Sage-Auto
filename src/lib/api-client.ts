@@ -258,7 +258,7 @@ class ApiClient {
     },
     getRental: (id: string) => this.get(`/rentals/${id}`),
     getReadiness: (bookingId: string) => this.get(`/rentals/readiness/${bookingId}`),
-    startRental: (dto: {
+    startRental: (dtoOrBookingId: string | {
       bookingId: string;
       contractId?: string;
       handoverId?: string;
@@ -266,10 +266,12 @@ class ApiClient {
       startFuelLevel?: number;
       notes?: string;
       idempotencyKey?: string;
-    }) => this.post('/rentals/start', dto),
+    }) => this.post('/rentals/start', typeof dtoOrBookingId === 'string' ? { bookingId: dtoOrBookingId } : dtoOrBookingId),
     getStartSnapshot: (id: string) => this.get(`/rentals/${id}/start-snapshot`),
 
     requestExtension: (id: string, dto: any) => this.post(`/rentals/${id}/extensions`, dto),
+    // Compatibility alias for legacy callers; this now creates a REQUESTED extension.
+    extendRental: (id: string, dto: any) => this.post(`/rentals/${id}/extensions`, dto),
     listExtensions: (id: string) => this.get(`/rentals/${id}/extensions`),
     approveExtension: (id: string, extensionId: string, dto: any = {}) =>
       this.post(`/rentals/${id}/extensions/${extensionId}/approve`, dto),
