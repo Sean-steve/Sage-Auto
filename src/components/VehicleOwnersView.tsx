@@ -26,7 +26,6 @@ export const VehicleOwnersView: React.FC = () => {
     activeTenantId,
     setIsNewOwnerOpen,
     setSelectedOwnerId,
-    calculateOwnerSettlement,
     setCurrentView,
   } = useApp();
 
@@ -148,10 +147,7 @@ export const VehicleOwnersView: React.FC = () => {
               <div className="pt-4 mt-4 border-t border-slate-100 dark:border-slate-700 flex items-center justify-between">
                 <button disabled={restoration} aria-describedby="restoration-actions-note"
                   onClick={() => {
-                    const now = new Date();
-                    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-                    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).toISOString();
-                    calculateOwnerSettlement(owner.id, startOfMonth, endOfMonth);
+                    setSelectedOwnerId(owner.id);
                     setCurrentView("settlements");
                   }}
                   className="px-3 py-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 text-xs font-semibold hover:bg-emerald-100 transition-colors flex items-center gap-1"
