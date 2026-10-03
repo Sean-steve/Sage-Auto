@@ -25,7 +25,7 @@ const SettlementsView=lazy(()=>import("./SettlementsView").then(m=>({default:m.S
 const PublicWebsiteView=lazy(()=>import("./PublicWebsiteView").then(m=>({default:m.PublicWebsiteView})));
 const WorkspaceSettingsView=lazy(()=>import("./WorkspaceSettingsView").then(m=>({default:m.WorkspaceSettingsView})));
 
-const icons:Record<string,React.ComponentType<any>>={
+const icons:Record<string,React.ElementType>={
   overview:LayoutDashboard,fleet:CarFront,bookings:BookOpenCheck,handover:ClipboardCheck,availability:CalendarRange,
   customers:UsersRound,rentals:Gauge,returns:ArrowLeftRight,inspections:ClipboardCheck,maintenance:Wrench,
   compliance:ShieldCheck,owners:Building2,pricing:Tags,finance:WalletCards,settlements:Banknote,website:Globe2,settings:Settings2
@@ -66,7 +66,7 @@ function WorkspaceScreen({section,portal}:{section:string;portal:AccessPortal}) 
   if(section==="availability") return <AvailabilityExperienceView portal={portal}/>;
   if(section==="bookings") return <BookingExperienceView portal={portal}/>;
   if(section==="handover") return <ContractHandoverExperienceView portal={portal}/>;
-  const views:Record<string,React.ComponentType<any>>={
+  const views:Record<string,React.ElementType>={
     rentals:RentalsView,returns:ReturnFinalCalculationView,inspections:InspectionsView,maintenance:MaintenanceView,
     compliance:ComplianceView,owners:VehicleOwnersView,finance:FinanceView,settlements:SettlementsView,
     website:PublicWebsiteView,settings:WorkspaceSettingsView

@@ -1,9 +1,36 @@
 export type AccessPortal = {id:string;name:string;kind:string;site?:string;tenantId?:string;roles:string[];permissions:string[];sections:{id:string;label:string}[]};
 export type AccessContext = {reviewMode?:boolean;user:{id:string;email:string;fullName:string;emailVerified:boolean};onboarding:any;portals:AccessPortal[]};
 export const permits = (portal:AccessPortal, permission:string) => portal.permissions.includes('*') || portal.permissions.includes(permission);
-export const originalViews:Record<string,string>={
-  overview:'dashboard', fleet:'fleet', bookings:'bookings', handover:'handover', availability:'availability',
-  customers:'customers', rentals:'rentals', returns:'returns', inspections:'inspections', maintenance:'maintenance',
-  compliance:'compliance', owners:'owners', pricing:'pricing', finance:'finance', settlements:'settlements',
-  mySettlements:'settlements', website:'website', settings:'settings'
+export const originalViews:Record<string,string>={overview:'dashboard',fleet:'fleet',bookings:'bookings',handover:'handover',availability:'availability',customers:'customers',rentals:'rentals',returns:'returns',inspections:'inspections',maintenance:'maintenance',compliance:'compliance',owners:'owners',pricing:'pricing',finance:'finance',settlements:'settlements',mySettlements:'settlements',website:'website',settings:'settings'};
+
+
+export type RestorationConnectionStatus = 'READ_VERIFIED' | 'PARTIAL' | 'UNCONNECTED';
+
+export type RestorationScreenConnection = {
+  status: RestorationConnectionStatus;
+  readSource: string;
+  mutationsEnabled: boolean;
+  note: string;
+};
+
+// Historical reconstruction ledger retained for engineering audits and regression tests.
+// Runtime navigation no longer uses this ledger to disable the Company workspace;
+// authorization, entitlements and each server-backed domain contract are authoritative.
+export const RESTORATION_SCREEN_CONNECTIONS: Record<string, RestorationScreenConnection> = {
+  overview:{status:'UNCONNECTED',readSource:'No verified dashboard aggregate',mutationsEnabled:false,note:'Layout preserved; dashboard figures are not authoritative business totals.'},
+  fleet:{status:'PARTIAL',readSource:'Fleet REST API + digital twin + permission-scoped linked domain reads',mutationsEnabled:true,note:'Fleet list, registration, asset edits, status, telemetry, ownership, documents and profile reads are server-backed. Maintenance, Compliance and Inspection execution remain in their dedicated modules.'},
+  bookings:{status:'PARTIAL',readSource:'Booking REST API: register, detail, quote, lifecycle, amendment, substitution and handover readiness',mutationsEnabled:true,note:'Bookings use a reconstructed server-backed reservation experience. Pricing and Availability remain authoritative bounded contexts; direct browser Booking-to-Rental creation is removed.'},
+  handover:{status:'PARTIAL',readSource:'Contracts + Handovers REST APIs with Booking, Inspection and Rental-readiness boundaries',mutationsEnabled:true,note:'Contract & Handover uses a reconstructed server-backed dispatch experience. Contract generation requires a confirmed Booking; Handover checkpoints are sequential and Rental start remains separate.'},
+  customers:{status:'PARTIAL',readSource:'Customers + Drivers + Corporate Accounts REST APIs with permission-scoped detail/readiness/relationship reads',mutationsEnabled:true,note:'Customers, Drivers and Corporate Accounts use a reconstructed server-backed People & Accounts experience. Booking remains a separate workflow.'},
+  rentals:{status:'UNCONNECTED',readSource:'Not loaded by restoration provider',mutationsEnabled:false,note:'Layout preserved only.'},
+  inspections:{status:'UNCONNECTED',readSource:'Not loaded by restoration provider',mutationsEnabled:false,note:'Layout preserved only.'},
+  maintenance:{status:'UNCONNECTED',readSource:'Not loaded by restoration provider',mutationsEnabled:false,note:'Layout preserved only.'},
+  compliance:{status:'UNCONNECTED',readSource:'Not loaded by restoration provider',mutationsEnabled:false,note:'Layout preserved only.'},
+  owners:{status:'UNCONNECTED',readSource:'Not loaded by restoration provider',mutationsEnabled:false,note:'Layout preserved only.'},
+  finance:{status:'UNCONNECTED',readSource:'Not loaded by restoration provider',mutationsEnabled:false,note:'Layout preserved only; no local financial totals are authoritative.'},
+  settlements:{status:'UNCONNECTED',readSource:'Not loaded by restoration provider',mutationsEnabled:false,note:'Layout preserved only.'},
+  pricing:{status:'PARTIAL',readSource:'Pricing REST API: rate plans, matrices, assignments, rules, fees, promos and server quote calculation',mutationsEnabled:true,note:'Pricing uses a reconstructed server-backed experience. The legacy local quote calculator is no longer reachable; Availability/Booking handoff remains separate.'},
+  availability:{status:'PARTIAL',readSource:'Availability REST API: checks, search, allocation/hold/block registries, vehicle calendar and substitution',mutationsEnabled:true,note:'Availability uses a reconstructed server-backed dispatch experience. Empty timeline space is never treated as proof of availability; Booking handoff remains separate.'},
+  website:{status:'UNCONNECTED',readSource:'Not loaded by restoration provider',mutationsEnabled:false,note:'Layout preserved only.'},
+  settings:{status:'UNCONNECTED',readSource:'Not loaded by restoration provider',mutationsEnabled:false,note:'Layout preserved only.'},
 };

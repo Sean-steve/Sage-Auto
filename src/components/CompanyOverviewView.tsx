@@ -85,12 +85,12 @@ export function CompanyOverviewView({portal}:{portal:AccessPortal}) {
         {label:"Bookings",value:state.bookingsTotal,sub:"Reservation dossiers",icon:CalendarCheck2,section:"bookings"},
         {label:"Active rentals",value:state.activeRentals,sub:state.overdue?`${state.overdue} overdue`:"No overdue rentals",icon:Clock3,section:"rentals"},
         {label:"Collected",value:money(state.collected,state.currency),sub:`${money(state.receivables,state.currency)} receivable`,icon:CircleDollarSign,section:"finance"},
-      ].map(item=><button key={item.label} onClick={()=>go(item.section)} disabled={!hasSection(item.section)} className="group rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-md disabled:cursor-default disabled:hover:translate-y-0">
-        <div className="flex items-start justify-between"><span className="grid h-10 w-10 place-items-center rounded-xl bg-slate-100 text-slate-700 group-hover:bg-emerald-50 group-hover:text-emerald-700"><item.icon size={19}/></span><ArrowRight size={16} className="text-slate-300 group-hover:text-emerald-600"/></div>
+      ].map(item=>{const Icon=item.icon;return <button key={item.label} onClick={()=>go(item.section)} disabled={!hasSection(item.section)} className="group rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-md disabled:cursor-default disabled:hover:translate-y-0">
+        <div className="flex items-start justify-between"><span className="grid h-10 w-10 place-items-center rounded-xl bg-slate-100 text-slate-700 group-hover:bg-emerald-50 group-hover:text-emerald-700"><Icon size={19}/></span><ArrowRight size={16} className="text-slate-300 group-hover:text-emerald-600"/></div>
         <div className="mt-5 text-2xl font-black tracking-tight text-slate-950">{loading?"—":item.value}</div>
         <div className="mt-1 text-sm font-semibold text-slate-600">{item.label}</div>
         <div className="mt-1 text-xs text-slate-400">{item.sub}</div>
-      </button>)}
+      </button>})}
     </section>
 
     <div className="grid gap-6 xl:grid-cols-[1.35fr_.9fr]">
