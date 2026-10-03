@@ -4138,6 +4138,12 @@ export interface ProcessDepositSettlementDto {
   settlementStatus: DepositSettlementStatus;
   refundAmount?: number;
   additionalChargedAmount?: number;
+  /**
+   * Finance evidence. CHARGED requires a fully settled invoice for this Rental.
+   * REFUNDED requires a completed provider Refund tied to this Rental/deposit.
+   */
+  invoiceId?: string;
+  refundId?: string;
   paymentMethod?: "MPESA" | "CARD" | "BANK_TRANSFER" | "CASH" | "SECURITY_DEPOSIT_HOLD";
   transactionReference?: string;
   notes?: string;
