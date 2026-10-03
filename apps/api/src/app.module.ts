@@ -216,7 +216,8 @@ export function createApiApp(): Express {
   // Vehicle Owner Settlements, Revenue Sharing & Payout Obligations (Sprint 21: DOM-003 §41-45)
   const ownerSettlementsModule = new OwnerSettlementsModule(
     permissionGuard,
-    ledgerModule.ledgerService
+    ledgerModule.ledgerService,
+    financeModule.financeService
   );
 
   // Secure Files, Document Storage & Object Access Module (Sprint 27: ARCH-001, SEC-001, SEC-002)
