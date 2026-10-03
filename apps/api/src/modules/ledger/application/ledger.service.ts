@@ -407,6 +407,25 @@ export class LedgerService {
     return journalTx;
   }
 
+  async reverseSourcePosting(
+    tenantId: string,
+    sourceType: string,
+    sourceId: string,
+    eventType: string,
+    actor: LedgerActor,
+    reason = "Source posting reversal"
+  ): Promise<JournalTransaction | null> {
+    const original = await this.journalTxRepo.findBySource(
+      sourceType as any,
+      sourceId,
+      tenantId,
+      eventType
+    );
+    if (!original) return null;
+    if (original.status === "REVERSED") return original;
+    return this.reverseJournal(tenantId, original.id, actor, reason);
+  }
+
   // --------------------------------------------------------------------------
   // 4. JOURNAL REVERSAL ENGINE
   // --------------------------------------------------------------------------
