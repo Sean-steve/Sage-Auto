@@ -47,7 +47,9 @@ export class IdentityModule {
     // Postmark/SendGrid without switching the entire application to production.
     // Production/staging always require a real provider and can never capture tokens.
     const env = validateEnv();
-    const isProductionLike = env.NODE_ENV === "production" || env.NODE_ENV === "staging";
+    const isProductionLike = [env.NODE_ENV, env.APP_ENV].some(
+      value => value === "production" || value === "staging"
+    );
     const deliveryMode = isProductionLike
       ? (env.EMAIL_PROVIDER === "postmark" || env.EMAIL_PROVIDER === "sendgrid" ? env.EMAIL_PROVIDER : undefined)
       : (env.EMAIL_DELIVERY_MODE || "capture");
