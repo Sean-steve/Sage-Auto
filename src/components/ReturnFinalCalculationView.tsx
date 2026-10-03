@@ -219,6 +219,10 @@ export const ReturnFinalCalculationView: React.FC = () => {
   const handleReceive = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!selectedRental) return;
+    if (!hasPermission("rental.return_receive")) {
+      showNotification("You do not have permission to receive returned vehicles.", "error");
+      return;
+    }
     setSubmitting(true);
     try {
       const odometer = Number(returnOdometer);
@@ -270,6 +274,10 @@ export const ReturnFinalCalculationView: React.FC = () => {
   const handleInspection = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!selectedRental) return;
+    if (!hasPermission("rental.return_inspection_link")) {
+      showNotification("You do not have permission to advance rentals from return inspection.", "error");
+      return;
+    }
     if (!hasPermission("inspection.create") || !hasPermission("inspection.sign")) {
       showNotification("Return inspection requires inspection.create and inspection.sign permissions.", "error");
       return;
@@ -369,6 +377,10 @@ export const ReturnFinalCalculationView: React.FC = () => {
   const handleCalculate = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!selectedRental) return;
+    if (!hasPermission("rental.final_calculate")) {
+      showNotification("You do not have permission to calculate final rental charges.", "error");
+      return;
+    }
     setSubmitting(true);
     try {
       const additionalFees =
@@ -414,6 +426,10 @@ export const ReturnFinalCalculationView: React.FC = () => {
   const handleSettlement = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!selectedRental || !finalCalculation) return;
+    if (!hasPermission("rental.final_settle")) {
+      showNotification("You do not have permission to settle rental deposits or final balances.", "error");
+      return;
+    }
     setSubmitting(true);
     try {
       let settlementStatus = "SETTLED";
@@ -455,6 +471,10 @@ export const ReturnFinalCalculationView: React.FC = () => {
   const handleComplete = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!selectedRental) return;
+    if (!hasPermission("rental.final_complete")) {
+      showNotification("You do not have permission to complete the rental lifecycle.", "error");
+      return;
+    }
     setSubmitting(true);
     try {
       const response = await apiClient.rentals.completeRental(selectedRental.id, {
@@ -668,7 +688,7 @@ export const ReturnFinalCalculationView: React.FC = () => {
                 </div>
               </div>
 
-              {hasPermission("rental.complete") && !["COMPLETED", "RETURN_COMPLETED"].includes(selectedRental.state) && (
+              {!["COMPLETED", "RETURN_COMPLETED"].includes(selectedRental.state) && (
                 <div className="rounded-2xl border border-blue-200 bg-blue-50/70 p-4 dark:border-blue-900 dark:bg-blue-950/20">
                   <div className="mb-3 flex items-center justify-between">
                     <div>
@@ -678,19 +698,19 @@ export const ReturnFinalCalculationView: React.FC = () => {
                     <ShieldCheck className="h-5 w-5 text-blue-600" />
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    {selectedRental.state === "RETURN_SCHEDULED" && (
+                    {selectedRental.state === "RETURN_SCHEDULED" && hasPermission("rental.return_receive") && (
                       <button disabled={restoration} onClick={() => openAction("RECEIVE")} className="rounded-xl bg-blue-700 px-3 py-2 text-xs font-bold text-white">Receive vehicle</button>
                     )}
-                    {["VEHICLE_RECEIVED", "RETURN_INSPECTION_PENDING", "INSPECTION"].includes(selectedRental.state) && (
+                    {["VEHICLE_RECEIVED", "RETURN_INSPECTION_PENDING", "INSPECTION"].includes(selectedRental.state) && hasPermission("rental.return_inspection_link") && (
                       <button disabled={restoration || !hasPermission("inspection.create") || !hasPermission("inspection.sign")} onClick={() => openAction("INSPECT")} className="rounded-xl bg-cyan-700 px-3 py-2 text-xs font-bold text-white disabled:opacity-50">Perform return inspection</button>
                     )}
-                    {selectedRental.state === "DAMAGE_ASSESSMENT" && (
+                    {selectedRental.state === "DAMAGE_ASSESSMENT" && hasPermission("rental.final_calculate") && (
                       <button disabled={restoration} onClick={() => openAction("CALCULATE")} className="rounded-xl bg-violet-700 px-3 py-2 text-xs font-bold text-white">Calculate final charges</button>
                     )}
-                    {["FINAL_CALCULATION", "FINAL_SETTLEMENT_PENDING"].includes(selectedRental.state) && finalCalculation && (
+                    {["FINAL_CALCULATION", "FINAL_SETTLEMENT_PENDING"].includes(selectedRental.state) && finalCalculation && hasPermission("rental.final_settle") && (
                       <button disabled={restoration} onClick={() => openAction("SETTLE")} className="rounded-xl bg-fuchsia-700 px-3 py-2 text-xs font-bold text-white">Settle deposit / balance</button>
                     )}
-                    {selectedRental.state === "DEPOSIT_PROCESSING" && finalCalculation?.isImmutable && (
+                    {selectedRental.state === "DEPOSIT_PROCESSING" && finalCalculation?.isImmutable && hasPermission("rental.final_complete") && (
                       <button disabled={restoration} onClick={() => openAction("COMPLETE")} className="rounded-xl bg-emerald-700 px-3 py-2 text-xs font-bold text-white">Complete & release vehicle</button>
                     )}
                   </div>
