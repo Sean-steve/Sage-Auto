@@ -13,6 +13,8 @@ import {
   VehicleAllocationRepository,
   InspectionRepository,
   DamageRepository,
+  DepositPositionRepository,
+  OperationalInvoiceRepository,
   AuditRepository,
   OutboxRepository,
   IdempotencyRepository,
@@ -40,6 +42,8 @@ async function runTests() {
   VehicleAllocationRepository.clear();
   InspectionRepository.clear();
   DamageRepository.clear();
+  DepositPositionRepository.clear();
+  OperationalInvoiceRepository.clear();
 
   const rentalRepo = new RentalRepository();
   const bookingRepo = new BookingRepository();
@@ -49,6 +53,8 @@ async function runTests() {
   const allocationRepo = new VehicleAllocationRepository();
   const inspectionRepo = new InspectionRepository();
   const damageRepo = new DamageRepository();
+  const depositPositionRepo = new DepositPositionRepository();
+  const operationalInvoiceRepo = new OperationalInvoiceRepository();
   const auditRepo = new AuditRepository();
   const outboxRepo = new OutboxRepository();
   const idempotencyRepo = new IdempotencyRepository();
@@ -472,6 +478,26 @@ async function runTests() {
   // TEST 7: Authoritative Final Calculation Engine & Deposit Reconciliation
   // --------------------------------------------------------------------------
   console.log("\n[TEST 7] Executing Authoritative Final Rental Calculation Engine...");
+
+  // Deposit requirement is not money. Seed the actually received/held deposit
+  // liability that would have been funded by an authoritative Payment allocation.
+  await depositPositionRepo.create({
+    tenantId,
+    rentalId: rental.id,
+    bookingId: rental.bookingId,
+    customerId: rental.customerId,
+    currency: "KES",
+    requiredAmount: "30000.0000",
+    receivedAmount: "30000.0000",
+    heldAmount: "30000.0000",
+    appliedAmount: "0.0000",
+    refundDueAmount: "0.0000",
+    refundedAmount: "0.0000",
+    forfeitedAmount: "0.0000",
+    status: "HELD",
+    notes: "Verified deposit funding fixture",
+  });
+
   const { calculation, rental: calculatedRental } = await service.calculateFinalRental(
     tenantId,
     rental.id,
@@ -547,12 +573,40 @@ async function runTests() {
   // TEST 8: Process Deposit Settlement
   // --------------------------------------------------------------------------
   console.log("\n[TEST 8] Processing Deposit Settlement & Payment...");
+
+  const settlementInvoice = await operationalInvoiceRepo.create({
+    tenantId,
+    customerId: rental.customerId,
+    rentalId: rental.id,
+    bookingId: rental.bookingId,
+    currency: "KES",
+    status: "PAID",
+    issueDate: "2026-09-07",
+    dueDate: "2026-09-07",
+    subtotal: String(calculation.grossFinalTotal),
+    discountTotal: "0.0000",
+    taxTotal: "0.0000",
+    total: String(calculation.grossFinalTotal),
+    amountPaid: String(calculation.grossFinalTotal),
+    amountCredited: "0.0000",
+    amountOutstanding: "0.0000",
+    billingSnapshot: {
+      customerName: "Sprint 16 Customer",
+      customerEmail: "",
+      customerPhone: "",
+    },
+    lineItems: [],
+    issuedAt: "2026-09-07T12:30:00Z",
+    paidAt: "2026-09-07T12:35:00Z",
+  } as any);
+
   const settledCalc = await service.processDepositSettlement(
     tenantId,
     rental.id,
     {
       settlementStatus: "CHARGED",
       additionalChargedAmount: 70,
+      invoiceId: settlementInvoice.id,
       paymentMethod: "MPESA",
       transactionReference: "QKD883921Z",
       notes: "Customer settled 70 KES remaining incidental balance via M-Pesa.",
