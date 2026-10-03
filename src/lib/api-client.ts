@@ -344,6 +344,7 @@ class ApiClient {
     },
     createInspection: (dto: any) => this.post('/inspections', dto),
     getInspection: (id: string) => this.get(`/inspections/${id}`),
+    getReadiness: (id: string) => this.get(`/inspections/${id}/readiness`),
   };
 
   // 10. Customers & Parties Context
