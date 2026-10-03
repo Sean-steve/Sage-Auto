@@ -215,7 +215,10 @@ class ApiClient {
       return this.get<any[]>(`/fleet/vehicles${q ? `?${q}` : ''}`);
     },
     getVehicle: (id: string) => this.get<{ vehicle: any }>(`/fleet/vehicles/${id}`),
-    getDigitalTwin: (id: string) => this.get<{ twin: any }>(`/fleet/vehicles/${id}/digital-twin`),
+    getDigitalTwin: (id: string) => this.get<any>(`/fleet/vehicles/${id}/digital-twin`),
+    getCategories: () => this.get<any[]>('/fleet/categories'),
+    getDocuments: (id: string) => this.get<any[]>(`/fleet/vehicles/${id}/documents`),
+    addDocument: (id: string, dto: any) => this.post(`/fleet/vehicles/${id}/documents`, dto),
     createVehicle: (dto: any) => this.post('/fleet/vehicles', dto),
     updateVehicle: (id: string, dto: any) => this.patch(`/fleet/vehicles/${id}`, dto),
     deleteVehicle: (id: string) => this.delete(`/fleet/vehicles/${id}`),
@@ -270,7 +273,14 @@ class ApiClient {
 
   // 8. Vehicle Inspections & Damage Mapping Context
   public inspections = {
-    listInspections: () => this.get<any[]>('/inspections'),
+    listInspections: (params?: Record<string, any>) => {
+      const q = new URLSearchParams(params).toString();
+      return this.get<any[]>(`/inspections${q ? `?${q}` : ''}`);
+    },
+    listDamageCases: (params?: Record<string, any>) => {
+      const q = new URLSearchParams(params).toString();
+      return this.get<any[]>(`/inspections/damage-cases/list${q ? `?${q}` : ''}`);
+    },
     createInspection: (dto: any) => this.post('/inspections', dto),
     getInspection: (id: string) => this.get(`/inspections/${id}`),
   };
@@ -328,7 +338,10 @@ class ApiClient {
 
   // 14. Fleet Maintenance & Servicing Context
   public maintenance = {
-    listWorkOrders: () => this.get<any[]>('/maintenance/work-orders'),
+    listWorkOrders: (params?: Record<string, any>) => {
+      const q = new URLSearchParams(params).toString();
+      return this.get<any[]>(`/maintenance/work-orders${q ? `?${q}` : ''}`);
+    },
     createWorkOrder: (dto: any) => this.post('/maintenance/work-orders', dto),
     updateWorkOrder: (id: string, dto: any) => {
       const { status, ...payload } = dto;
@@ -353,6 +366,11 @@ class ApiClient {
 
   // 15. Regulatory Compliance & Expiry Alerts Context
   public compliance = {
+    listRecords: (params?: Record<string, any>) => {
+      const q = new URLSearchParams(params).toString();
+      return this.get<any[]>(`/compliance/records${q ? `?${q}` : ''}`);
+    },
+    getVehicleReadiness: (vehicleId: string) => this.get<any>(`/compliance/readiness/vehicle/${vehicleId}`),
     listDocuments: () => this.get<any[]>('/compliance/documents'),
     addDocument: (dto: any) => this.post('/compliance/documents', dto),
     overrideHold: (id: string, reason: string) => this.post(`/compliance/documents/${id}/override-hold`, { reason }),
