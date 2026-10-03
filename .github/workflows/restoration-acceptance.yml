@@ -55,6 +55,9 @@ jobs:
       - name: Customers and Drivers experience contract regression
         run: pnpm test:people-experience
 
+      - name: Pricing experience contract regression
+        run: pnpm test:pricing-experience
+
       - name: Account and 20-role access regression
         run: pnpm test:access
 
