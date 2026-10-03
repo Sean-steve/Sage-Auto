@@ -252,12 +252,41 @@ class ApiClient {
 
   // 7. On-Road Rentals & Operations Context
   public rentals = {
-    listRentals: () => this.get<any[]>('/rentals'),
+    listRentals: (params?: Record<string, any>) => {
+      const q = new URLSearchParams(params).toString();
+      return this.get<any[]>(`/rentals${q ? `?${q}` : ''}`);
+    },
     getRental: (id: string) => this.get(`/rentals/${id}`),
-    startRental: (bookingId: string) => this.post('/rentals/start', { bookingId }),
-    extendRental: (id: string, dto: any) => this.post(`/rentals/${id}/extend`, dto),
-    completeRental: (id: string, dto: any) => this.post(`/rentals/${id}/complete`, dto),
+    getReadiness: (bookingId: string) => this.get(`/rentals/readiness/${bookingId}`),
+    startRental: (dto: {
+      bookingId: string;
+      contractId?: string;
+      handoverId?: string;
+      startOdometer?: number;
+      startFuelLevel?: number;
+      notes?: string;
+      idempotencyKey?: string;
+    }) => this.post('/rentals/start', dto),
+    getStartSnapshot: (id: string) => this.get(`/rentals/${id}/start-snapshot`),
+
+    requestExtension: (id: string, dto: any) => this.post(`/rentals/${id}/extensions`, dto),
+    listExtensions: (id: string) => this.get(`/rentals/${id}/extensions`),
+    approveExtension: (id: string, extensionId: string, dto: any = {}) =>
+      this.post(`/rentals/${id}/extensions/${extensionId}/approve`, dto),
+    rejectExtension: (id: string, extensionId: string, dto: any) =>
+      this.post(`/rentals/${id}/extensions/${extensionId}/reject`, dto),
+
+    listIncidents: (id: string) => this.get(`/rentals/${id}/incidents`),
     recordIncident: (id: string, incident: any) => this.post(`/rentals/${id}/incidents`, incident),
+
+    scheduleReturn: (id: string, dto: any) => this.post(`/rentals/${id}/return-schedule`, dto),
+    receiveReturnedVehicle: (id: string, dto: any) => this.post(`/rentals/${id}/receive`, dto),
+    linkReturnInspection: (id: string, dto: any) => this.post(`/rentals/${id}/return-inspection`, dto),
+    getReturnRecord: (id: string) => this.get(`/rentals/${id}/return-record`),
+    calculateFinal: (id: string, dto: any) => this.post(`/rentals/${id}/calculate-final`, dto),
+    getFinalCalculation: (id: string) => this.get(`/rentals/${id}/final-calculation`),
+    processDepositSettlement: (id: string, dto: any) => this.post(`/rentals/${id}/deposit-settlement`, dto),
+    completeRental: (id: string, dto: any = {}) => this.post(`/rentals/${id}/complete`, dto),
   };
 
   // 8. Vehicle Inspections & Damage Mapping Context
