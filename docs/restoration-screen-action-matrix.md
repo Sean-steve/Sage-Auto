@@ -36,7 +36,7 @@ Status meanings:
 
 ## Action-level rule
 
-Every button/form inside a restored legacy screen inherits **DISABLED** until an explicit row/evidence entry is added for that action. Enabling an entire screen because one read endpoint works is prohibited.
+Every button/form inside an unreconstructed legacy screen inherits **DISABLED** until explicit action evidence exists. Fleet is no longer served by the legacy Fleet screen in the restored company workspace; its reachable actions are governed by `docs/FLEET_EXPERIENCE_CONTRACTS.md` and `fleet-experience-contract.test.ts`. Enabling an entire legacy screen because one read endpoint works remains prohibited.
 
 ## Restoration acceptance evidence required per writable action
 
