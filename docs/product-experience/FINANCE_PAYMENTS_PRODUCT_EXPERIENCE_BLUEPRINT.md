@@ -176,7 +176,8 @@ Rules:
 - cumulative refund cannot exceed refundable balance
 - requester is persisted
 - requester cannot approve/execute the same refund
-- approval/execution requires `refund.approve`
+- liability approval requires `refund.approve`
+- provider disbursement requires `refund.execute`
 - provider execution is idempotent
 - completed refund is immutable except through explicit corrective workflow
 - audit and ledger/outbox facts are mandatory
@@ -259,7 +260,7 @@ Primary finance authority:
 - invoice lifecycle
 - payment verification/allocation
 - deposits
-- refund request + independent approval capability
+- refund request, liability approval and provider execution capability
 - expenses and approvals
 - reconciliation
 - ledger controls
