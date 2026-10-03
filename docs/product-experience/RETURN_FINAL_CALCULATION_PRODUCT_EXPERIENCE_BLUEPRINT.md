@@ -299,8 +299,12 @@ No default assumption may silently release a damaged or unsafe Vehicle if the op
 Read:
 - `rental.read`
 
-Return lifecycle commands:
-- `rental.complete`
+Stage authority:
+- `rental.return_receive` — physical check-in
+- `rental.return_inspection_link` — advance from sealed Return inspection
+- `rental.final_calculate` — authoritative final charge calculation
+- `rental.final_settle` — seal deposit/balance outcome
+- `rental.final_complete` — final operational closure and vehicle disposition
 
 Inspection:
 - `inspection.create`
@@ -311,9 +315,11 @@ Damage:
 - `damage.record`
 - `damage.assess` where assessment authority is required
 
+The broad legacy `rental.complete` permission does not authorize these staged Return commands.
+
 The UI hides/disables commands that the current user cannot perform. API permission guards remain authoritative.
 
-Finance, booking and support roles may receive read-only access to Return dossiers when they have `rental.read`, without inheriting completion authority.
+Finance, booking, Fleet and support roles may receive Return dossier visibility according to their role and `rental.read`, without inheriting unrelated mutation authority. Default separation of duties is defined in `RENTAL_RETURN_AUTHORIZATION_MATRIX.md`.
 
 ## 14. Responsive UX
 
