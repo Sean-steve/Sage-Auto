@@ -110,10 +110,27 @@ export class ContractService {
     if (!booking) {
       throw new BookingNotFoundError(dto.bookingId);
     }
+    if (booking.status !== "CONFIRMED") {
+      throw new Error(`Contract generation requires a CONFIRMED booking. Booking ${booking.bookingNumber} is currently ${booking.status}.`);
+    }
+    if (!booking.pricingSnapshot) {
+      throw new Error(`Booking ${booking.bookingNumber} has no frozen PricingSnapshot. Generate/freeze the Booking quote before Contract generation.`);
+    }
+    if (!booking.pickupAt || !booking.returnAt || new Date(booking.returnAt).getTime() <= new Date(booking.pickupAt).getTime()) {
+      throw new Error(`Booking ${booking.bookingNumber} has an invalid pickup/return interval.`);
+    }
 
-    const vehicleId = booking.assignedVehicleId || booking.requestedVehicleId || booking.vehicleId;
+    const existingContracts = await this.contractRepo.findByBookingId(booking.id, tenantId);
+    const currentContract = existingContracts
+      .filter((item) => item.status !== "ARCHIVED")
+      .sort((a, b) => b.contractVersion - a.contractVersion || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+    if (currentContract) {
+      throw new Error(`Booking ${booking.bookingNumber} already has current Contract ${currentContract.contractNumber}. Amend/version the existing Contract instead of generating a duplicate.`);
+    }
+
+    const vehicleId = booking.assignedVehicleId;
     if (!vehicleId) {
-      throw new Error(`Booking ${booking.bookingNumber} has no assigned vehicle.`);
+      throw new Error(`Booking ${booking.bookingNumber} has no confirmed assigned Vehicle.`);
     }
 
     // 3. Fetch customer, driver & vehicle details
@@ -136,14 +153,28 @@ export class ContractService {
     const driverFullName = driver?.fullName || customerFullName;
 
     // 4. Construct terms snapshot
-    const pricing = booking.pricingSnapshot || (booking.pricing as any);
-    const dailyRate = pricing?.dailyRate || vehicle.dailyRate || 0;
-    const billableDays = pricing?.billableDays || 1;
-    const grossTotal = booking.grossTotal || pricing?.grossTotal || dailyRate * billableDays;
-    const netSubtotal = booking.netRentalSubtotal || pricing?.netRentalSubtotal || dailyRate * billableDays;
-    const depositAmount = booking.depositRequired || pricing?.securityDeposit || 0;
-    const taxAmount = booking.taxAmount || pricing?.taxAmount || 0;
-    const currency = booking.currency || pricing?.currency || "KES";
+    const pricing = booking.pricingSnapshot;
+    const dailyRate =
+      pricing.appliedAverageDailyRate ??
+      pricing.baseDailyRate ??
+      pricing.dailyRate ??
+      vehicle.dailyRate ??
+      0;
+    const billableDays = pricing.billableDays ?? pricing.totalDays ?? 1;
+    const grossTotal = booking.grossTotal ?? pricing.grossRentalTotal ?? pricing.grossTotal ?? dailyRate * billableDays;
+    const netSubtotal = booking.netRentalSubtotal ?? pricing.netRentalSubtotal ?? dailyRate * billableDays;
+    const depositAmount =
+      booking.depositRequired ??
+      pricing.securityDeposit?.amount ??
+      (typeof (pricing as any).securityDeposit === "number" ? (pricing as any).securityDeposit : 0);
+    const taxAmount = booking.taxAmount ?? pricing.tax?.taxAmount ?? pricing.taxAmount ?? 0;
+    const currency = booking.currency || pricing.currency || "KES";
+    const pricingFreeKmPerDay =
+      (pricing as any).freeKmPerDay ??
+      (pricing.mileageAllowance?.model === "DAILY_CAPPED" && billableDays > 0
+        ? pricing.mileageAllowance.includedKm / billableDays
+        : undefined);
+    const excessKmRate = pricing.mileageAllowance?.excessKmRate ?? (pricing as any).excessKmRate ?? vehicle.excessKmRate;
 
     const termsSnapshot: ContractTermsSnapshot = {
       templateId: "STD-RENTAL-2026-v1",
@@ -157,10 +188,10 @@ export class ContractService {
       customerPhone: customer.phone,
       primaryDriverFullName: driverFullName,
       primaryDriverLicenseNumber: driver?.licenseNumber || undefined,
-      pickupAt: booking.pickupAt || new Date().toISOString(),
-      returnAt: booking.returnAt || new Date(Date.now() + 86400000).toISOString(),
-      pickupLocation: booking.pickupLocationName || "Main Dispatch Station",
-      returnLocation: booking.returnLocationName || booking.pickupLocationName || "Main Dispatch Station",
+      pickupAt: booking.pickupAt,
+      returnAt: booking.returnAt,
+      pickupLocation: booking.pickupLocationName || "Not specified",
+      returnLocation: booking.returnLocationName || booking.pickupLocationName || "Not specified",
       baseDailyRate: dailyRate,
       billableDays,
       grossTotal,
@@ -168,9 +199,9 @@ export class ContractService {
       depositAmount,
       taxAmount,
       currency,
-      freeKmPerDay: 250,
-      excessKmRate: 25,
-      lateReturnHourlyFee: 500,
+      freeKmPerDay: pricingFreeKmPerDay,
+      excessKmRate,
+      lateReturnHourlyFee: undefined,
       cdwCoverIncluded: true,
       specialTerms: dto.specialTerms || [
         "Vehicle must be returned with the same fuel level as recorded at handover.",
@@ -192,16 +223,7 @@ export class ContractService {
       status: "GENERATED",
       templateVersion: dto.templateVersion || "1.0.0",
       termsSnapshot,
-      pricingSnapshot: pricing || {
-        dailyRate,
-        billableDays,
-        grossTotal,
-        netRentalSubtotal: netSubtotal,
-        securityDeposit: depositAmount,
-        taxAmount,
-        currency,
-        calculatedAt: new Date().toISOString(),
-      } as any,
+      pricingSnapshot: pricing,
       actorUserId: actor?.userId,
       actorType: actor?.actorType || "USER",
     });
@@ -264,6 +286,9 @@ export class ContractService {
     const contract = await this.contractRepo.findById(contractId, tenantId);
     if (!contract) {
       throw new ContractNotFoundError(contractId);
+    }
+    if (!["GENERATED", "SENT", "SIGNED"].includes(contract.status)) {
+      throw new ContractImmutableError(contractId, contract.status);
     }
 
     // Add signature record
@@ -389,12 +414,20 @@ export class ContractService {
     data: {
       changeReason: string;
       termsSnapshot?: Partial<ContractTermsSnapshot>;
+      expectedVersion?: number;
     },
     actor?: ContractActor
   ): Promise<ContractVersionRecord> {
     const contract = await this.contractRepo.findById(contractId, tenantId);
     if (!contract) {
       throw new ContractNotFoundError(contractId);
+    }
+
+    if (contract.status === "ACTIVE" || contract.status === "COMPLETED" || contract.status === "ARCHIVED") {
+      throw new ContractImmutableError(contractId, contract.status);
+    }
+    if (!data.changeReason?.trim()) {
+      throw new Error("Contract amendment requires a changeReason.");
     }
 
     const nextVersion = contract.contractVersion + 1;
@@ -418,10 +451,33 @@ export class ContractService {
       createdAt: new Date().toISOString(),
     });
 
-    await this.contractRepo.update(contractId, tenantId, {
-      contractVersion: nextVersion,
-      termsSnapshot: mergedTerms,
-    });
+    const previousStatus = contract.status;
+    await this.contractRepo.update(
+      contractId,
+      tenantId,
+      {
+        contractVersion: nextVersion,
+        termsSnapshot: mergedTerms,
+        status: "GENERATED",
+        sentAt: undefined,
+        signedAt: undefined,
+      },
+      data.expectedVersion
+    );
+
+    if (previousStatus !== "GENERATED") {
+      await this.contractRepo.appendStatusHistory(tenantId, {
+        contractId,
+        tenantId,
+        fromStatus: previousStatus,
+        toStatus: "GENERATED",
+        actorType: actor?.actorType || "USER",
+        actorId: actor?.userId || "system",
+        actorName: actor?.name || "Operator",
+        reason: `Contract amended to version ${nextVersion}; current version requires dispatch/signature again. ${data.changeReason}`,
+        occurredAt: new Date().toISOString(),
+      });
+    }
 
     await this.auditRepo.record({
       tenantId,
