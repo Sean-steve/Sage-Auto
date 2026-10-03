@@ -197,6 +197,31 @@ async function runTests() {
   console.log("✓ Base Rental created and start snapshot saved.");
 
   // --------------------------------------------------------------------------
+  // TEST 2A: Rental Incident Persistence & Audit Path
+  // --------------------------------------------------------------------------
+  console.log("\n[TEST 2A] Recording an on-road rental incident...");
+  const incident = await service.recordIncident(
+    tenantId,
+    rental.id,
+    {
+      type: "MECHANICAL_BREAKDOWN",
+      description: "Warning light reported while vehicle remained safely parked.",
+      location: "Nairobi",
+      estimatedCost: 2500,
+      reportedAt: "2026-09-03T11:15:00Z",
+    },
+    actor
+  );
+  assert.equal(incident.rentalId, rental.id);
+  assert.equal(incident.resolved, false);
+  const incidentList = await service.getRentalIncidents(tenantId, rental.id);
+  assert.equal(incidentList.length, 1);
+  assert.equal(incidentList[0].type, "MECHANICAL_BREAKDOWN");
+  const rentalWithIncident = await rentalRepo.findById(rental.id, tenantId);
+  assert.equal(rentalWithIncident?.incidents.length, 1);
+  console.log("✓ Incident persisted to the authoritative rental aggregate.");
+
+  // --------------------------------------------------------------------------
   // TEST 3: Rental Extension Request & Pricing Calculation
   // --------------------------------------------------------------------------
   console.log("\n[TEST 3] Testing Rental Extension Request & Pricing...");
@@ -465,6 +490,23 @@ async function runTests() {
     (err: any) => err instanceof RentalAlreadyCompletedError
   );
   console.log("✓ Post-completion modifications strictly rejected.");
+
+  await assert.rejects(
+    async () => {
+      await service.recordIncident(
+        tenantId,
+        rental.id,
+        {
+          type: "OTHER",
+          description: "Should not be accepted after completion.",
+          location: "Nairobi",
+        },
+        actor
+      );
+    },
+    (err: any) => err instanceof RentalAlreadyCompletedError
+  );
+  console.log("✓ Post-completion incident mutation rejected.");
 
   console.log("\n================================================================");
   console.log("ALL SPRINT 16 TESTS PASSED SUCCESSFULLY! (10/10 TEST SUITES GREEN)");
