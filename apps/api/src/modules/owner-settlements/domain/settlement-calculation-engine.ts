@@ -53,6 +53,7 @@ export interface CalculationResult {
   operatorNetRevenue: string;
   carriedForwardBalance: string;
   termsSnapshot: OwnerSettlementTermsSnapshot;
+  termsSnapshots: OwnerSettlementTermsSnapshot[];
   rentalLines: OwnerSettlementRentalLine[];
   expenseLines: OwnerSettlementExpenseLine[];
   adjustmentLines: OwnerSettlementAdjustmentLine[];
@@ -117,6 +118,25 @@ export class SettlementCalculationEngine {
       agreementStartDate: primaryOwnership.startDate,
       agreementEndDate: primaryOwnership.endDate || undefined,
     };
+
+    const termsSnapshots: OwnerSettlementTermsSnapshot[] = input.ownerships
+      .filter(
+        (o) =>
+          o.ownerId === input.owner.id &&
+          o.startDate <= input.periodEnd &&
+          (!o.endDate || o.endDate >= input.periodStart)
+      )
+      .map((o) => ({
+        ownershipId: o.id,
+        ownershipType: o.ownershipType,
+        revenueSharePercent: Number(o.revenueSharePercent),
+        fixedMonthlyPayout:
+          o.fixedMonthlyPayout != null ? String(o.fixedMonthlyPayout) : undefined,
+        allowableExpenseDeductions: o.allowableExpenseDeductions,
+        termsVersion: o.version || 1,
+        agreementStartDate: o.startDate,
+        agreementEndDate: o.endDate || undefined,
+      }));
 
     // 2. Process Rental Lines
     const rentalLines: OwnerSettlementRentalLine[] = [];
@@ -388,6 +408,7 @@ export class SettlementCalculationEngine {
       operatorNetRevenue: operatorNetRevenueMoney.amount,
       carriedForwardBalance: carriedForwardMoney.amount,
       termsSnapshot,
+      termsSnapshots,
       rentalLines,
       expenseLines,
       adjustmentLines,
