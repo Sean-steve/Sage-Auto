@@ -51,6 +51,7 @@ import { SettlementCalculationEngine } from "../domain/settlement-calculation-en
 import { OwnerSettlementStateMachine } from "../domain/owner-settlement-state-machine";
 import { SettlementPostingContractFactory } from "../domain/settlement-posting-contract.factory";
 import { LedgerService } from "../../ledger/application/ledger.service";
+import type { FinanceService } from "../../finance/application/finance.service";
 
 export interface SettlementActor {
   userId: string;
@@ -68,7 +69,8 @@ export class OwnerSettlementsService {
     private readonly rentalRepo: IRentalRepository,
     private readonly expenseRepo: IExpenseRepository,
     private readonly ledgerService?: LedgerService,
-    private readonly auditRepo?: IAuditRepository
+    private readonly auditRepo?: IAuditRepository,
+    private readonly financeService?: Pick<FinanceService, "getSettledRentalRevenueComponents">
   ) {}
 
   // --------------------------------------------------------------------------
@@ -215,21 +217,59 @@ export class OwnerSettlementsService {
     const ownerVehicleIds = new Set(ownerships.map((o) => o.vehicleId));
     const ownerVehicles = vehicles.filter((v) => ownerVehicleIds.has(v.id));
 
-    // Fetch all tenant rentals and expenses
+    // Fetch all tenant rentals and expenses.
     const { items: allRentals } = await this.rentalRepo.findMany(tenantId, { limit: 1000 });
     const allExpenses = await this.expenseRepo.listByTenant(tenantId);
+
+    if (!this.financeService) {
+      const err: any = new Error("Owner Settlement requires the Tenant Finance revenue read contract.");
+      err.statusCode = 503;
+      throw err;
+    }
+
+    // Tenant Finance is the commercial authority. Gather only settled revenue facts
+    // for completed rentals in this owner's period; Settlement never re-prices a Rental.
+    const candidateRentals = allRentals.filter((r) => {
+      if (!ownerVehicleIds.has(r.vehicleId)) return false;
+      if (!["COMPLETED", "RETURN_COMPLETED"].includes(r.state)) return false;
+      const eventDate = (r.actualEnd || r.completedAt || r.scheduledEnd || r.actualStart || r.scheduledStart).split("T")[0];
+      return eventDate >= periodStart && eventDate <= periodEnd;
+    });
+
+    const rentalRevenueFacts = new Map<string, Awaited<ReturnType<FinanceService["getSettledRentalRevenueComponents"]>> extends infer T ? Exclude<T, null> : never>();
+    const currencies = new Set<string>();
+    for (const rental of candidateRentals) {
+      const fact = await this.financeService.getSettledRentalRevenueComponents(tenantId, rental.id);
+      if (fact?.isPaidOrSettled) {
+        rentalRevenueFacts.set(rental.id, fact as any);
+        currencies.add(fact.currency.toUpperCase());
+      }
+    }
+
+    if (rentalRevenueFacts.size === 0) {
+      throw new Error(
+        `No paid/settled Tenant Finance revenue facts exist for ${owner.name} in ${periodStart} to ${periodEnd}.`
+      );
+    }
+    if (currencies.size !== 1) {
+      throw new Error(
+        `Owner settlement period contains multiple currencies (${Array.from(currencies).join(", ")}). Settle each currency separately.`
+      );
+    }
+    const settlementCurrency = Array.from(currencies)[0];
 
     // 5. Execute Calculation via Domain Engine
     const calculation = SettlementCalculationEngine.calculate({
       owner,
       ownerships,
       vehicles: ownerVehicles,
-      rentals: allRentals as any,
+      rentals: candidateRentals,
+      rentalRevenueFacts: rentalRevenueFacts as any,
       expenses: allExpenses,
       adjustments: existingToUpdate?.adjustmentLines || [],
       periodStart,
       periodEnd,
-      currency: "KES",
+      currency: settlementCurrency,
     });
 
     // 6. Persist or Update Settlement Aggregate
@@ -239,6 +279,7 @@ export class OwnerSettlementsService {
       const updated = await this.settlementRepo.update(existingToUpdate.id, tenantId, {
         status: "CALCULATED",
         calculatedAt: new Date().toISOString(),
+        calculatedBy: actor.userId,
         totalEligibleRentalRevenue: calculation.totalEligibleRentalRevenue,
         totalExcludedRevenue: calculation.totalExcludedRevenue,
         grossRevenue: calculation.grossRevenue,
@@ -268,7 +309,7 @@ export class OwnerSettlementsService {
       periodId,
       periodStart,
       periodEnd,
-      currency: "KES",
+      currency: settlementCurrency,
       status: "CALCULATED",
       calculatedAt: new Date().toISOString(),
       calculatedBy: actor.userId,
@@ -290,12 +331,35 @@ export class OwnerSettlementsService {
       adjustmentLines: calculation.adjustmentLines,
     });
 
+    await this.auditRepo?.create({
+      tenantId,
+      actorUserId: actor.userId,
+      actorType: "USER",
+      action: "OWNER_SETTLEMENT_CALCULATED",
+      resourceType: "OWNER_SETTLEMENT",
+      resourceId: created.id,
+      description: `Calculated ${created.settlementNumber} from settled Finance facts and historical ownership terms`,
+      payload: {
+        ownerId: created.ownerId,
+        periodStart: created.periodStart,
+        periodEnd: created.periodEnd,
+        netPayoutAmount: created.netPayoutAmount,
+      },
+    });
+
     return created;
   }
 
   // --------------------------------------------------------------------------
   // 3. IDEMPOTENT SETTLEMENT BATCH GENERATION
   // --------------------------------------------------------------------------
+
+  async listBatches(
+    tenantId: string,
+    periodId?: string
+  ): Promise<OwnerSettlementBatch[]> {
+    return this.batchRepo.listByTenant(tenantId, periodId);
+  }
 
   async generateBatch(
     tenantId: string,
@@ -412,6 +476,12 @@ export class OwnerSettlementsService {
     if (settlement.status === "DISPUTED") {
       throw new SettlementDisputedBlockedError(settlement.settlementNumber, "approval");
     }
+    if (settlement.calculatedBy && settlement.calculatedBy === actor.userId) {
+      const err: any = new Error("Settlement approval requires a different authorized user from the calculator.");
+      err.code = "SEPARATION_OF_DUTIES";
+      err.statusCode = 409;
+      throw err;
+    }
 
     OwnerSettlementStateMachine.assertTransition(settlement.status, "APPROVED", settlement.settlementNumber);
 
@@ -459,6 +529,17 @@ export class OwnerSettlementsService {
         console.error(`[OwnerSettlement] Ledger posting failed for ${settlement.settlementNumber}:`, ledgerErr.message);
       }
     }
+
+    await this.auditRepo?.create({
+      tenantId,
+      actorUserId: actor.userId,
+      actorType: "USER",
+      action: "OWNER_SETTLEMENT_APPROVED",
+      resourceType: "OWNER_SETTLEMENT",
+      resourceId: updated.id,
+      description: `Approved ${updated.settlementNumber}; payable obligation created`,
+      payload: { ownerId: updated.ownerId, netPayoutAmount: updated.netPayoutAmount },
+    });
 
     return updated;
   }
@@ -534,24 +615,26 @@ export class OwnerSettlementsService {
       actor
     );
 
-    const nextStatus = dto.approveImmediately ? "APPROVED" : "CALCULATED";
-
+    // Dispute resolution returns the settlement to CALCULATED. Approval is a
+    // separate four-eyes command and is the only path that creates a payable.
     const resolved = await this.settlementRepo.update(refreshed.id, tenantId, {
-      status: nextStatus,
+      status: "CALCULATED",
       disputeResolvedAt: new Date().toISOString(),
       disputeResolutionNotes: notes,
-      approvedAt: nextStatus === "APPROVED" ? new Date().toISOString() : undefined,
-      approvedBy: nextStatus === "APPROVED" ? actor.userId : undefined,
+      approvedAt: undefined,
+      approvedBy: undefined,
     });
 
-    if (nextStatus === "APPROVED" && this.ledgerService) {
-      try {
-        const postingContract = SettlementPostingContractFactory.createApprovalPosting(resolved);
-        await this.ledgerService.postFromSourceContract(tenantId, postingContract, actor);
-      } catch (ledgerErr: any) {
-        console.error(`[OwnerSettlement] Ledger posting failed for ${resolved.settlementNumber}:`, ledgerErr.message);
-      }
-    }
+    await this.auditRepo?.create({
+      tenantId,
+      actorUserId: actor.userId,
+      actorType: "USER",
+      action: "OWNER_SETTLEMENT_DISPUTE_RESOLVED",
+      resourceType: "OWNER_SETTLEMENT",
+      resourceId: resolved.id,
+      description: `Resolved dispute for ${resolved.settlementNumber}; returned to CALCULATED for independent approval`,
+      payload: { resolutionNotes: notes },
+    });
 
     return resolved;
   }
@@ -567,7 +650,7 @@ export class OwnerSettlementsService {
       throw new SettlementNotFoundError(settlementId);
     }
 
-    if (settlement.status === "APPROVED" || settlement.status === "PAID") {
+    if (settlement.status === "APPROVED" || settlement.status === "PAYMENT_PENDING" || settlement.status === "PAID") {
       throw new Error(`Cannot add adjustments to finalized settlement ${settlement.settlementNumber}.`);
     }
 
@@ -599,54 +682,19 @@ export class OwnerSettlementsService {
   async executePayout(
     tenantId: string,
     settlementId: string,
-    dto: ExecuteSettlementPayoutDto,
-    actor: SettlementActor
+    _dto: ExecuteSettlementPayoutDto,
+    _actor: SettlementActor
   ): Promise<OwnerSettlement> {
     const settlement = await this.settlementRepo.findById(settlementId, tenantId);
     if (!settlement) {
       throw new SettlementNotFoundError(settlementId);
     }
-
-    if (settlement.status !== "APPROVED" && settlement.status !== "PAYMENT_PENDING") {
-      throw new Error(
-        `Cannot disburse payout for settlement in status ${settlement.status}. Settlement must be APPROVED.`
-      );
-    }
-
-    const paidAt = new Date().toISOString();
-
-    // 1. Update Settlement to PAID
-    const updated = await this.settlementRepo.update(settlementId, tenantId, {
-      status: "PAID",
-      paidAt,
-      payoutReference: dto.payoutReference,
-      payoutMethod: dto.payoutMethod || settlement.payoutMethod,
-    });
-
-    // 2. Update Payable Obligation
-    const payables = await this.settlementRepo.listPayables(tenantId, { settlementId });
-    if (payables.length > 0) {
-      await this.settlementRepo.updatePayable(payables[0].id, tenantId, {
-        status: "PAID",
-        externalPayoutReference: dto.payoutReference,
-        payoutCompletedAt: paidAt,
-      });
-    }
-
-    // 3. Post to General Ledger (Debit 2150, Credit 1010)
-    if (this.ledgerService) {
-      try {
-        const payoutPosting = SettlementPostingContractFactory.createPayoutPosting(
-          updated,
-          dto.payoutReference
-        );
-        await this.ledgerService.postFromSourceContract(tenantId, payoutPosting, actor);
-      } catch (ledgerErr: any) {
-        console.error(`[OwnerSettlement] Payout ledger posting failed for ${settlement.settlementNumber}:`, ledgerErr.message);
-      }
-    }
-
-    return updated;
+    const err: any = new Error(
+      "Direct settlement payout is disabled. Execute the approved payable through the Payments provider boundary."
+    );
+    err.code = "SETTLEMENT_PAYOUT_REQUIRES_PAYMENT_PROVIDER";
+    err.statusCode = 409;
+    throw err;
   }
 
   async listPayables(
@@ -659,6 +707,57 @@ export class OwnerSettlementsService {
   // --------------------------------------------------------------------------
   // 7. STATEMENTS & VEHICLE PROFITABILITY READ MODELS
   // --------------------------------------------------------------------------
+
+  private async resolveOwnerSelf(tenantId: string, actor: SettlementActor): Promise<VehicleOwner> {
+    if (!actor.email) {
+      const err: any = new Error("Vehicle Owner self-service requires a linked membership email.");
+      err.statusCode = 403;
+      throw err;
+    }
+    const owner = await this.ownerRepo.findByEmail(actor.email, tenantId);
+    if (!owner) {
+      const err: any = new Error("No Vehicle Owner record is linked to this user.");
+      err.statusCode = 403;
+      throw err;
+    }
+    return owner;
+  }
+
+  async listMySettlements(tenantId: string, actor: SettlementActor): Promise<OwnerSettlement[]> {
+    const owner = await this.resolveOwnerSelf(tenantId, actor);
+    return this.settlementRepo.listByTenant(tenantId, { ownerId: owner.id });
+  }
+
+  async getMyStatement(
+    tenantId: string,
+    settlementId: string,
+    actor: SettlementActor
+  ): Promise<OwnerSettlementStatementReadModel> {
+    const owner = await this.resolveOwnerSelf(tenantId, actor);
+    const settlement = await this.getSettlement(tenantId, settlementId);
+    if (settlement.ownerId !== owner.id) {
+      const err: any = new Error("Forbidden: Settlement does not belong to the linked Vehicle Owner.");
+      err.statusCode = 403;
+      throw err;
+    }
+    return this.getStatement(tenantId, settlementId);
+  }
+
+  async disputeMySettlement(
+    tenantId: string,
+    settlementId: string,
+    reason: string,
+    actor: SettlementActor
+  ): Promise<OwnerSettlement> {
+    const owner = await this.resolveOwnerSelf(tenantId, actor);
+    const settlement = await this.getSettlement(tenantId, settlementId);
+    if (settlement.ownerId !== owner.id) {
+      const err: any = new Error("Forbidden: Settlement does not belong to the linked Vehicle Owner.");
+      err.statusCode = 403;
+      throw err;
+    }
+    return this.disputeSettlement(tenantId, settlementId, { reason }, actor);
+  }
 
   async getSettlement(tenantId: string, id: string): Promise<OwnerSettlement> {
     const settlement = await this.settlementRepo.findById(id, tenantId);
