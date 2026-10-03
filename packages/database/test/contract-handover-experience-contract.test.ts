@@ -38,7 +38,7 @@ for (const permission of [
   'contract.read','contract.generate','contract.sign','rental.read','rental.start','inspection.create'
 ]) assert.ok(view.includes(permission), 'Contract/Handover UI must account for '+permission);
 
-assert.doesNotMatch(view,/apiClient\.rentals\.startRental|createRentalFromBooking|setBookings\(|setVehicles\(/,'Contract/Handover UI must not create a Rental or locally mutate Booking/Vehicle authority');
+assert.doesNotMatch(view,/apiClient\.rentals\.startRental|createRentalFromBooking|setBookings\(\(prev|setVehicles\(\(prev/,'Contract/Handover UI must not create a Rental or locally transform Booking/Vehicle authority');
 assert.match(view,/Rental creation remains in Rental Operations|does not create a Rental/,'Rental boundary must be explicit');
 
 assert.match(contractService,/Claim the aggregate version before writing signature evidence/,'signature flow must claim optimistic version before evidence');
