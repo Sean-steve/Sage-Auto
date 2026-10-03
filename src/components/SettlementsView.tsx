@@ -3,8 +3,6 @@ import {
   AlertTriangle,
   ArrowRight,
   Banknote,
-  Building2,
-  CalendarDays,
   CheckCircle2,
   ChevronRight,
   CircleDollarSign,
@@ -12,10 +10,7 @@ import {
   History,
   Loader2,
   RefreshCw,
-  Scale,
   ShieldCheck,
-  TrendingUp,
-  UserRound,
   WalletCards,
   X,
 } from "lucide-react";
@@ -783,20 +778,20 @@ export const SettlementsView: React.FC = () => {
             {actionMode === "CALCULATE" && (
               <form onSubmit={handleCalculate} className="space-y-4">
                 <Field labelText="Vehicle owner">
-                  <select required value={calcOwnerId} onChange={(e) => setCalcOwnerId(e.target.value)} className="input">
+                  <select required value={calcOwnerId} onChange={(e) => setCalcOwnerId(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:focus:ring-indigo-950">
                     <option value="">Select owner</option>
                     {vehicleOwners.filter((o) => o.tenantId === activeTenantId && o.status === "ACTIVE").map((owner) => <option key={owner.id} value={owner.id}>{owner.name}{owner.companyName ? ` · ${owner.companyName}` : ""}</option>)}
                   </select>
                 </Field>
                 {periods.length > 0 && (
                   <Field labelText="Governed period (optional)">
-                    <select value={calcPeriodId} onChange={(e) => setCalcPeriodId(e.target.value)} className="input">
+                    <select value={calcPeriodId} onChange={(e) => setCalcPeriodId(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:focus:ring-indigo-950">
                       <option value="">Custom dates</option>
                       {periods.filter((p) => p.status !== "CLOSED").map((period) => <option key={period.id} value={period.id}>{period.periodNumber} · {period.startDate} → {period.endDate}</option>)}
                     </select>
                   </Field>
                 )}
-                {!calcPeriodId && <div className="grid gap-3 sm:grid-cols-2"><Field labelText="Start date"><input required type="date" value={calcStart} onChange={(e) => setCalcStart(e.target.value)} className="input" /></Field><Field labelText="End date"><input required type="date" value={calcEnd} onChange={(e) => setCalcEnd(e.target.value)} className="input" /></Field></div>}
+                {!calcPeriodId && <div className="grid gap-3 sm:grid-cols-2"><Field labelText="Start date"><input required type="date" value={calcStart} onChange={(e) => setCalcStart(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:focus:ring-indigo-950" /></Field><Field labelText="End date"><input required type="date" value={calcEnd} onChange={(e) => setCalcEnd(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:focus:ring-indigo-950" /></Field></div>}
                 <div className="rounded-xl bg-indigo-50 p-3 text-[11px] text-indigo-800 dark:bg-indigo-950/30 dark:text-indigo-300">Only paid/settled Finance invoice components are eligible. Missing historical ownership terms block calculation; no default rate or share is fabricated.</div>
                 <SubmitButton disabled={submitting} text={submitting ? "Calculating…" : "Calculate from authoritative facts"} />
               </form>
@@ -804,26 +799,26 @@ export const SettlementsView: React.FC = () => {
 
             {actionMode === "CREATE_PERIOD" && (
               <form onSubmit={handleCreatePeriod} className="space-y-4">
-                <Field labelText="Period type"><select value={periodType} onChange={(e) => setPeriodType(e.target.value)} className="input"><option>MONTHLY</option><option>WEEKLY</option><option>BI_WEEKLY</option><option>CUSTOM</option></select></Field>
-                <div className="grid gap-3 sm:grid-cols-2"><Field labelText="Start date"><input required type="date" value={periodStart} onChange={(e) => setPeriodStart(e.target.value)} className="input" /></Field><Field labelText="End date"><input required type="date" value={periodEnd} onChange={(e) => setPeriodEnd(e.target.value)} className="input" /></Field></div>
-                <Field labelText="Description"><input value={periodDescription} onChange={(e) => setPeriodDescription(e.target.value)} className="input" placeholder="October owner settlements" /></Field>
+                <Field labelText="Period type"><select value={periodType} onChange={(e) => setPeriodType(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:focus:ring-indigo-950"><option>MONTHLY</option><option>WEEKLY</option><option>BI_WEEKLY</option><option>CUSTOM</option></select></Field>
+                <div className="grid gap-3 sm:grid-cols-2"><Field labelText="Start date"><input required type="date" value={periodStart} onChange={(e) => setPeriodStart(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:focus:ring-indigo-950" /></Field><Field labelText="End date"><input required type="date" value={periodEnd} onChange={(e) => setPeriodEnd(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:focus:ring-indigo-950" /></Field></div>
+                <Field labelText="Description"><input value={periodDescription} onChange={(e) => setPeriodDescription(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:focus:ring-indigo-950" placeholder="October owner settlements" /></Field>
                 <SubmitButton disabled={submitting} text="Create period" />
               </form>
             )}
 
             {actionMode === "DISPUTE" && (
               <form onSubmit={handleDispute} className="space-y-4">
-                <Field labelText="Dispute reason"><textarea required minLength={5} rows={4} value={disputeReason} onChange={(e) => setDisputeReason(e.target.value)} className="input" /></Field>
+                <Field labelText="Dispute reason"><textarea required minLength={5} rows={4} value={disputeReason} onChange={(e) => setDisputeReason(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:focus:ring-indigo-950" /></Field>
                 <SubmitButton disabled={submitting} text="Open dispute" />
               </form>
             )}
 
             {actionMode === "RESOLVE_DISPUTE" && (
               <form onSubmit={handleResolveDispute} className="space-y-4">
-                <Field labelText="Resolution notes"><textarea required minLength={5} rows={3} value={resolutionNotes} onChange={(e) => setResolutionNotes(e.target.value)} className="input" /></Field>
+                <Field labelText="Resolution notes"><textarea required minLength={5} rows={3} value={resolutionNotes} onChange={(e) => setResolutionNotes(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:focus:ring-indigo-950" /></Field>
                 <p className="text-[11px] font-semibold text-slate-500">Optional resolution adjustment</p>
-                <Field labelText="Adjustment type"><select value={adjustmentType} onChange={(e) => setAdjustmentType(e.target.value)} className="input"><option>CREDIT_ADJUSTMENT</option><option>DEBIT_ADJUSTMENT</option><option>DISPUTE_SETTLEMENT</option><option>CARRYOVER_DEDUCTION</option><option>HOLD</option></select></Field>
-                <div className="grid gap-3 sm:grid-cols-2"><Field labelText="Amount"><input type="number" min="0" step="0.01" value={adjustmentAmount} onChange={(e) => setAdjustmentAmount(e.target.value)} className="input" /></Field><Field labelText="Reason"><input value={adjustmentReason} onChange={(e) => setAdjustmentReason(e.target.value)} className="input" /></Field></div>
+                <Field labelText="Adjustment type"><select value={adjustmentType} onChange={(e) => setAdjustmentType(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:focus:ring-indigo-950"><option>CREDIT_ADJUSTMENT</option><option>DEBIT_ADJUSTMENT</option><option>DISPUTE_SETTLEMENT</option><option>CARRYOVER_DEDUCTION</option><option>HOLD</option></select></Field>
+                <div className="grid gap-3 sm:grid-cols-2"><Field labelText="Amount"><input type="number" min="0" step="0.01" value={adjustmentAmount} onChange={(e) => setAdjustmentAmount(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:focus:ring-indigo-950" /></Field><Field labelText="Reason"><input value={adjustmentReason} onChange={(e) => setAdjustmentReason(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:focus:ring-indigo-950" /></Field></div>
                 <div className="rounded-xl bg-amber-50 p-3 text-[11px] text-amber-800 dark:bg-amber-950/30 dark:text-amber-300">Resolution returns the statement to CALCULATED. It cannot silently self-approve or create a payable.</div>
                 <SubmitButton disabled={submitting} text="Resolve & recalculate" />
               </form>
@@ -831,9 +826,9 @@ export const SettlementsView: React.FC = () => {
 
             {actionMode === "ADJUST" && (
               <form onSubmit={handleAdjustment} className="space-y-4">
-                <Field labelText="Adjustment type"><select value={adjustmentType} onChange={(e) => setAdjustmentType(e.target.value)} className="input"><option>CREDIT_ADJUSTMENT</option><option>DEBIT_ADJUSTMENT</option><option>DISPUTE_SETTLEMENT</option><option>CARRYOVER_DEDUCTION</option><option>HOLD</option></select></Field>
-                <Field labelText="Amount"><input required type="number" min="0.01" step="0.01" value={adjustmentAmount} onChange={(e) => setAdjustmentAmount(e.target.value)} className="input" /></Field>
-                <Field labelText="Reason"><textarea required minLength={3} rows={3} value={adjustmentReason} onChange={(e) => setAdjustmentReason(e.target.value)} className="input" /></Field>
+                <Field labelText="Adjustment type"><select value={adjustmentType} onChange={(e) => setAdjustmentType(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:focus:ring-indigo-950"><option>CREDIT_ADJUSTMENT</option><option>DEBIT_ADJUSTMENT</option><option>DISPUTE_SETTLEMENT</option><option>CARRYOVER_DEDUCTION</option><option>HOLD</option></select></Field>
+                <Field labelText="Amount"><input required type="number" min="0.01" step="0.01" value={adjustmentAmount} onChange={(e) => setAdjustmentAmount(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:focus:ring-indigo-950" /></Field>
+                <Field labelText="Reason"><textarea required minLength={3} rows={3} value={adjustmentReason} onChange={(e) => setAdjustmentReason(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:focus:ring-indigo-950" /></Field>
                 <SubmitButton disabled={submitting} text="Record adjustment & recalculate" />
               </form>
             )}
@@ -847,7 +842,7 @@ export const SettlementsView: React.FC = () => {
                   <Row labelText="Destination" value={selectedPayable.destinationMpesaNumber || selectedPayable.destinationAccount || "Not configured"} />
                 </div>
                 <Field labelText="Provider">
-                  <select value={payoutProvider} onChange={(e) => setPayoutProvider(e.target.value)} className="input">
+                  <select value={payoutProvider} onChange={(e) => setPayoutProvider(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:focus:ring-indigo-950">
                     <option value="MPESA_DARAJA">M-Pesa Daraja B2C</option>
                     <option value="STRIPE_CARD">Stripe transfer adapter (development/test only)</option>
                   </select>
