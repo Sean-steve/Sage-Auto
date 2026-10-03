@@ -64,4 +64,4 @@ HEALTHCHECK --interval=15s --timeout=3s --start-period=10s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:3002/health/live || exit 1
 
 ENTRYPOINT ["/usr/bin/dumb-init", "--"]
-CMD ["node", "apps/worker/dist/main.js"]
+CMD ["node", "apps/worker/dist/apps/worker/src/main.js"]
