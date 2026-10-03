@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import { apiClient } from "../lib/api-client";
 import { useApp } from "../lib/store";
-import type { Rental, RentalFinalCalculation, RentalReturnRecord } from "../types";
+import type { InspectionComparison, Rental, RentalFinalCalculation, RentalReturnRecord } from "../types";
 
 type ActionMode = "RECEIVE" | "INSPECT" | "CALCULATE" | "SETTLE" | "COMPLETE" | null;
 
@@ -80,6 +80,7 @@ export const ReturnFinalCalculationView: React.FC = () => {
   const [selectedRentalId, setSelectedRentalId] = useState<string | null>(null);
   const [returnRecord, setReturnRecord] = useState<RentalReturnRecord | null>(null);
   const [finalCalculation, setFinalCalculation] = useState<RentalFinalCalculation | null>(null);
+  const [comparison, setComparison] = useState<InspectionComparison | null>(null);
   const [actionMode, setActionMode] = useState<ActionMode>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -137,12 +138,14 @@ export const ReturnFinalCalculationView: React.FC = () => {
   }, []);
 
   const loadArtifacts = useCallback(async (rentalId: string) => {
-    const [returnResponse, calcResponse] = await Promise.all([
+    const [returnResponse, calcResponse, comparisonResponse] = await Promise.all([
       apiClient.rentals.getReturnRecord(rentalId),
       apiClient.rentals.getFinalCalculation(rentalId),
+      apiClient.inspections.getRentalComparison(rentalId),
     ]);
     setReturnRecord(!returnResponse.error && returnResponse.data ? (returnResponse.data as RentalReturnRecord) : null);
     setFinalCalculation(!calcResponse.error && calcResponse.data ? (calcResponse.data as RentalFinalCalculation) : null);
+    setComparison(!comparisonResponse.error && comparisonResponse.data ? (comparisonResponse.data as InspectionComparison) : null);
   }, []);
 
   useEffect(() => {
@@ -153,6 +156,7 @@ export const ReturnFinalCalculationView: React.FC = () => {
     if (!selectedRentalId) {
       setReturnRecord(null);
       setFinalCalculation(null);
+      setComparison(null);
       return;
     }
     void loadArtifacts(selectedRentalId);
@@ -338,6 +342,15 @@ export const ReturnFinalCalculationView: React.FC = () => {
         damageCaseIds: [],
       });
       if (linked.error) throw new Error(linked.error.message);
+
+      const startSnapshot = await apiClient.rentals.getStartSnapshot(selectedRental.id);
+      const baselineInspectionId = (startSnapshot.data as any)?.preRentalInspectionId;
+      if (baselineInspectionId) {
+        const comparisonResponse = await apiClient.inspections.compare(baselineInspectionId, inspection.id);
+        if (!comparisonResponse.error && comparisonResponse.data) {
+          setComparison(comparisonResponse.data as InspectionComparison);
+        }
+      }
 
       await refreshRental(selectedRental.id);
       await loadArtifacts(selectedRental.id);
@@ -680,6 +693,35 @@ export const ReturnFinalCalculationView: React.FC = () => {
                     {selectedRental.state === "DEPOSIT_PROCESSING" && finalCalculation?.isImmutable && (
                       <button disabled={restoration} onClick={() => openAction("COMPLETE")} className="rounded-xl bg-emerald-700 px-3 py-2 text-xs font-bold text-white">Complete & release vehicle</button>
                     )}
+                  </div>
+                </div>
+              )}
+
+              {comparison && (
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+                  <div className="mb-3 flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-bold text-slate-900 dark:text-white">Departure vs return condition</p>
+                      <p className="text-[11px] text-slate-400">Canonical comparison against the pre-rental inspection baseline.</p>
+                    </div>
+                    <ClipboardCheck className="h-5 w-5 text-amber-600" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    {[
+                      ["New damage", comparison.newDamageCount],
+                      ["Worsened", comparison.worsenedDamageCount],
+                      ["Unchanged", comparison.unchangedDamageCount],
+                      ["Resolved", comparison.resolvedDamageCount],
+                    ].map(([label, value]) => (
+                      <div key={String(label)} className="rounded-xl bg-slate-50 p-3 text-center dark:bg-slate-950/60">
+                        <div className="text-lg font-bold text-slate-950 dark:text-white">{String(value)}</div>
+                        <div className="text-[10px] uppercase tracking-wide text-slate-400">{String(label)}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-3 text-[11px] text-slate-500">
+                    <span>Odometer delta: <strong>{comparison.odometerDelta.toLocaleString()} km</strong></span>
+                    <span>Fuel delta: <strong>{comparison.fuelLevelDelta}%</strong></span>
                   </div>
                 </div>
               )}
