@@ -175,6 +175,53 @@ async function runTestSuite() {
   });
 
   // --------------------------------------------------------------------------
+  // TEST 3A: DEVELOPMENT-ONLY EMAIL AUTO-VERIFICATION ALLOWLIST
+  // --------------------------------------------------------------------------
+  await test("3A. Development allowlist auto-verifies selected local test accounts only", async () => {
+    const previousAllowlist=process.env.DEV_AUTO_VERIFY_EMAILS;
+    const previousNode=process.env.NODE_ENV;
+    const previousApp=process.env.APP_ENV;
+
+    try {
+      process.env.NODE_ENV="development";
+      process.env.APP_ENV="development";
+      process.env.DEV_AUTO_VERIFY_EMAILS=" local.allowed@example.test , existing.allowed@example.test ";
+
+      emailDelivery.clearCaptured();
+      const localResult=await authService.register({
+        email:"LOCAL.ALLOWED@EXAMPLE.TEST",
+        password:"AllowedPassword#2026",
+        fullName:"Allowed Local User",
+      });
+      assert(localResult.user.emailVerified===true,"Allowlisted development registration must be verified");
+      assert(emailDelivery.getCapturedEmails().length===0,"Allowlisted development registration must not send a verification token");
+
+      // Production-like environments must ignore the same allowlist.
+      process.env.NODE_ENV="production";
+      process.env.APP_ENV="production";
+      emailDelivery.clearCaptured();
+      const productionResult=await authService.register({
+        email:"existing.allowed@example.test",
+        password:"ProductionSafePassword#2026",
+        fullName:"Production Safe User",
+      });
+      assert(productionResult.user.emailVerified===false,"Production must ignore DEV_AUTO_VERIFY_EMAILS");
+      assert(
+        emailDelivery.getLatestTokenFor("existing.allowed@example.test","EMAIL_VERIFICATION")!==null,
+        "Production-like bypass rejection must preserve normal verification flow"
+      );
+    } finally {
+      if(previousAllowlist===undefined) delete process.env.DEV_AUTO_VERIFY_EMAILS;
+      else process.env.DEV_AUTO_VERIFY_EMAILS=previousAllowlist;
+      if(previousNode===undefined) delete process.env.NODE_ENV;
+      else process.env.NODE_ENV=previousNode;
+      if(previousApp===undefined) delete process.env.APP_ENV;
+      else process.env.APP_ENV=previousApp;
+      emailDelivery.clearCaptured();
+    }
+  });
+
+  // --------------------------------------------------------------------------
   // TEST 4: AUTHENTICATION LOGIN & TOKEN CLAIMS DISCIPLINE
   // --------------------------------------------------------------------------
   let loggedInUserSession: any;
