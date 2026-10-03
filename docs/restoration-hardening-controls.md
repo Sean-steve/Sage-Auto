@@ -79,9 +79,10 @@ A planned mutation module may legitimately change counts only after the baseline
 
 ## 9. Honest per-action UI
 
-The restored company workspace is read-only by default. Each screen displays its connection status and read source.
-Unsupported actions remain disabled; empty prototype totals are not presented as authoritative business values.
-Future partial screens must distinguish connected controls from disabled controls rather than enabling the whole screen.
+The restored company workspace is read-only by default. A module may leave that state only after its explicit experience contract and mutation gate pass.
+Fleet is the first such reconstructed module and is routed to its new server-backed experience; this does not authorize any other screen.
+Unsupported legacy actions remain disabled; empty prototype totals are not presented as authoritative business values.
+Future partial screens must distinguish connected controls from disabled controls rather than enabling an unverified legacy screen.
 
 ## 10. Real email acceptance dependency
 
@@ -102,4 +103,4 @@ The isolated review mailbox is test infrastructure only.
 - typecheck/build/access/public-booking regressions pass;
 - real staging email is listed separately if still unavailable.
 
-Only after this gate should Fleet → Customers → Booking → Rental be planned.
+The restoration gate has passed and Fleet has now completed its first reconstruction/connection pass. Subsequent modules must follow the Product Experience Master Blueprint dependency order and receive the same contract → implementation → regression-gate treatment.
