@@ -33,6 +33,7 @@ import {
   IWebhookRepository,
   IOperationalInvoiceRepository,
   IDepositPositionRepository,
+  IBookingRepository,
   IOwnerSettlementRepository,
   IAuditRepository,
   IOutboxRepository,
@@ -74,6 +75,7 @@ export class PaymentService {
     private readonly webhookRepo?: IWebhookRepository,
     private readonly invoiceRepo?: IOperationalInvoiceRepository,
     private readonly depositPositionRepo?: IDepositPositionRepository,
+    private readonly bookingRepo?: IBookingRepository,
     private readonly settlementRepo?: IOwnerSettlementRepository,
     private readonly auditRepo?: IAuditRepository,
     private readonly outboxRepo?: IOutboxRepository
@@ -735,24 +737,68 @@ export class PaymentService {
       }
 
       let deposit = await this.depositPositionRepo.findById(dto.sourceId, tenantId);
-      if (!deposit) {
-        // If sourceId was a rentalId, search by rentalId
-        deposit = await this.depositPositionRepo.findByRentalId(dto.sourceId, tenantId);
+      if (!deposit) deposit = await this.depositPositionRepo.findByRentalId(dto.sourceId, tenantId);
+      if (!deposit) deposit = await this.depositPositionRepo.findByBookingId(dto.sourceId, tenantId);
+
+      let booking: any = null;
+      if (!deposit && this.bookingRepo) {
+        booking = await this.bookingRepo.findById(dto.sourceId, tenantId);
+        if (booking && Number(booking.depositRequired || 0) > 0) {
+          deposit = await this.depositPositionRepo.create({
+            tenantId,
+            bookingId: booking.id,
+            customerId: booking.customerId,
+            currency: (booking.currency || payment.currency).toUpperCase(),
+            requiredAmount: to4Dec(booking.depositRequired),
+            receivedAmount: "0.0000",
+            heldAmount: "0.0000",
+            appliedAmount: "0.0000",
+            refundDueAmount: "0.0000",
+            refundedAmount: "0.0000",
+            forfeitedAmount: "0.0000",
+            status: "REQUIRED",
+            notes: `Security deposit position for booking ${booking.bookingNumber}`,
+          });
+        }
       }
 
-      if (deposit) {
-        const newReceived = parseFloat(deposit.receivedAmount) + parseFloat(allocationAmount);
-        const newHeld = parseFloat(deposit.heldAmount) + parseFloat(allocationAmount);
+      if (!deposit) {
+        throw new DepositPositionNotFoundError(dto.sourceId);
+      }
+      if (deposit.currency !== payment.currency) {
+        throw new PaymentCurrencyMismatchError(deposit.currency, payment.currency);
+      }
 
-        await this.depositPositionRepo.update(
-          deposit.id,
+      if (!booking && deposit.bookingId && this.bookingRepo) {
+        booking = await this.bookingRepo.findById(deposit.bookingId, tenantId);
+      }
+
+      const newReceived = parseFloat(deposit.receivedAmount) + parseFloat(allocationAmount);
+      const newHeld = parseFloat(deposit.heldAmount) + parseFloat(allocationAmount);
+      const required = parseFloat(deposit.requiredAmount);
+      if (newReceived > required + 0.0001) {
+        throw new Error(
+          `Deposit allocation would exceed required amount ${deposit.requiredAmount} ${deposit.currency}.`
+        );
+      }
+      const funded = newReceived + 0.0001 >= required;
+      deposit = await this.depositPositionRepo.update(
+        deposit.id,
+        tenantId,
+        {
+          receivedAmount: to4Dec(newReceived),
+          heldAmount: to4Dec(newHeld),
+          status: funded ? "HELD" : "REQUIRED",
+        },
+        deposit.version
+      );
+
+      if (booking && this.bookingRepo) {
+        await this.bookingRepo.update(
+          booking.id,
           tenantId,
-          {
-            receivedAmount: to4Dec(newReceived),
-            heldAmount: to4Dec(newHeld),
-            status: "HELD",
-          },
-          deposit.version
+          { depositStatus: funded ? "HELD" : "REQUESTED" },
+          booking.version
         );
       }
 
@@ -760,7 +806,7 @@ export class PaymentService {
         tenantId,
         paymentId: payment.id,
         sourceType: "RENTAL_DEPOSIT",
-        sourceId: deposit ? deposit.id : dto.sourceId,
+        sourceId: deposit.id,
         amount: allocationAmount,
         currency: payment.currency,
         notes: dto.notes,
@@ -774,6 +820,12 @@ export class PaymentService {
           allocatedAmount: newAllocated,
           unallocatedAmount: newUnallocated,
           status: newStatus,
+          sourceContext: {
+            ...(payment.sourceContext || {}),
+            customerId: deposit.customerId,
+            bookingId: deposit.bookingId,
+            rentalId: deposit.rentalId,
+          },
         },
         payment.version
       );
@@ -781,7 +833,7 @@ export class PaymentService {
       postingContract = PaymentPostingContractFactory.createDepositPaymentPostingContract(
         payment,
         allocation,
-        deposit?.rentalId || dto.sourceId
+        deposit.rentalId || deposit.bookingId || dto.sourceId
       );
 
       await this.outboxRepo?.publish({
