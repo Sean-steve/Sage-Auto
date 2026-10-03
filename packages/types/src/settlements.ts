@@ -221,8 +221,11 @@ export interface OwnerSettlement {
   operatorNetRevenue?: string;
   carriedForwardBalance?: string;
 
-  // Frozen historical snapshot of terms
+  // Frozen historical terms used by the calculation. termsSnapshot remains
+  // the compatibility/primary view; termsSnapshots preserves every distinct
+  // ownership agreement represented by source lines.
   termsSnapshot?: OwnerSettlementTermsSnapshot;
+  termsSnapshots?: OwnerSettlementTermsSnapshot[];
 
   // Lifecycle & Audit
   calculatedAt: string;
@@ -288,6 +291,7 @@ export interface OwnerSettlementStatementReadModel {
     payoutMpesaNumber?: string;
   };
   commercialTerms: OwnerSettlementTermsSnapshot;
+  commercialTermsHistory?: OwnerSettlementTermsSnapshot[];
   currency: string;
   financialSummary: {
     totalEligibleRentalRevenue: string;
