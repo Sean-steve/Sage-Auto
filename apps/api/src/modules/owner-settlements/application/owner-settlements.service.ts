@@ -519,7 +519,7 @@ export class OwnerSettlementsService {
     const payoutMethod = (dto.payoutMethod as any) || (owner?.payoutMpesaNumber ? "MPESA_B2C" : "BANK_TRANSFER");
     const netAmountStr = String(settlement.netPayoutAmount);
 
-    await this.settlementRepo.createPayable({
+    const payable = await this.settlementRepo.createPayable({
       tenantId,
       settlementId: settlement.id,
       ownerId: settlement.ownerId,
@@ -538,13 +538,23 @@ export class OwnerSettlementsService {
       createdBy: actor.userId,
     });
 
-    // 3. Post to General Ledger (Debit 5100, Credit 2150, Credit 5110)
+    // 3. Post to General Ledger (Debit 5100, Credit 2150, Credit 5110).
+    // Approval is not successful unless its payable liability posting succeeds.
     if (this.ledgerService) {
       try {
         const postingContract = SettlementPostingContractFactory.createApprovalPosting(updated);
         await this.ledgerService.postFromSourceContract(tenantId, postingContract, actor);
       } catch (ledgerErr: any) {
-        console.error(`[OwnerSettlement] Ledger posting failed for ${settlement.settlementNumber}:`, ledgerErr.message);
+        await this.settlementRepo.updatePayable(payable.id, tenantId, {
+          status: "CANCELLED",
+          failureReason: "Approval ledger posting failed",
+        });
+        await this.settlementRepo.update(settlementId, tenantId, {
+          status: "CALCULATED",
+          approvedAt: undefined,
+          approvedBy: undefined,
+        });
+        throw ledgerErr;
       }
     }
 
@@ -577,17 +587,55 @@ export class OwnerSettlementsService {
       throw new SettlementNotFoundError(settlementId);
     }
 
-    if (settlement.status === "PAID") {
-      throw new Error(`Cannot dispute paid settlement ${settlement.settlementNumber}.`);
+    if (settlement.status === "PAID" || settlement.status === "PAYMENT_PENDING") {
+      throw new Error(`Cannot dispute settlement ${settlement.settlementNumber} while payment is final or in-flight.`);
     }
 
     OwnerSettlementStateMachine.assertTransition(settlement.status, "DISPUTED", settlement.settlementNumber);
+
+    // If approval already created a liability, freeze payout and reverse that
+    // accrual before moving the settlement into dispute.
+    if (settlement.status === "APPROVED") {
+      const payable = await this.settlementRepo.findPayableBySettlementId(settlement.id, tenantId);
+      if (payable && ["PROCESSING", "PAID"].includes(payable.status)) {
+        throw new Error(
+          `Cannot dispute ${settlement.settlementNumber}; payout ${payable.payableNumber} is already ${payable.status}.`
+        );
+      }
+      if (payable && payable.status !== "CANCELLED") {
+        await this.settlementRepo.updatePayable(payable.id, tenantId, {
+          status: "CANCELLED",
+          failureReason: "Cancelled because approved settlement entered dispute",
+        });
+      }
+      if (this.ledgerService) {
+        await this.ledgerService.reverseSourcePosting(
+          tenantId,
+          "OWNER_SETTLEMENT",
+          settlement.id,
+          "settlement.approved",
+          actor,
+          `Settlement ${settlement.settlementNumber} disputed before payout`
+        );
+      }
+    }
 
     const updated = await this.settlementRepo.update(settlementId, tenantId, {
       status: "DISPUTED",
       disputedAt: new Date().toISOString(),
       disputedBy: actor.userId,
       disputeReason: dto.reason || dto.disputeReason || "Disputed by owner",
+    });
+
+    await this.auditRepo?.create({
+      tenantId,
+      actorUserId: actor.userId,
+      actorType: "USER",
+      action: "OWNER_SETTLEMENT_DISPUTED",
+      resourceType: "OWNER_SETTLEMENT",
+      resourceId: updated.id,
+      description: `Settlement ${updated.settlementNumber} disputed; payout blocked`,
+      payload: { reason: updated.disputeReason, priorStatus: settlement.status },
     });
 
     return updated;
