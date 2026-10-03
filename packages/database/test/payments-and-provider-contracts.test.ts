@@ -420,11 +420,29 @@ async function runPaymentSuite() {
   // --------------------------------------------------------------------------
   console.log("\nTEST 8: Owner Settlement Payout Execution");
 
-  // Create an approved settlement payable in settlementRepo
+  // Create the approved settlement backing the payable. Payments must not
+  // disburse an orphan payable or bypass settlement approval.
+  const approvedSettlement = await settlementRepo.create({
+    tenantId,
+    settlementNumber: "SET-2026-PAYOUT-001",
+    ownerId: "owner_james_kariuki",
+    ownerName: "James Kariuki",
+    periodStart: "2026-08-01",
+    periodEnd: "2026-08-31",
+    currency: "KES",
+    status: "APPROVED",
+    calculatedAt: "2026-09-01T08:00:00Z",
+    calculatedBy: "user_finance_calculator",
+    approvedAt: "2026-09-01T09:00:00Z",
+    approvedBy: "user_finance_approver",
+    totalDeductions: "2250.0000",
+    netPayoutAmount: "42750.0000",
+  });
+
   const payable = await settlementRepo.createPayable({
     tenantId,
     payableNumber: "PAY-2026-0001",
-    settlementId: "settlement_001",
+    settlementId: approvedSettlement.id,
     ownerId: "owner_james_kariuki",
     recipientName: "James Kariuki",
     destinationMpesaNumber: "+254722334455",
@@ -437,6 +455,21 @@ async function runPaymentSuite() {
     createdBy: actor.userId,
     retryCount: 0,
   });
+
+  await assert.rejects(
+    () =>
+      paymentService.executeOwnerPayout(
+        tenantId,
+        {
+          settlementPayableId: payable.id,
+          provider: "FAKE_PROVIDER",
+          notes: "Self-approval payout must be rejected",
+        },
+        { userId: "user_finance_approver", tenantId, role: "FINANCE_ADMIN" }
+      ),
+    (err: any) => err?.code === "SEPARATION_OF_DUTIES"
+  );
+  console.log("  ✓ Settlement approver cannot execute the same payout");
 
   const payoutResult = await paymentService.executeOwnerPayout(
     tenantId,
@@ -453,6 +486,10 @@ async function runPaymentSuite() {
   assert.strictEqual(payoutResult.payment.amount, "42750.0000");
   assert.strictEqual(payoutResult.payment.status, "ALLOCATED");
   assert.strictEqual(payoutResult.payable.status, "PAID");
+  const paidSettlement = await settlementRepo.findById(approvedSettlement.id, tenantId);
+  assert.strictEqual(paidSettlement?.status, "PAID");
+  assert.ok(paidSettlement?.payoutReference, "Provider payout reference must seal the settlement");
+  console.log("  ✓ Provider payout sealed both payable and settlement PAID");
 
   // Payout on already paid payable must fail
   try {
