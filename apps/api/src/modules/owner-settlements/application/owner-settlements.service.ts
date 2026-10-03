@@ -414,8 +414,23 @@ export class OwnerSettlementsService {
       }
     }
 
-    // 5. Aggregate Batch Totals
+    // 5. Aggregate Batch Totals. Cross-currency arithmetic is forbidden.
+    if (generatedSettlements.length === 0) {
+      await this.periodRepo.update(period.id, tenantId, { status: "OPEN" });
+      throw new Error(`No eligible paid/settled owner revenue exists for period ${period.periodNumber}.`);
+    }
+
+    const batchCurrencies = new Set(generatedSettlements.map((s) => s.currency.toUpperCase()));
+    if (batchCurrencies.size !== 1) {
+      await this.periodRepo.update(period.id, tenantId, { status: "OPEN" });
+      throw new Error(
+        `Settlement batch ${period.periodNumber} contains multiple currencies (${Array.from(batchCurrencies).join(", ")}). Generate currency-specific periods instead.`
+      );
+    }
+    const batchCurrency = Array.from(batchCurrencies)[0];
+
     let totalEligible = 0;
+    let totalGross = 0;
     let totalOwner = 0;
     let totalOperator = 0;
     let totalDeductions = 0;
@@ -423,6 +438,7 @@ export class OwnerSettlementsService {
 
     for (const s of generatedSettlements) {
       totalEligible += parseFloat(s.totalEligibleRentalRevenue || "0");
+      totalGross += parseFloat(s.grossRevenue || s.totalEligibleRentalRevenue || "0");
       totalOwner += parseFloat(s.ownerGrossRevenueShare || "0");
       totalOperator += parseFloat(s.operatorGrossRevenueShare || "0");
       totalDeductions += parseFloat(String(s.totalDeductions || "0"));
@@ -441,14 +457,14 @@ export class OwnerSettlementsService {
       totalOperatorShare: totalOperator.toFixed(4),
       totalDeductions: totalDeductions.toFixed(4),
       totalNetPayout: totalNet.toFixed(4),
-      currency: period.settlementCount > 0 ? "KES" : "KES",
+      currency: batchCurrency,
       initiatedBy: actor.userId,
     });
 
     // 7. Update Period totals
     await this.periodRepo.update(period.id, tenantId, {
       settlementCount: generatedSettlements.length,
-      totalGrossRevenue: totalEligible.toFixed(4),
+      totalGrossRevenue: totalGross.toFixed(4),
       totalOwnerPayout: totalNet.toFixed(4),
       totalOperatorRevenue: totalOperator.toFixed(4),
       totalDeductions: totalDeductions.toFixed(4),
