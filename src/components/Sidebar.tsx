@@ -6,6 +6,7 @@ import {
   CalendarCheck,
   CalendarDays,
   KeyRound,
+  RotateCcw,
   ClipboardCheck,
   Wrench,
   ShieldCheck,
@@ -48,6 +49,11 @@ export const Sidebar: React.FC = () => {
   ).length;
   const activeRentalsCount = (rentals || []).filter(
     (r) => r.tenantId === activeTenantId && r.state === "ACTIVE_ON_ROAD"
+  ).length;
+  const activeReturnsCount = (rentals || []).filter(
+    (r) =>
+      r.tenantId === activeTenantId &&
+      ["RETURN_SCHEDULED", "VEHICLE_RECEIVED", "RETURN_INSPECTION_PENDING", "INSPECTION", "DAMAGE_ASSESSMENT", "FINAL_CALCULATION", "FINAL_SETTLEMENT_PENDING", "DEPOSIT_PROCESSING"].includes(r.state)
   ).length;
   const urgentComplianceCount = (complianceDocs || []).filter(
     (c) => c.tenantId === activeTenantId && (c.expiryState === "EXPIRING_SOON" || c.expiryState === "URGENT" || c.expiryState === "EXPIRED")
@@ -92,6 +98,14 @@ export const Sidebar: React.FC = () => {
       icon: <KeyRound className="w-4 h-4" />,
       badge: activeRentalsCount > 0 ? activeRentalsCount : undefined,
       badgeColor: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300",
+      category: "OPERATIONS",
+    },
+    {
+      id: "returns",
+      label: "Returns & Final Calculation",
+      icon: <RotateCcw className="w-4 h-4" />,
+      badge: activeReturnsCount > 0 ? activeReturnsCount : undefined,
+      badgeColor: "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300",
       category: "OPERATIONS",
     },
     {
