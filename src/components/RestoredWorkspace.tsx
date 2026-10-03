@@ -2,6 +2,7 @@ import React, { lazy, Suspense } from 'react';
 import { Building2, ChevronLeft, LogOut } from 'lucide-react';
 import { AppProvider, useApp } from '../lib/store';
 import { RESTORATION_SCREEN_CONNECTIONS, type AccessContext, type AccessPortal } from '../lib/access-context';
+import FleetExperience from './fleet/FleetExperience';
 import { FleetExperienceView } from './FleetExperienceView';
 
 const screens: Record<string, React.LazyExoticComponent<React.ComponentType>> = {
@@ -24,6 +25,7 @@ function Screen({section,portal}:{section:string;portal:AccessPortal}) {
   const {workspaceLoading,workspaceError,searchQuery,setSearchQuery}=useApp();
   const View=screens[section];
   const connection=RESTORATION_SCREEN_CONNECTIONS[section] || {status:'UNCONNECTED',readSource:'Not verified',mutationsEnabled:false,note:'This screen has not been connected yet.'};
+  if(section==='fleet') return <FleetExperience portal={portal} onNavigate={onSection}/>;
   if(workspaceLoading)return <p role="status" className="p-8">Loading saved workspace records…</p>;
   return <>{workspaceError&&<p role="alert" className="m-6 rounded border border-red-200 bg-red-50 p-4 text-red-900">{workspaceError}</p>}
     {section!=='fleet'&&<div id="restoration-actions-note" className="m-6 rounded border border-amber-200 bg-amber-50 p-4 text-amber-950"><strong>Original screen — {connection.status.replaceAll('_',' ').toLowerCase()}</strong><p>{connection.note}</p><p><small>Read source: {connection.readSource}. Mutations: {connection.mutationsEnabled?'verified and enabled':'disabled until the mutation acceptance gate passes'}.</small></p></div>}
