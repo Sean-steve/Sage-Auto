@@ -34,6 +34,7 @@ import {
   ContractNotFoundError,
   BookingNotFoundError,
   ContractImmutableError,
+  ConcurrencyConflictError,
   RecordNotFoundError,
 } from "@carhire/database";
 import { ContractStateMachine } from "../domain/contract-state-machine";
@@ -290,6 +291,11 @@ export class ContractService {
     if (!["GENERATED", "SENT", "SIGNED"].includes(contract.status)) {
       throw new ContractImmutableError(contractId, contract.status);
     }
+    if (dto.expectedVersion !== undefined && dto.expectedVersion !== contract.version) {
+      throw new ConcurrencyConflictError(
+        `Contract optimistic lock failure: expected version ${dto.expectedVersion}, but found ${contract.version}.`
+      );
+    }
 
     // Add signature record
     const sig = await this.contractRepo.addSignature(tenantId, contractId, {
@@ -402,6 +408,36 @@ export class ContractService {
       });
     }
 
+    await this.outboxRepo.record({
+      tenantId,
+      eventType: "contract.sent",
+      aggregateType: "RentalContract",
+      aggregateId: contract.id,
+      payload: {
+        contractId: contract.id,
+        contractNumber: contract.contractNumber,
+        bookingId: contract.bookingId,
+        deliveryMethod: dto.deliveryMethod,
+        recipientEmail: dto.recipientEmail,
+        recipientPhone: dto.recipientPhone,
+        dispatchRecorded: true,
+      },
+    });
+
+    await this.auditRepo.record({
+      tenantId,
+      actorType: toAuditActorType(actor?.actorType),
+      actorId: actor?.userId || "system",
+      action: "contract.sent",
+      resourceType: "RentalContract",
+      resourceId: contract.id,
+      metadata: {
+        deliveryMethod: dto.deliveryMethod,
+        recipientEmail: dto.recipientEmail,
+        recipientPhone: dto.recipientPhone,
+      },
+    });
+
     return updated;
   }
 
@@ -428,6 +464,11 @@ export class ContractService {
     }
     if (!data.changeReason?.trim()) {
       throw new Error("Contract amendment requires a changeReason.");
+    }
+    if (data.expectedVersion !== undefined && data.expectedVersion !== contract.version) {
+      throw new ConcurrencyConflictError(
+        `Contract optimistic lock failure: expected version ${data.expectedVersion}, but found ${contract.version}.`
+      );
     }
 
     const nextVersion = contract.contractVersion + 1;
