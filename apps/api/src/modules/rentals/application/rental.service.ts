@@ -872,6 +872,13 @@ export class RentalService {
     dto: ScheduleRentalReturnDto,
     actor: RentalActor
   ): Promise<Rental> {
+    if (dto.idempotencyKey) {
+      const cached = await this.idempotencyRepo.findByKey(tenantId, dto.idempotencyKey);
+      if (cached?.responseBody) {
+        return cached.responseBody as unknown as Rental;
+      }
+    }
+
     const rental = await this.rentalRepo.findById(rentalId, tenantId);
     if (!rental) {
       throw new RentalNotFoundError(rentalId);
@@ -935,6 +942,17 @@ export class RentalService {
       },
     });
 
+    if (dto.idempotencyKey) {
+      await this.idempotencyRepo.record({
+        tenantId,
+        idempotencyKey: dto.idempotencyKey,
+        resourceType: "RentalReturnSchedule",
+        resourceId: rentalId,
+        responseStatus: 200,
+        responseBody: updated as unknown as Record<string, unknown>,
+      });
+    }
+
     return updated;
   }
 
@@ -944,6 +962,13 @@ export class RentalService {
     dto: ReceiveReturnedVehicleDto,
     actor: RentalActor
   ): Promise<Rental> {
+    if (dto.idempotencyKey) {
+      const cached = await this.idempotencyRepo.findByKey(tenantId, dto.idempotencyKey);
+      if (cached?.responseBody) {
+        return cached.responseBody as unknown as Rental;
+      }
+    }
+
     const rental = await this.rentalRepo.findById(rentalId, tenantId);
     if (!rental) {
       throw new RentalNotFoundError(rentalId);
@@ -1024,6 +1049,17 @@ export class RentalService {
         receivedAt: now,
       },
     });
+
+    if (dto.idempotencyKey) {
+      await this.idempotencyRepo.record({
+        tenantId,
+        idempotencyKey: dto.idempotencyKey,
+        resourceType: "RentalReturnReceipt",
+        resourceId: rentalId,
+        responseStatus: 200,
+        responseBody: updated as unknown as Record<string, unknown>,
+      });
+    }
 
     return updated;
   }
@@ -1661,6 +1697,13 @@ export class RentalService {
     dto: CompleteRentalDto,
     actor: RentalActor
   ): Promise<Rental> {
+    if (dto.idempotencyKey) {
+      const cached = await this.idempotencyRepo.findByKey(tenantId, dto.idempotencyKey);
+      if (cached?.responseBody) {
+        return cached.responseBody as unknown as Rental;
+      }
+    }
+
     const rental = await this.rentalRepo.findById(rentalId, tenantId);
     if (!rental) {
       throw new RentalNotFoundError(rentalId);
@@ -1827,6 +1870,17 @@ export class RentalService {
       returnInspectionId: completedRental.returnInspectionId,
       status: "COMPLETED",
     });
+
+    if (dto.idempotencyKey) {
+      await this.idempotencyRepo.record({
+        tenantId,
+        idempotencyKey: dto.idempotencyKey,
+        resourceType: "RentalCompletion",
+        resourceId: rentalId,
+        responseStatus: 200,
+        responseBody: completedRental as unknown as Record<string, unknown>,
+      });
+    }
 
     return completedRental;
   }
