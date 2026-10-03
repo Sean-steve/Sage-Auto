@@ -331,8 +331,8 @@ export const TENANT_SYSTEM_ROLES: Record<string, SystemRoleDefinition> = {
     description: "Self-service role for assigned trips, handover digital signing, and incident logging.",
     isSystem: true,
     defaultPermissions: [
-      TENANT_PERMISSIONS.RENTAL_READ,
-      TENANT_PERMISSIONS.INSPECTION_READ,
+      // Trip/inspection reads are supplied by the linked-record self-service portal,
+      // not tenant-wide rental.read / inspection.read.
       TENANT_PERMISSIONS.INSPECTION_SIGN,
       TENANT_PERMISSIONS.RENTAL_INCIDENT_REPORT,
     ],
