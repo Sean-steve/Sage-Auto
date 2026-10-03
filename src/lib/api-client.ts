@@ -294,7 +294,35 @@ class ApiClient {
     },
   };
 
-  // 7. On-Road Rentals & Operations Context
+  // 7. Contracts & Handover Context
+  public contracts = {
+    listContracts: (params?: Record<string, any>) => {
+      const q = new URLSearchParams(params).toString();
+      return this.get<any[]>(`/contracts${q ? `?${q}` : ''}`);
+    },
+    getContract: (id: string) => this.get(`/contracts/${id}`),
+    generateContract: (dto: any) => this.post('/contracts/generate', dto),
+    sendContract: (id: string, dto: any) => this.post(`/contracts/${id}/send`, dto),
+    signContract: (id: string, dto: any) => this.post(`/contracts/${id}/sign`, dto),
+    amendContract: (id: string, dto: any) => this.post(`/contracts/${id}/amend`, dto),
+  };
+
+  public handovers = {
+    listHandovers: (params?: Record<string, any>) => {
+      const q = new URLSearchParams(params).toString();
+      return this.get<any[]>(`/handovers${q ? `?${q}` : ''}`);
+    },
+    getHandover: (id: string) => this.get(`/handovers/${id}`),
+    schedule: (dto: any) => this.post('/handovers/schedule', dto),
+    recordArrival: (id: string, dto: any) => this.post(`/handovers/${id}/arrive`, dto),
+    verifyDocuments: (id: string, dto: any) => this.post(`/handovers/${id}/verify-documents`, dto),
+    completeInspection: (id: string, dto: any) => this.post(`/handovers/${id}/inspection`, dto),
+    confirmSignature: (id: string, dto: any) => this.post(`/handovers/${id}/confirm-signature`, dto),
+    handoverKeys: (id: string, dto: any) => this.post(`/handovers/${id}/handover-keys`, dto),
+    complete: (id: string, dto: any = {}) => this.post(`/handovers/${id}/complete`, dto),
+  };
+
+  // 8. On-Road Rentals & Operations Context
   public rentals = {
     listRentals: () => this.get<any[]>('/rentals'),
     getRental: (id: string) => this.get(`/rentals/${id}`),
@@ -304,7 +332,7 @@ class ApiClient {
     recordIncident: (id: string, incident: any) => this.post(`/rentals/${id}/incidents`, incident),
   };
 
-  // 8. Vehicle Inspections & Damage Mapping Context
+  // 9. Vehicle Inspections & Damage Mapping Context
   public inspections = {
     listInspections: (params?: Record<string, any>) => {
       const q = new URLSearchParams(params).toString();
@@ -318,7 +346,7 @@ class ApiClient {
     getInspection: (id: string) => this.get(`/inspections/${id}`),
   };
 
-  // 9. Customers & Parties Context
+  // 10. Customers & Parties Context
   public customers = {
     listCustomers: (params?: Record<string, any>) => {
       const q = new URLSearchParams(params).toString();
@@ -370,7 +398,7 @@ class ApiClient {
       this.delete(`/corporate-accounts/${id}/authorized-drivers/${authorizationId}`),
   };
 
-  // 10. Pricing & Rate Engine Context
+  // 11. Pricing & Rate Engine Context
   public pricing = {
     getRatePlans: () => this.get<any[]>('/pricing/rate-plans'),
     getRatePlan: (id: string) => this.get(`/pricing/rate-plans/${id}`),
@@ -397,7 +425,7 @@ class ApiClient {
     calculateQuote: (req: any) => this.post('/pricing/calculate', req),
   };
 
-  // 11. Operational Finance & General Ledger Context
+  // 12. Operational Finance & General Ledger Context
   public finance = {
     getInvoices: () => this.get<any[]>('/finance/invoices'),
     getExpenses: () => this.get<any[]>('/finance/expenses'),
@@ -407,7 +435,7 @@ class ApiClient {
     getLedgerTransactions: () => this.get<any[]>('/ledger/transactions'),
   };
 
-  // 12. Vehicle Owner Settlements Context
+  // 13. Vehicle Owner Settlements Context
   public ownerSettlements = {
     listSettlements: () => this.get<any[]>('/owner-settlements'),
     calculateSettlement: (dto: any) => this.post('/owner-settlements/calculate', dto),
@@ -415,7 +443,7 @@ class ApiClient {
     paySettlement: (id: string, payoutRef: string) => this.post(`/owner-settlements/${id}/pay`, { payoutRef }),
   };
 
-  // 13. Payments & M-Pesa Integration Context
+  // 14. Payments & M-Pesa Integration Context
   public payments = {
     stkPush: (dto: { bookingId: string; phoneNumber: string; amount: number }) =>
       this.post('/payments/attempts', {
@@ -428,7 +456,7 @@ class ApiClient {
     getAttempts: (bookingId?: string) => this.get('/payments/attempts', bookingId ? { bookingId } : undefined),
   };
 
-  // 14. Fleet Maintenance & Servicing Context
+  // 15. Fleet Maintenance & Servicing Context
   public maintenance = {
     listWorkOrders: (params?: Record<string, any>) => {
       const q = new URLSearchParams(params).toString();
@@ -456,7 +484,7 @@ class ApiClient {
     createProvider: (dto: any) => this.post('/maintenance/providers', dto),
   };
 
-  // 15. Regulatory Compliance & Expiry Alerts Context
+  // 16. Regulatory Compliance & Expiry Alerts Context
   public compliance = {
     listRecords: (params?: Record<string, any>) => {
       const q = new URLSearchParams(params).toString();
@@ -469,7 +497,7 @@ class ApiClient {
     overrideHold: (id: string, reason: string) => this.post(`/compliance/documents/${id}/override-hold`, { reason }),
   };
 
-  // 16. Analytics & Reports Engine Context
+  // 17. Analytics & Reports Engine Context
   public analytics = {
     getDashboard: (params?: Record<string, any>) => {
       const q = new URLSearchParams(params).toString();
@@ -485,7 +513,7 @@ class ApiClient {
       this.post(`/reports/export/${reportKey}`, { format }),
   };
 
-  // 17. SaaS Control Plane & Platform Operations Context
+  // 18. SaaS Control Plane & Platform Operations Context
   public platform = {
     getAnalyticsOverview: () => this.get('/platform/analytics/overview'),
     getMrrMovements: () => this.get('/platform/analytics/mrr-movements'),
