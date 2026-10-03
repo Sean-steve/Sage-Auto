@@ -132,13 +132,13 @@ export function PricingExperienceView({portal}:Props){
   }
 
   const activePlans=plans.filter(p=>p.status==="ACTIVE").length;
-  const tabItems:{id:Tab;label:string;icon:React.ReactNode;show:boolean}[]=[
+  const tabItems=([
     {id:"plans",label:"Rate Plans",icon:<Layers3 size={16}/>,show:can("pricing.read")},
     {id:"rules",label:"Season & Duration",icon:<CalendarDays size={16}/>,show:can("pricing.read")},
     {id:"fees",label:"Fees & Add-ons",icon:<SlidersHorizontal size={16}/>,show:can("pricing.read")},
     {id:"promos",label:"Promotions",icon:<Percent size={16}/>,show:can("pricing.read")},
     {id:"quote",label:"Quote Workbench",icon:<Calculator size={16}/>,show:can("pricing.calculate")},
-  ].filter(x=>x.show);
+  ] as {id:Tab;label:string;icon:React.ReactNode;show:boolean}[]).filter(x=>x.show);
 
   return <div className="mx-auto max-w-[1500px] space-y-6 p-4 sm:p-6 lg:p-8">
     <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
