@@ -418,7 +418,7 @@ export function createFinanceController(
 
   router.get(
     "/deposits",
-    guard(TENANT_PERMISSIONS.DEPOSIT_RECORD),
+    guard(TENANT_PERMISSIONS.DEPOSIT_READ),
     async (req: Request, res: Response, next: NextFunction) => {
       try {
         const tenantId = getTenantId(req);
