@@ -336,12 +336,66 @@ class ApiClient {
 
   // 11. Operational Finance & General Ledger Context
   public finance = {
-    getInvoices: () => this.get<any[]>('/finance/invoices'),
-    getExpenses: () => this.get<any[]>('/finance/expenses'),
+    getSummary: () => this.get('/finance/summary'),
+    getInvoices: (params?: Record<string, any>) => {
+      const q = new URLSearchParams(
+        Object.entries(params || {}).filter(([, value]) => value !== undefined && value !== null && value !== '') as [string, string][]
+      ).toString();
+      return this.get<any[]>(`/finance/invoices${q ? `?${q}` : ''}`);
+    },
+    getInvoice: (id: string) => this.get(`/finance/invoices/${id}`),
+    getInvoiceHistory: (id: string) => this.get<any[]>(`/finance/invoices/${id}/history`),
+    createInvoice: (dto: any) => this.post('/finance/invoices', dto),
+    generateRentalInvoice: (dto: any) => this.post('/finance/invoices/generate-from-rental', dto),
+    issueInvoice: (id: string, dto: any = {}) => this.post(`/finance/invoices/${id}/issue`, dto),
+    voidInvoice: (id: string, dto: any) => this.post(`/finance/invoices/${id}/void`, dto),
+
+    getCreditNotes: (params?: Record<string, any>) => {
+      const q = new URLSearchParams(
+        Object.entries(params || {}).filter(([, value]) => value !== undefined && value !== null && value !== '') as [string, string][]
+      ).toString();
+      return this.get<any[]>(`/finance/credit-notes${q ? `?${q}` : ''}`);
+    },
+    createCreditNote: (dto: any) => this.post('/finance/credit-notes', dto),
+    issueCreditNote: (id: string) => this.post(`/finance/credit-notes/${id}/issue`),
+    voidCreditNote: (id: string, reason: string) => this.post(`/finance/credit-notes/${id}/void`, { reason }),
+
+    getExpenses: (params?: Record<string, any>) => {
+      const q = new URLSearchParams(
+        Object.entries(params || {}).filter(([, value]) => value !== undefined && value !== null && value !== '') as [string, string][]
+      ).toString();
+      return this.get<any[]>(`/finance/expenses${q ? `?${q}` : ''}`);
+    },
     createExpense: (dto: any) => this.post('/finance/expenses', dto),
-    recordPayment: (dto: any) => this.post('/finance/payments', dto),
+    submitExpense: (id: string) => this.post(`/finance/expenses/${id}/submit`),
+    approveExpense: (id: string, dto: any = {}) => this.post(`/finance/expenses/${id}/approve`, dto),
+    rejectExpense: (id: string, reason: string) => this.post(`/finance/expenses/${id}/reject`, { reason }),
+    voidExpense: (id: string, reason: string) => this.post(`/finance/expenses/${id}/void`, { reason }),
+
+    getDeposits: (params?: Record<string, any>) => {
+      const q = new URLSearchParams(
+        Object.entries(params || {}).filter(([, value]) => value !== undefined && value !== null && value !== '') as [string, string][]
+      ).toString();
+      return this.get<any[]>(`/finance/deposits${q ? `?${q}` : ''}`);
+    },
+    createDeposit: (dto: any) => this.post('/finance/deposits', dto),
+    applyDeposit: (id: string, dto: any) => this.post(`/finance/deposits/${id}/apply`, dto),
+
+    getRefundObligations: (params?: Record<string, any>) => {
+      const q = new URLSearchParams(
+        Object.entries(params || {}).filter(([, value]) => value !== undefined && value !== null && value !== '') as [string, string][]
+      ).toString();
+      return this.get<any[]>(`/finance/refunds${q ? `?${q}` : ''}`);
+    },
+    createRefundObligation: (dto: any) => this.post('/finance/refunds', dto),
+    approveRefundObligation: (id: string) => this.post(`/finance/refunds/${id}/approve`),
+
+    getCustomerReceivables: (customerId: string) => this.get(`/finance/receivables/customers/${customerId}`),
+    getCorporateReceivables: (corporateAccountId: string) => this.get(`/finance/receivables/corporate/${corporateAccountId}`),
+
     getLedgerAccounts: () => this.get<any[]>('/ledger/accounts'),
-    getLedgerTransactions: () => this.get<any[]>('/ledger/transactions'),
+    getLedgerTransactions: () => this.get<any[]>('/ledger/journals'),
+    getTrialBalance: (asOfDate?: string) => this.get(`/ledger/trial-balance${asOfDate ? `?asOfDate=${encodeURIComponent(asOfDate)}` : ''}`),
   };
 
   // 12. Vehicle Owner Settlements Context
@@ -352,17 +406,51 @@ class ApiClient {
     paySettlement: (id: string, payoutRef: string) => this.post(`/owner-settlements/${id}/pay`, { payoutRef }),
   };
 
-  // 13. Payments & M-Pesa Integration Context
+  // 13. Payments & Provider Integration Context
   public payments = {
-    stkPush: (dto: { bookingId: string; phoneNumber: string; amount: number }) =>
+    initiateAttempt: (dto: any) => this.post('/payments/attempts', dto),
+    stkPush: (dto: { invoiceId: string; phoneNumber: string; amount: number; customerId?: string }) =>
       this.post('/payments/attempts', {
         purpose: 'CUSTOMER_INVOICE',
         amount: String(dto.amount),
-        targetId: dto.bookingId,
+        targetId: dto.invoiceId,
+        customerId: dto.customerId,
         customerPhone: dto.phoneNumber,
         provider: 'MPESA_DARAJA',
       }),
-    getAttempts: (bookingId?: string) => this.get('/payments/attempts', bookingId ? { bookingId } : undefined),
+    listAttempts: (params?: Record<string, any>) => {
+      const q = new URLSearchParams(
+        Object.entries(params || {}).filter(([, value]) => value !== undefined && value !== null && value !== '') as [string, string][]
+      ).toString();
+      return this.get<any[]>(`/payments/attempts${q ? `?${q}` : ''}`);
+    },
+    getAttempt: (id: string) => this.get(`/payments/attempts/${id}`),
+    verifyAttempt: (id: string) => this.post(`/payments/attempts/${id}/verify`, {}),
+
+    recordManual: (dto: any) => this.post('/payments/manual', dto),
+    listPayments: (params?: Record<string, any>) => {
+      const q = new URLSearchParams(
+        Object.entries(params || {}).filter(([, value]) => value !== undefined && value !== null && value !== '') as [string, string][]
+      ).toString();
+      return this.get<any[]>(`/payments${q ? `?${q}` : ''}`);
+    },
+    getPayment: (id: string) => this.get(`/payments/${id}`),
+    allocate: (paymentId: string, dto: any) => this.post(`/payments/${paymentId}/allocate`, dto),
+    getAllocations: (paymentId: string) => this.get<any[]>(`/payments/${paymentId}/allocations`),
+
+    listRefunds: (params?: Record<string, any>) => {
+      const q = new URLSearchParams(
+        Object.entries(params || {}).filter(([, value]) => value !== undefined && value !== null && value !== '') as [string, string][]
+      ).toString();
+      return this.get<any[]>(`/payments/refunds${q ? `?${q}` : ''}`);
+    },
+    requestRefund: (dto: any) => this.post('/payments/refunds', dto),
+    approveAndExecuteRefund: (id: string) => this.post(`/payments/refunds/${id}/approve-and-execute`),
+
+    runReconciliation: () => this.post<any[]>('/payments/reconciliation/scan', {}),
+    listReconciliationIssues: (resolved?: boolean) =>
+      this.get<any[]>(`/payments/reconciliation/issues${resolved === undefined ? '' : `?resolved=${resolved}`}`),
+    resolveReconciliationIssue: (id: string) => this.post(`/payments/reconciliation/issues/${id}/resolve`),
   };
 
   // 14. Fleet Maintenance & Servicing Context
