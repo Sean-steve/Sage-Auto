@@ -48,6 +48,21 @@ export class AuthorizationService {
 
     const permissions = Array.from(permissionSet);
 
+    // Database grants remain authoritative so revocations are observed immediately.
+    // Refresh the cache after each authoritative resolution; cache failures must
+    // never fail open or prevent authorization from being calculated.
+    try {
+      await this.cacheService.set(tenantId, membershipId, {
+        roles: roles.map((role) => role.code || role.id),
+        permissions,
+        isOwner,
+        cachedAt: Date.now(),
+        version: Math.max(1, ...roles.map((role) => Number((role as any).version || 1))),
+      });
+    } catch {
+      // Cache is an optimization/derived copy only.
+    }
+
     return { roles, permissions, isOwner };
   }
 
