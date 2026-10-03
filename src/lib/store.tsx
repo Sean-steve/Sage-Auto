@@ -97,6 +97,7 @@ interface AppContextType {
   // Current Navigation & Context
   currentView: ActiveTab;
   setCurrentView: (view: ActiveTab) => void;
+  navigateSection: (section: string) => void;
   activeTenantId: string;
   setActiveTenantId: (id: string) => void;
   activeTenant: Tenant;
