@@ -16,6 +16,7 @@ import type {
 } from "@carhire/types";
 import {
   IDriverRepository,
+  ICustomerRepository,
   IPartyDocumentRepository,
   IAuditRepository,
   IOutboxRepository,
@@ -31,7 +32,8 @@ export class DriversService {
     private readonly driverRepository: IDriverRepository,
     private readonly documentRepository: IPartyDocumentRepository,
     private readonly auditRepository: IAuditRepository,
-    private readonly outboxRepository: IOutboxRepository
+    private readonly outboxRepository: IOutboxRepository,
+    private readonly customerRepository?: ICustomerRepository
   ) {}
 
   async createDriver(
@@ -293,9 +295,20 @@ export class DriversService {
     customerId: string,
     driverId: string,
     relationshipType: "PERSONAL_CHAUFFEUR" | "FAMILY_MEMBER" | "CORPORATE_DESIGNATED" | "OTHER" = "PERSONAL_CHAUFFEUR",
-    isDefault: boolean = false
+    isDefault: boolean = false,
+    actorId?: string
   ): Promise<CustomerDriverRelationship> {
-    return this.driverRepository.linkCustomerDriver({
+    const driver = await this.driverRepository.findById(driverId, tenantId);
+    if (!driver) throw new DriverNotFoundError(driverId);
+    if (this.customerRepository) {
+      const customer = await this.customerRepository.findById(customerId, tenantId);
+      if (!customer) {
+        const err: any = new Error(`Customer ${customerId} was not found in the selected tenant.`);
+        err.statusCode = 404;
+        throw err;
+      }
+    }
+    const relationship = await this.driverRepository.linkCustomerDriver({
       tenantId,
       customerId,
       driverId,
@@ -303,12 +316,64 @@ export class DriversService {
       isDefault,
       status: "ACTIVE",
     });
+    if (actorId) {
+      await this.auditRepository.record({
+        tenantId,
+        actorType: "USER",
+        actorId,
+        action: "driver.customer_linked",
+        resourceType: "CustomerDriverRelationship",
+        resourceId: relationship.id,
+        metadata: { customerId, driverId, relationshipType, isDefault },
+      });
+      await this.outboxRepository.publish({
+        tenantId,
+        eventType: "driver.customer_linked",
+        aggregateType: "CustomerDriverRelationship",
+        aggregateId: relationship.id,
+        payload: { customerId, driverId, relationshipType, isDefault },
+      });
+    }
+    return relationship;
   }
 
   async listCustomerDrivers(
     customerId: string,
     tenantId: string
   ): Promise<CustomerDriverRelationship[]> {
+    if (this.customerRepository) {
+      const customer = await this.customerRepository.findById(customerId, tenantId);
+      if (!customer) {
+        const err: any = new Error(`Customer ${customerId} was not found in the selected tenant.`);
+        err.statusCode = 404;
+        throw err;
+      }
+    }
     return this.driverRepository.listCustomerDrivers(customerId, tenantId);
+  }
+
+  async unlinkDriverFromCustomer(
+    relationshipId: string,
+    tenantId: string,
+    actorId?: string
+  ): Promise<void> {
+    await this.driverRepository.unlinkCustomerDriver(relationshipId, tenantId);
+    if (actorId) {
+      await this.auditRepository.record({
+        tenantId,
+        actorType: "USER",
+        actorId,
+        action: "driver.customer_unlinked",
+        resourceType: "CustomerDriverRelationship",
+        resourceId: relationshipId,
+      });
+      await this.outboxRepository.publish({
+        tenantId,
+        eventType: "driver.customer_unlinked",
+        aggregateType: "CustomerDriverRelationship",
+        aggregateId: relationshipId,
+        payload: { relationshipId },
+      });
+    }
   }
 }
