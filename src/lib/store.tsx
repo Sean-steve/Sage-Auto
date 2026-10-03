@@ -3854,6 +3854,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode; access?:{context
       value={{
         currentView: access ? (originalViews[access.section] || access.section) as ActiveTab : currentView,
         setCurrentView: access ? (view)=>{const section=Object.keys(originalViews).find(id=>originalViews[id]===view);if(section&&access.portal.sections.some(s=>s.id===section))access.onSection(section);} : setCurrentView,
+        navigateSection: (section:string)=>{if(access){if(access.portal.sections.some(s=>s.id===section))access.onSection(section);}else setCurrentView(section as ActiveTab);},
         activeTenantId,
         setActiveTenantId,
         activeTenant,
