@@ -29,7 +29,7 @@ export const ROLE_SECTIONS: Record<string,string[]> = {
   COMPANY_OWNER:['overview','fleet','bookings','availability','customers','rentals','returns','inspections','maintenance','compliance','owners','finance','settlements','pricing','website','team','settings'],
   TENANT_ADMIN:['overview','fleet','bookings','availability','customers','rentals','returns','inspections','maintenance','compliance','owners','finance','settlements','pricing','website','team'],
   MANAGER:['overview','bookings','availability','fleet','customers','rentals','returns','inspections','maintenance','compliance','finance','pricing'],
-  FLEET_MANAGER:['fleet','maintenance','compliance','inspections','owners'],
+  FLEET_MANAGER:['fleet','returns','maintenance','compliance','inspections','owners'],
   BOOKING_MANAGER:['bookings','availability','availability','customers','rentals','returns','pricing','leads'], BOOKING_AGENT:['bookings','availability','customers','rentals','returns'],
   FINANCE_MANAGER:['returns','finance','settlements'], ACCOUNTANT:['returns','finance','settlements'], SALES_AGENT:['leads','bookings','customers'],
   DRIVER_MANAGER:['drivers','rentals','returns','compliance'], DRIVER:['myTrips','myInspections'],
