@@ -12,7 +12,7 @@ Status meanings:
 | Overview | UNCONNECTED | No verified dashboard aggregate | DISABLED | server portal/navigation | Preserve layout only; do not treat prototype totals as business truth |
 | Fleet | PARTIAL / RECONSTRUCTED | Fleet REST API + digital twin + linked domain reads | ENABLED FOR VERIFIED FLEET COMMANDS | Fleet/ownership permissions per action | New Fleet experience is server-backed for list, register, edit, status, telemetry, ownership and Fleet documents; Maintenance/Compliance/Inspection execution remains in dedicated modules |
 | Bookings | READ_VERIFIED | `GET /api/v1/bookings` | DISABLED | `booking.read` | Saved bookings display; original workflow mutations remain quarantined |
-| Customers | READ_VERIFIED | `GET /api/v1/customers` | DISABLED | `customer.read` | Saved customers display; original mutations remain quarantined |
+| Customers & Drivers | PARTIAL / RECONSTRUCTED | Customers + Drivers + Corporate Accounts APIs | ENABLED FOR VERIFIED PEOPLE COMMANDS | Customer/Driver permissions per action | Server-backed Customer KYC/status, Driver eligibility/status, Customer↔Driver relationships and Corporate authorized-driver workflows |
 | Rentals | UNCONNECTED | Not loaded by restored provider | DISABLED | `rental.read` | Layout only |
 | Inspections | UNCONNECTED | Not loaded by restored provider | DISABLED | `inspection.read` | Layout only |
 | Maintenance | UNCONNECTED | Not loaded by restored provider | DISABLED | `maintenance.read` | Layout only |
@@ -36,7 +36,7 @@ Status meanings:
 
 ## Action-level rule
 
-Every button/form inside an unreconstructed legacy screen inherits **DISABLED** until explicit action evidence exists. Fleet is no longer served by the legacy Fleet screen in the restored company workspace; its reachable actions are governed by `docs/FLEET_EXPERIENCE_CONTRACTS.md` and `fleet-experience-contract.test.ts`. Enabling an entire legacy screen because one read endpoint works remains prohibited.
+Every button/form inside an unreconstructed legacy screen inherits **DISABLED** until explicit action evidence exists. Fleet and Customers/Drivers are no longer served by their legacy local-store screens in the restored company workspace; their reachable actions are governed by their experience contracts and targeted regression tests. Enabling an entire legacy screen because one read endpoint works remains prohibited.
 
 ## Restoration acceptance evidence required per writable action
 
