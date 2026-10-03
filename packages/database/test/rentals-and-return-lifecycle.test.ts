@@ -80,8 +80,9 @@ async function runTests() {
   console.log("\n[TEST 1] Testing Rental State Machine Transitions...");
   assert.equal(RentalStateMachine.canTransition("SCHEDULED_HANDOVER", "ACTIVE_ON_ROAD"), true);
   assert.equal(RentalStateMachine.canTransition("ACTIVE_ON_ROAD", "RETURN_SCHEDULED"), true);
-  assert.equal(RentalStateMachine.canTransition("ACTIVE_ON_ROAD", "VEHICLE_RECEIVED"), true);
-  assert.equal(RentalStateMachine.canTransition("ACTIVE_ON_ROAD", "FINAL_CALCULATION"), true);
+  assert.equal(RentalStateMachine.canTransition("ACTIVE_ON_ROAD", "VEHICLE_RECEIVED"), false);
+  assert.equal(RentalStateMachine.canTransition("ACTIVE_ON_ROAD", "FINAL_CALCULATION"), false);
+  assert.equal(RentalStateMachine.canTransition("RETURN_SCHEDULED", "VEHICLE_RECEIVED"), true);
   assert.equal(RentalStateMachine.canTransition("VEHICLE_RECEIVED", "DAMAGE_ASSESSMENT"), true);
   assert.equal(RentalStateMachine.canTransition("FINAL_CALCULATION", "DEPOSIT_PROCESSING"), true);
   assert.equal(RentalStateMachine.canTransition("DEPOSIT_PROCESSING", "COMPLETED"), true);
@@ -329,15 +330,36 @@ async function runTests() {
   assert.equal(receivedRental.state, "VEHICLE_RECEIVED");
   assert.equal(receivedRental.returnOdometer, 46600);
   assert.equal(receivedRental.returnFuelLevel, 60);
-  console.log("✓ Vehicle successfully received at branch. State:", receivedRental.state);
+  const mergedReturnRecord = await rentalRepo.getReturnRecord(rental.id, tenantId);
+  assert.equal(mergedReturnRecord?.scheduledReturnAt, "2026-09-07T10:00:00Z");
+  assert.equal(mergedReturnRecord?.actualReturnAt, "2026-09-07T12:00:00Z");
+  assert.equal(mergedReturnRecord?.returnOdometer, 46600);
+  console.log("✓ Vehicle successfully received and scheduled return facts were preserved.");
 
   // --------------------------------------------------------------------------
   // TEST 6: Link Damage Cases to Rental
   // --------------------------------------------------------------------------
   console.log("\n[TEST 6] Linking Observed Damage Cases...");
+  const returnInspection = await inspectionRepo.create(tenantId, {
+    inspectionType: "RETURN",
+    vehicleId: vehicle.id,
+    rentalId: rental.id,
+    bookingId: booking.id,
+    odometer: 46600,
+    fuelLevel: 60,
+    overallCondition: "FAIR",
+    performedByMembershipId: "mbr-sprint16-return",
+    actorUserId: actor.userId,
+    actorType: actor.actorType,
+  } as any);
+  await inspectionRepo.update(returnInspection.id, tenantId, {
+    status: "COMPLETED",
+    completedAt: "2026-09-07T12:20:00Z",
+  } as any);
+
   const damageCase = await damageRepo.create(tenantId, {
     vehicleId: vehicle.id,
-    inspectionId: "insp-return-16001",
+    inspectionId: returnInspection.id,
     rentalId: rental.id,
     damageType: "SCRATCH",
     severity: "MINOR",
@@ -351,7 +373,7 @@ async function runTests() {
     tenantId,
     rental.id,
     {
-      inspectionId: "insp-return-16001",
+      inspectionId: returnInspection.id,
       damageCaseIds: [damageCase.id],
     },
     actor
@@ -428,7 +450,7 @@ async function runTests() {
     tenantId,
     rental.id,
     {
-      settlementStatus: "SETTLED",
+      settlementStatus: "CHARGED",
       additionalChargedAmount: 70,
       paymentMethod: "MPESA",
       transactionReference: "QKD883921Z",
@@ -437,7 +459,7 @@ async function runTests() {
     actor
   );
 
-  assert.equal(settledCalc.depositSettlementStatus, "SETTLED");
+  assert.equal(settledCalc.depositSettlementStatus, "CHARGED");
   assert.equal(settledCalc.isImmutable, true);
   console.log("✓ Deposit settlement sealed as immutable and recorded.");
 
