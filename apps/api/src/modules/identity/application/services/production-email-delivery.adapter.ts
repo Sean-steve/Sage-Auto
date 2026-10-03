@@ -22,8 +22,10 @@ export class ProductionEmailDeliveryAdapter implements IEmailDeliveryPort {
       throw unavailable('APP_PUBLIC_URL must be a valid absolute URL.');
     }
 
-    const environment=(process.env.APP_ENV||process.env.NODE_ENV||'development').toLowerCase();
-    const productionLike=environment==='production'||environment==='staging';
+    const environments=[process.env.APP_ENV,process.env.NODE_ENV]
+      .filter(Boolean)
+      .map(value=>String(value).toLowerCase());
+    const productionLike=environments.some(value=>value==='production'||value==='staging');
     const localHosts=new Set(['localhost','127.0.0.1','[::1]']);
     const secure=parsed.protocol==='https:';
     const localDevelopment=parsed.protocol==='http:'&&localHosts.has(parsed.hostname);
