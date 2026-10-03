@@ -444,6 +444,18 @@ async function runTests() {
     estimatedRepairCost: 7500,
   });
 
+  await damageRepo.create(tenantId, {
+    vehicleId: vehicle.id,
+    inspectionId: returnInspection.id,
+    rentalId: rental.id,
+    damageType: "MECHANICAL",
+    severity: "MINOR",
+    bodyZone: "UNDERBODY",
+    description: "Operator-attributable workshop item that must not be charged to the customer",
+    responsibleParty: "OPERATOR",
+    estimatedRepairCost: 9000,
+  });
+
   const inspectionLinkedRental = await service.linkReturnInspection(
     tenantId,
     rental.id,
@@ -507,6 +519,7 @@ async function runTests() {
   assert.equal(calculation.billableLateHours, 3);
   assert.equal(calculation.lateReturnFee, 1500);
   assert.equal(calculation.totalDamageCharge, 7500);
+  console.log("✓ Operator-attributable damage was excluded from customer final charges.");
   assert.equal(calculation.depositHeldAmount, 30000);
   // Post rental incidental charges = 14000 (excess km) + 4070 (fuel) + 500 (refuel fee) + 1500 (late) + 7500 (damage) + 3000 (500 refuel + 2500 cleaning) = 30070
   // Deposit held = 30000. Incidental total = 30070.
@@ -549,6 +562,19 @@ async function runTests() {
 
   assert.equal(settledCalc.depositSettlementStatus, "CHARGED");
   assert.equal(settledCalc.isImmutable, true);
+
+  await assert.rejects(
+    async () => {
+      await service.completeRental(
+        tenantId,
+        rental.id,
+        {} as any,
+        actor
+      );
+    },
+    /explicit vehicle disposition/i
+  );
+  console.log("✓ Completion cannot silently release a vehicle without an explicit disposition.");
 
   const sealedReplay = await service.calculateFinalRental(
     tenantId,
