@@ -9,7 +9,10 @@ import { TENANT_PERMISSIONS } from "@carhire/constants";
 
 export function createFinanceController(
   financeService: FinanceService,
-  permissionGuard?: (perm: string) => (req: Request, res: Response, next: NextFunction) => void
+  permissionGuard?: (perm: string) => (req: Request, res: Response, next: NextFunction) => void,
+  paymentService?: {
+    recordGovernedManualPayment(tenantId: string, dto: any, actor: any): Promise<any>;
+  }
 ): Router {
   const router = Router();
   const guard = (perm: string) =>
@@ -162,20 +165,46 @@ export function createFinanceController(
     }
   );
 
-  // Record manual offline payment on invoice
+  // Legacy compatibility route. Payment truth remains owned by the Payments context.
   router.post(
     "/invoices/:id/payments",
     guard(TENANT_PERMISSIONS.PAYMENT_RECORD),
     async (req: Request, res: Response, next: NextFunction) => {
       try {
+        if (!paymentService) {
+          const err: any = new Error("Canonical Payment service is unavailable.");
+          err.statusCode = 503;
+          throw err;
+        }
         const tenantId = getTenantId(req);
         const actor = getActor(req);
-        const invoice = await financeService.recordManualPayment(
+        const invoice = await financeService.getInvoice(tenantId, req.params.id);
+        const amount = String(req.body.amount ?? "");
+        const transactionReference =
+          req.body.transactionReference || req.body.providerTransactionId || req.body.reference;
+        if (!transactionReference) {
+          const err: any = new Error("Transaction reference is required for manual payment recording.");
+          err.statusCode = 400;
+          throw err;
+        }
+
+        const payment = await paymentService.recordGovernedManualPayment(
           tenantId,
-          { ...req.body, invoiceId: req.params.id },
+          {
+            purpose: "CUSTOMER_INVOICE",
+            amount,
+            currency: invoice.currency,
+            targetId: invoice.id,
+            customerId: invoice.customerId,
+            payerReference: req.body.payerReference || invoice.billingSnapshot.customerName,
+            providerTransactionId: transactionReference,
+            paidAt: req.body.paidAt,
+            notes: req.body.notes || `Legacy finance payment route for ${invoice.invoiceNumber}`,
+          },
           actor
         );
-        res.status(200).json({ success: true, data: invoice });
+        const updatedInvoice = await financeService.getInvoice(tenantId, invoice.id);
+        res.status(200).json({ success: true, data: updatedInvoice, payment });
       } catch (err) {
         next(err);
       }
