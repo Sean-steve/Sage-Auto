@@ -2,6 +2,7 @@ import { z } from "zod";
 
 export const EnvSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "staging", "production"]).default("development"),
+  APP_ENV: z.enum(["development", "test", "staging", "production"]).default("development"),
   PORT: z.coerce.number().default(3000),
   API_PREFIX: z.string().default("/api/v1"),
   DATABASE_URL: z.string().default("postgresql://postgres:postgres@localhost:5432/carhire_db?schema=public"),
