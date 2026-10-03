@@ -43,11 +43,16 @@ export class IdentityModule {
     this.tokenService = new TokenService();
     this.rateLimiter = new RateLimiterService();
 
-    // Use production email adapter in production/staging, development adapter otherwise
+    // Email transport is explicit in development so local testing can use
+    // real SendGrid delivery without switching the entire application to production.
+    // Production/staging always require a real provider and can never capture tokens.
     const env = validateEnv();
     const isProductionLike = env.NODE_ENV === "production" || env.NODE_ENV === "staging";
-    
-    if (isProductionLike) {
+    const deliveryMode = isProductionLike
+      ? "sendgrid"
+      : (env.EMAIL_DELIVERY_MODE || "capture");
+
+    if (deliveryMode === "sendgrid") {
       this.emailDelivery = new ProductionEmailDeliveryAdapter();
     } else {
       this.emailDelivery = new DevelopmentEmailDeliveryAdapter();
