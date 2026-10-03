@@ -3433,10 +3433,11 @@ export interface RentalStartReadiness {
 
 export interface CreateRentalFromBookingDto {
   bookingId: string;
-  contractId: string;
-  handoverId: string;
-  startOdometer: number;
-  startFuelLevel: number;
+  /** Optional explicit links. The server resolves the current booking contract/handover when omitted. */
+  contractId?: string;
+  handoverId?: string;
+  startOdometer?: number;
+  startFuelLevel?: number;
   notes?: string;
   idempotencyKey?: string;
 }
@@ -4061,6 +4062,18 @@ export interface RequestRentalExtensionDto {
   reason?: string;
   notes?: string;
   idempotencyKey?: string;
+}
+
+export interface RecordRentalIncidentDto {
+  type: RentalIncident["type"];
+  description: string;
+  location: string;
+  occurredAt?: string;
+  reportedAt?: string;
+  policeReportNumber?: string;
+  estimatedCost?: number;
+  evidenceIds?: string[];
+  notes?: string;
 }
 
 export interface ApproveRentalExtensionDto {
