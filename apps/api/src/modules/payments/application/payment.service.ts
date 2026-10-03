@@ -1049,6 +1049,22 @@ export class PaymentService {
       throw new SettlementAlreadyPaidError(payable.payableNumber);
     }
 
+    const settlement = await this.settlementRepo.findById(payable.settlementId, tenantId);
+    if (!settlement) {
+      throw new Error(`Settlement ${payable.settlementId} backing payable ${payable.payableNumber} was not found.`);
+    }
+    if (!["APPROVED", "PAYMENT_PENDING"].includes(settlement.status)) {
+      throw new Error(
+        `Settlement ${settlement.settlementNumber} must be APPROVED before provider payout; current status is ${settlement.status}.`
+      );
+    }
+    if (settlement.approvedBy && settlement.approvedBy === actor.userId) {
+      const err: any = new Error("Owner payout execution requires a different authorized user from the settlement approver.");
+      err.code = "SEPARATION_OF_DUTIES";
+      err.statusCode = 409;
+      throw err;
+    }
+
     if (this.isProductionLike() && (!dto.provider || dto.provider === "FAKE_PROVIDER")) {
       throw new Error(
         "Production and staging require an explicit payment provider; FAKE_PROVIDER is forbidden."
@@ -1057,6 +1073,14 @@ export class PaymentService {
 
     const providerName = dto.provider || "FAKE_PROVIDER";
     const provider = this.providerRegistry.get(providerName);
+
+    await this.settlementRepo.updatePayableStatus(payable.id, tenantId, "PROCESSING");
+    if (settlement.status !== "PAYMENT_PENDING") {
+      await this.settlementRepo.update(settlement.id, tenantId, {
+        status: "PAYMENT_PENDING",
+        paymentPendingAt: new Date().toISOString(),
+      });
+    }
 
     const payoutResult = await provider.executePayout({
       tenantId,
@@ -1072,6 +1096,7 @@ export class PaymentService {
 
     if (!payoutResult.success) {
       await this.settlementRepo.updatePayableStatus(payable.id, tenantId, "FAILED");
+      await this.settlementRepo.update(settlement.id, tenantId, { status: "APPROVED" });
       throw new Error(`Owner settlement payout failed: ${payoutResult.failureReason}`);
     }
 
@@ -1108,6 +1133,30 @@ export class PaymentService {
       now
     );
 
+    await this.settlementRepo.update(settlement.id, tenantId, {
+      status: "PAID",
+      paidAt: payoutResult.disbursedAt || now,
+      payoutReference: payoutResult.providerTransactionId || payment.paymentNumber,
+      payoutMethod: payable.payoutMethod,
+    });
+
+    await this.auditRepo?.create({
+      tenantId,
+      actorUserId: actor.userId,
+      actorType: "USER",
+      action: "OWNER_SETTLEMENT_PAYOUT_EXECUTED",
+      resourceType: "OWNER_SETTLEMENT",
+      resourceId: settlement.id,
+      description: `Executed provider payout for ${settlement.settlementNumber} (${payment.amount} ${payment.currency})`,
+      payload: {
+        settlementId: settlement.id,
+        payableId: payable.id,
+        paymentId: payment.id,
+        provider: payment.provider,
+        providerTransactionId: payment.providerTransactionId,
+      },
+    });
+
     const postingContract = PaymentPostingContractFactory.createOwnerPayoutPostingContract(
       payment,
       payable.payableNumber,
@@ -1122,6 +1171,7 @@ export class PaymentService {
       payload: {
         paymentId: payment.id,
         payableId: payable.id,
+        settlementId: settlement.id,
         amount: payment.amount,
         postingContract,
       },
