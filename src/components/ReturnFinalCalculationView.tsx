@@ -21,7 +21,7 @@ import { apiClient } from "../lib/api-client";
 import { useApp } from "../lib/store";
 import type { InspectionComparison, Rental, RentalFinalCalculation, RentalReturnRecord } from "../types";
 
-type ActionMode = "RECEIVE" | "INSPECT" | "CALCULATE" | "SETTLE" | "COMPLETE" | null;
+type ActionMode = "RECEIVE" | "INSPECT" | "CALCULATE" | "COMPLETE" | null;
 
 type DamageDraft = {
   bodyZone: string;
@@ -72,6 +72,7 @@ export const ReturnFinalCalculationView: React.FC = () => {
     restoration,
     hasPermission,
     showNotification,
+    setCurrentView,
   } = useApp();
 
   const [rentals, setRentals] = useState<Rental[]>([]);
@@ -109,8 +110,6 @@ export const ReturnFinalCalculationView: React.FC = () => {
   const [additionalFeeLabel, setAdditionalFeeLabel] = useState("");
   const [additionalFeeAmount, setAdditionalFeeAmount] = useState("0");
 
-  const [settlementMethod, setSettlementMethod] = useState("MPESA");
-  const [settlementReference, setSettlementReference] = useState("");
   const [releaseStatus, setReleaseStatus] = useState("AVAILABLE");
   const [completionNotes, setCompletionNotes] = useState("");
 
@@ -209,9 +208,6 @@ export const ReturnFinalCalculationView: React.FC = () => {
       setReceivedAt(nowLocalInput());
       setReturnOdometer(String(selectedRental.returnOdometer ?? selectedRental.checkoutOdometer));
       setReturnFuel(String(selectedRental.returnFuelLevel ?? selectedRental.checkoutFuelLevel));
-    }
-    if (mode === "SETTLE") {
-      setSettlementReference("");
     }
     setActionMode(mode);
   };
@@ -418,51 +414,6 @@ export const ReturnFinalCalculationView: React.FC = () => {
       setActionMode(null);
     } catch (error: any) {
       showNotification(error.message || "Unable to calculate final rental charges.", "error");
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleSettlement = async (event: React.FormEvent) => {
-    event.preventDefault();
-    if (!selectedRental || !finalCalculation) return;
-    if (!hasPermission("rental.final_settle")) {
-      showNotification("You do not have permission to settle rental deposits or final balances.", "error");
-      return;
-    }
-    setSubmitting(true);
-    try {
-      let settlementStatus = "SETTLED";
-      const dto: any = {
-        settlementStatus,
-        paymentMethod: settlementMethod,
-        transactionReference: settlementReference.trim() || undefined,
-        notes: "Settled from Return & Final Calculation workspace",
-      };
-
-      if (finalCalculation.depositRefundDue > 0) {
-        settlementStatus = "REFUNDED";
-        dto.settlementStatus = settlementStatus;
-        dto.refundAmount = finalCalculation.depositRefundDue;
-      } else if (finalCalculation.depositAdditionalPaymentDue > 0) {
-        settlementStatus = "CHARGED";
-        dto.settlementStatus = settlementStatus;
-        dto.additionalChargedAmount = finalCalculation.depositAdditionalPaymentDue;
-      }
-
-      if ((settlementStatus === "REFUNDED" || settlementStatus === "CHARGED") && !settlementReference.trim()) {
-        throw new Error("Transaction reference is required for the refund or additional charge.");
-      }
-
-      const response = await apiClient.rentals.processDepositSettlement(selectedRental.id, dto);
-      if (response.error || !response.data) throw new Error(response.error?.message || "Settlement failed.");
-      setFinalCalculation(response.data as RentalFinalCalculation);
-      await refreshRental(selectedRental.id);
-      await loadArtifacts(selectedRental.id);
-      showNotification("Deposit/final settlement sealed. Rental can now be formally completed.");
-      setActionMode(null);
-    } catch (error: any) {
-      showNotification(error.message || "Unable to settle final balance.", "error");
     } finally {
       setSubmitting(false);
     }
@@ -707,8 +658,8 @@ export const ReturnFinalCalculationView: React.FC = () => {
                     {selectedRental.state === "DAMAGE_ASSESSMENT" && hasPermission("rental.final_calculate") && (
                       <button disabled={restoration} onClick={() => openAction("CALCULATE")} className="rounded-xl bg-violet-700 px-3 py-2 text-xs font-bold text-white">Calculate final charges</button>
                     )}
-                    {["FINAL_CALCULATION", "FINAL_SETTLEMENT_PENDING"].includes(selectedRental.state) && finalCalculation && hasPermission("rental.final_settle") && (
-                      <button disabled={restoration} onClick={() => openAction("SETTLE")} className="rounded-xl bg-fuchsia-700 px-3 py-2 text-xs font-bold text-white">Settle deposit / balance</button>
+                    {["FINAL_CALCULATION", "FINAL_SETTLEMENT_PENDING"].includes(selectedRental.state) && finalCalculation && (
+                      <button disabled={restoration || !hasPermission("invoice.read")} onClick={() => setCurrentView("finance")} className="rounded-xl bg-fuchsia-700 px-3 py-2 text-xs font-bold text-white disabled:opacity-50">Continue in Finance & Payments</button>
                     )}
                     {selectedRental.state === "DEPOSIT_PROCESSING" && finalCalculation?.isImmutable && hasPermission("rental.final_complete") && (
                       <button disabled={restoration} onClick={() => openAction("COMPLETE")} className="rounded-xl bg-emerald-700 px-3 py-2 text-xs font-bold text-white">Complete & release vehicle</button>
@@ -751,7 +702,7 @@ export const ReturnFinalCalculationView: React.FC = () => {
                   <div className="mb-4 flex items-center justify-between">
                     <div>
                       <p className="text-xs font-bold text-slate-900 dark:text-white">Final calculation</p>
-                      <p className="text-[11px] text-slate-400">{finalCalculation.isImmutable ? "Sealed immutable settlement snapshot" : "Reviewable calculation before settlement"}</p>
+                      <p className="text-[11px] text-slate-400">{finalCalculation.isImmutable ? "Sealed immutable settlement snapshot" : "Authoritative return calculation · Finance settlement pending"}</p>
                     </div>
                     <ReceiptText className="h-5 w-5 text-violet-600" />
                   </div>
@@ -806,8 +757,7 @@ export const ReturnFinalCalculationView: React.FC = () => {
                   {actionMode === "RECEIVE" && "Receive Returned Vehicle"}
                   {actionMode === "INSPECT" && "Return Inspection & Damage Evidence"}
                   {actionMode === "CALCULATE" && "Final Charge Calculation"}
-                  {actionMode === "SETTLE" && "Deposit / Balance Settlement"}
-                  {actionMode === "COMPLETE" && "Complete Rental & Release Vehicle"}
+                                    {actionMode === "COMPLETE" && "Complete Rental & Release Vehicle"}
                 </h2>
                 <p className="mt-1 text-xs text-slate-400">{selectedRental.rentalNumber} · authoritative return workflow</p>
               </div>
@@ -942,29 +892,6 @@ export const ReturnFinalCalculationView: React.FC = () => {
                   <label className="text-xs font-semibold">Amount<input type="number" min="0" step="0.01" value={additionalFeeAmount} onChange={(e) => setAdditionalFeeAmount(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 dark:border-slate-700 dark:bg-slate-950" /></label>
                 </div>
                 <button disabled={submitting} className="w-full rounded-xl bg-violet-700 px-4 py-2.5 text-xs font-bold text-white disabled:opacity-50">{submitting ? "Calculating…" : "Generate final calculation"}</button>
-              </form>
-            )}
-
-            {actionMode === "SETTLE" && finalCalculation && (
-              <form onSubmit={handleSettlement} className="space-y-4">
-                <div className="grid gap-2 rounded-xl bg-slate-50 p-3 text-xs dark:bg-slate-950/60">
-                  <div className="flex justify-between"><span>Deposit held</span><strong>{formatMoney(finalCalculation.depositHeldAmount)}</strong></div>
-                  <div className="flex justify-between"><span>Deductions</span><strong>{formatMoney(finalCalculation.depositDeductionsTotal)}</strong></div>
-                  <div className="flex justify-between"><span>Refund due</span><strong className="text-emerald-600">{formatMoney(finalCalculation.depositRefundDue)}</strong></div>
-                  <div className="flex justify-between"><span>Additional payment due</span><strong className="text-rose-600">{formatMoney(finalCalculation.depositAdditionalPaymentDue)}</strong></div>
-                </div>
-                {(finalCalculation.depositRefundDue > 0 || finalCalculation.depositAdditionalPaymentDue > 0) && (
-                  <>
-                    <label className="block text-xs font-semibold">Settlement method
-                      <select value={settlementMethod} onChange={(e) => setSettlementMethod(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 dark:border-slate-700 dark:bg-slate-950">
-                        <option value="MPESA">M-Pesa</option><option value="CARD">Card</option><option value="BANK_TRANSFER">Bank transfer</option><option value="CASH">Cash</option>
-                      </select>
-                    </label>
-                    <label className="block text-xs font-semibold">Transaction reference<input required value={settlementReference} onChange={(e) => setSettlementReference(e.target.value)} placeholder="Receipt / transaction reference" className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 dark:border-slate-700 dark:bg-slate-950" /></label>
-                  </>
-                )}
-                <p className="rounded-xl bg-amber-50 p-3 text-[11px] text-amber-800 dark:bg-amber-950/30 dark:text-amber-300">Sealing settlement makes the final calculation immutable.</p>
-                <button disabled={submitting} className="w-full rounded-xl bg-fuchsia-700 px-4 py-2.5 text-xs font-bold text-white disabled:opacity-50">{submitting ? "Sealing…" : finalCalculation.depositRefundDue > 0 ? "Confirm refund & seal" : finalCalculation.depositAdditionalPaymentDue > 0 ? "Confirm charge & seal" : "Seal zero-balance settlement"}</button>
               </form>
             )}
 
