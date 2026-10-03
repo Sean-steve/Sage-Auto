@@ -75,10 +75,10 @@ export class PaymentService {
     private readonly webhookRepo?: IWebhookRepository,
     private readonly invoiceRepo?: IOperationalInvoiceRepository,
     private readonly depositPositionRepo?: IDepositPositionRepository,
-    private readonly bookingRepo?: IBookingRepository,
     private readonly settlementRepo?: IOwnerSettlementRepository,
     private readonly auditRepo?: IAuditRepository,
-    private readonly outboxRepo?: IOutboxRepository
+    private readonly outboxRepo?: IOutboxRepository,
+    private readonly bookingRepo?: IBookingRepository
   ) {}
 
   // --------------------------------------------------------------------------
