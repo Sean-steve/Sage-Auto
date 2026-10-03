@@ -6,55 +6,73 @@ Baseline branch: `restoration-baseline-2026-10-03`
 
 ## Restoration acceptance result
 
-GitHub Actions workflow: **Restoration Acceptance**, run #1 — **PASS**.
+The dedicated **Restoration Acceptance** workflow is green on the reconstructed Fleet branch state.
 
 Passed gates:
 
-- frozen `pnpm install --frozen-lockfile`
-- Node 24 typecheck
-- `pnpm test:restoration`
-- `pnpm test:access` (20-role account/access regression)
-- `pnpm test:public-booking`
-- email delivery adapter regression
-- production build
+- frozen dependency install;
+- Node 24 typecheck;
+- `pnpm test:restoration`;
+- `pnpm test:fleet-experience`;
+- `pnpm test:access` covering the 20-role access foundation;
+- public-booking regression;
+- email-adapter regression;
+- production frontend build.
 
-The restoration-specific milestone is therefore technically accepted on this branch, subject to the separate real staging email delivery dependency described in `docs/access-milestone-review.md`.
+Real external email delivery over a configured HTTPS staging environment remains a separate acceptance dependency.
 
-## Full historical matrix status
+## Canonical matrix status
 
-The canonical full test matrix executed 48 suites on the same branch:
+The canonical full automated matrix now executes **49 suites**:
 
-- 42 passed
-- 6 failed
-- the new `restoration-hardening.test.ts` passed
+- **49 passed**
+- **0 failed**
 
-Failing suites are outside the files/domains changed by the restoration hardening work and remain visible as broader repository defects:
+The matrix includes:
 
-1. `authorization.test.ts` — authorization cache expectation
-2. `deployment-and-cicd-architecture.test.ts` — expected 200, received 503
-3. `domains-and-host-resolution.test.ts` — expected domain count/state mismatch
-4. `leads-sales-quotes-and-crm.test.ts` — booking fixture lacks required daily rate/rate plan
-5. `payments-and-provider-contracts.test.ts` — `MANUAL_RECORD` provider not registered for refund path
-6. `tenant-website-cms-and-branding.test.ts` — test resolves a website that remains unpublished
+- `fleet-and-vehicle-owners.test.ts` — PASS
+- `fleet-experience-contract.test.ts` — PASS
 
-These failures were **not hidden or waived**. They prevent treating the entire repository regression matrix as green and should be triaged separately before declaring whole-system readiness.
+The six previously exposed failures in authorization, deployment readiness, Domains, CRM pricing, manual refund handling and CMS maintenance resolution were repaired and remain green.
 
-## Controls now enforced
+## Fleet reconstruction status
+
+Fleet is the first operational experience allowed through the restoration mutation gate.
+
+Server-backed Fleet capabilities now include:
+
+- list/search/filter;
+- Register Vehicle;
+- Vehicle Asset Profile / digital twin;
+- canonical vehicle edit;
+- lifecycle and availability status commands;
+- mileage and fuel telemetry;
+- ownership assignment, transfer and terms changes;
+- Fleet document metadata;
+- permission-scoped Maintenance, Compliance and Inspection context;
+- primary image persistence;
+- status/telemetry/ownership history;
+- responsive desktop/mobile presentation.
+
+The legacy Fleet screen/store is no longer the reachable Fleet authority in the restored company workspace.
+
+The backend digital twin no longer publishes fabricated utilization/revenue figures. Rental history count/days are repository-backed; revenue/utilization stay unavailable until a canonical cross-domain metric is defined.
+
+## Controls still enforced
 
 - source baseline branch exists;
-- local data checkpoint tool exists and refuses review SQLite;
-- checkpoint stores counts, stable keys and SHA-256 evidence locally without committing data;
-- all restored legacy company mutations are centrally disabled by default;
-- Fleet, Bookings and Customers are explicitly marked READ_VERIFIED only for their current read paths;
-- unsupported original screens are marked UNCONNECTED rather than showing fabricated authority;
-- tenant context is cleared on portal exit, access loss, session expiry and logout;
-- personal Driver, Vehicle Owner and Renter portals remain outside the broad company loader;
+- local data checkpoint tool refuses the review SQLite database;
+- checkpoints capture counts, stable keys and hashes without committing data;
+- only reconstructed/accepted actions may become writable;
+- all other restored operational screens remain read-only;
+- tenant context clears on portal exit, access loss, session expiry and logout;
+- personal Driver, Vehicle Owner and Renter portals remain record-scoped;
 - prototype SaaS control-plane mutations remain quarantined;
-- mutation activation gate is documented;
-- real staging email remains an external acceptance dependency.
+- server permissions remain authoritative;
+- real staging email remains separately tracked.
 
-## Merge recommendation
+## Current development boundary
 
-Do not merge merely because the restoration-specific workflow is green if repository policy requires the canonical full matrix to be green.
+Fleet core is reconstructed and accepted as **PARTIAL / RECONSTRUCTED** because Maintenance, Compliance and Inspection execution intentionally remains owned by those dedicated bounded contexts.
 
-The PR is suitable for review as the completed restoration-hardening milestone. The six broader failures should be triaged explicitly rather than bundled silently into Fleet/Customers/Booking/Rental implementation.
+The next Product Experience Master Blueprint wave is **Customers & Drivers**. It must receive its own screen contract and mutation acceptance gate rather than inheriting Fleet's writable status.
