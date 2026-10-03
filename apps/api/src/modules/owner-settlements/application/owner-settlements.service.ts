@@ -18,6 +18,7 @@ import type {
   VehicleProfitabilityQueryDto,
   VehicleOwner,
   Vehicle,
+  SettledRentalRevenueComponent,
 } from "@carhire/types";
 import type {
   CreateOwnerSettlementPeriodDto,
@@ -236,12 +237,12 @@ export class OwnerSettlementsService {
       return eventDate >= periodStart && eventDate <= periodEnd;
     });
 
-    const rentalRevenueFacts = new Map<string, Awaited<ReturnType<FinanceService["getSettledRentalRevenueComponents"]>> extends infer T ? Exclude<T, null> : never>();
+    const rentalRevenueFacts = new Map<string, SettledRentalRevenueComponent>();
     const currencies = new Set<string>();
     for (const rental of candidateRentals) {
       const fact = await this.financeService.getSettledRentalRevenueComponents(tenantId, rental.id);
       if (fact?.isPaidOrSettled) {
-        rentalRevenueFacts.set(rental.id, fact as any);
+        rentalRevenueFacts.set(rental.id, fact);
         currencies.add(fact.currency.toUpperCase());
       }
     }
@@ -264,7 +265,7 @@ export class OwnerSettlementsService {
       ownerships,
       vehicles: ownerVehicles,
       rentals: candidateRentals,
-      rentalRevenueFacts: rentalRevenueFacts as any,
+      rentalRevenueFacts,
       expenses: allExpenses,
       adjustments: existingToUpdate?.adjustmentLines || [],
       periodStart,
