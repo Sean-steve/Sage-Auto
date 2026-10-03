@@ -90,6 +90,7 @@ export function ContractHandoverExperienceView({portal}:Props){
 
   async function loadContracts(){
     const request=++seq.current;setLoading(true);setError("");
+    if(!can("contract.read")){if(request===seq.current){setContracts([]);setLoading(false);}return;}
     try{
       const params:any={limit:100};
       if(contractStatus!=="ALL")params.status=contractStatus;
@@ -104,6 +105,7 @@ export function ContractHandoverExperienceView({portal}:Props){
 
   async function loadHandovers(){
     const request=++seq.current;setLoading(true);setError("");
+    if(!can("rental.read")){if(request===seq.current){setHandovers([]);setLoading(false);}return;}
     try{
       const params:any={limit:100};
       if(handoverStatus!=="ALL")params.status=handoverStatus;
@@ -158,7 +160,7 @@ export function ContractHandoverExperienceView({portal}:Props){
     {notice&&<Notice text={notice}/>}
     <section className="grid grid-cols-2 gap-3 lg:grid-cols-4"><Metric label="Contracts" value={contracts.length}/><Metric label="Signed" value={contracts.filter(x=>x.status==="SIGNED").length}/><Metric label="Active handovers" value={handovers.filter(x=>x.status!=="HANDOVER_COMPLETED").length}/><Metric label="Completed handovers" value={handovers.filter(x=>x.status==="HANDOVER_COMPLETED").length}/></section>
 
-    <div className="overflow-x-auto"><div className="inline-flex min-w-max rounded-xl border bg-white p-1 shadow-sm"><button onClick={()=>setTab("contracts")} className={"rounded-lg px-4 py-2 text-sm font-semibold "+(tab==="contracts"?"bg-slate-950 text-white":"text-slate-600")}>Contracts</button><button onClick={()=>setTab("handovers")} className={"rounded-lg px-4 py-2 text-sm font-semibold "+(tab==="handovers"?"bg-slate-950 text-white":"text-slate-600")}>Handovers</button></div></div>
+    <div className="overflow-x-auto"><div className="inline-flex min-w-max rounded-xl border bg-white p-1 shadow-sm">{can("contract.read")&&<button onClick={()=>setTab("contracts")} className={"rounded-lg px-4 py-2 text-sm font-semibold "+(tab==="contracts"?"bg-slate-950 text-white":"text-slate-600")}>Contracts</button>}{can("rental.read")&&<button onClick={()=>setTab("handovers")} className={"rounded-lg px-4 py-2 text-sm font-semibold "+(tab==="handovers"?"bg-slate-950 text-white":"text-slate-600")}>Handovers</button>}</div></div>
 
     <section className="rounded-2xl border bg-white p-4 shadow-sm"><form onSubmit={e=>{e.preventDefault();setSearch(searchInput.trim());}} className="grid gap-3 md:grid-cols-[1fr_220px_auto]"><Field label="Search"><div className="relative"><Search size={15} className="absolute left-3 top-3 text-slate-400"/><input value={searchInput} onChange={e=>setSearchInput(e.target.value)} placeholder={tab==="contracts"?"Contract number, customer, Vehicle…":"Handover number or notes…"} className={inputClass+" pl-9"}/></div></Field>{tab==="contracts"?<Field label="Contract status"><select value={contractStatus} onChange={e=>setContractStatus(e.target.value)} className={inputClass}><option>ALL</option>{["DRAFT","GENERATED","SENT","SIGNED","ACTIVE","COMPLETED","ARCHIVED"].map(x=><option key={x}>{x}</option>)}</select></Field>:<Field label="Handover status"><select value={handoverStatus} onChange={e=>setHandoverStatus(e.target.value)} className={inputClass}><option>ALL</option>{["SCHEDULED","CUSTOMER_ARRIVED","DOCUMENT_VERIFIED","PRE_RENTAL_INSPECTION","SIGNATURE","KEY_HANDOVER","HANDOVER_COMPLETED"].map(x=><option key={x}>{x}</option>)}</select></Field>}<div className="flex items-end"><button className={secondary+" w-full"}>Apply search</button></div></form></section>
 
