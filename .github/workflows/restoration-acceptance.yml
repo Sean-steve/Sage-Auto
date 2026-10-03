@@ -58,6 +58,9 @@ jobs:
       - name: Pricing experience contract regression
         run: pnpm test:pricing-experience
 
+      - name: Availability experience contract regression
+        run: pnpm test:availability-experience
+
       - name: Account and 20-role access regression
         run: pnpm test:access
 
