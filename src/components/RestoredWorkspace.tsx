@@ -3,6 +3,7 @@ import { Building2, ChevronLeft, LogOut } from 'lucide-react';
 import { AppProvider, useApp } from '../lib/store';
 import { RESTORATION_SCREEN_CONNECTIONS, type AccessContext, type AccessPortal } from '../lib/access-context';
 import { FleetExperienceView } from './FleetExperienceView';
+import { CustomersDriversExperienceView } from './CustomersDriversExperienceView';
 
 const screens: Record<string, React.LazyExoticComponent<React.ComponentType>> = {
   overview:lazy(()=>import('./DashboardView').then(m=>({default:m.DashboardView}))),
@@ -24,11 +25,13 @@ function Screen({section,portal}:{section:string;portal:AccessPortal}) {
   const {workspaceLoading,workspaceError,searchQuery,setSearchQuery}=useApp();
   const View=screens[section];
   const connection=RESTORATION_SCREEN_CONNECTIONS[section] || {status:'UNCONNECTED',readSource:'Not verified',mutationsEnabled:false,note:'This screen has not been connected yet.'};
+  if(section==='fleet') return <FleetExperienceView portal={portal}/>;
+  if(section==='customers') return <CustomersDriversExperienceView portal={portal}/>;
   if(workspaceLoading)return <p role="status" className="p-8">Loading saved workspace records…</p>;
   return <>{workspaceError&&<p role="alert" className="m-6 rounded border border-red-200 bg-red-50 p-4 text-red-900">{workspaceError}</p>}
-    {section!=='fleet'&&<div id="restoration-actions-note" className="m-6 rounded border border-amber-200 bg-amber-50 p-4 text-amber-950"><strong>Original screen — {connection.status.replaceAll('_',' ').toLowerCase()}</strong><p>{connection.note}</p><p><small>Read source: {connection.readSource}. Mutations: {connection.mutationsEnabled?'verified and enabled':'disabled until the mutation acceptance gate passes'}.</small></p></div>}
-    {['bookings','customers'].includes(section)&&<label className="block mx-6 text-sm">Search saved records<input className="block mt-1 border rounded px-3 py-2" value={searchQuery} onChange={e=>setSearchQuery(e.target.value)}/></label>}
-    {section==='fleet'?<FleetExperienceView portal={portal}/>:View?<fieldset disabled={!connection.mutationsEnabled} aria-describedby="restoration-actions-note" className="min-w-0 border-0 p-0"><Suspense fallback={<p role="status" className="p-8">Opening your screen…</p>}><View/></Suspense></fieldset>:<p className="p-8">This role's workflow is not connected yet.</p>}
+    {!['fleet','customers'].includes(section)&&<div id="restoration-actions-note" className="m-6 rounded border border-amber-200 bg-amber-50 p-4 text-amber-950"><strong>Original screen — {connection.status.replaceAll('_',' ').toLowerCase()}</strong><p>{connection.note}</p><p><small>Read source: {connection.readSource}. Mutations: {connection.mutationsEnabled?'verified and enabled':'disabled until the mutation acceptance gate passes'}.</small></p></div>}
+    {section==='bookings'&&<label className="block mx-6 text-sm">Search saved records<input className="block mt-1 border rounded px-3 py-2" value={searchQuery} onChange={e=>setSearchQuery(e.target.value)}/></label>}
+    {View?<fieldset disabled={!connection.mutationsEnabled} aria-describedby="restoration-actions-note" className="min-w-0 border-0 p-0"><Suspense fallback={<p role="status" className="p-8">Opening your screen…</p>}><View/></Suspense></fieldset>:<p className="p-8">This role's workflow is not connected yet.</p>}
   </>;
 }
 export function RestoredWorkspace({context,portal,section,onSection,onSwitch,onSignOut}:{context:AccessContext;portal:AccessPortal;section:string;onSection:(s:string)=>void;onSwitch:()=>void;onSignOut:()=>void}) {
