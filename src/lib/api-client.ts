@@ -60,7 +60,15 @@ class ApiClient {
 
   public setTenantId(tenantId: string) {
     this.tenantId = tenantId;
-    localStorage.setItem('carhire_active_tenant_id', tenantId);
+    if (tenantId) {
+      localStorage.setItem('carhire_active_tenant_id', tenantId);
+    } else {
+      localStorage.removeItem('carhire_active_tenant_id');
+    }
+  }
+
+  public clearTenantId() {
+    this.setTenantId('');
   }
 
   public getTenantId(): string {
