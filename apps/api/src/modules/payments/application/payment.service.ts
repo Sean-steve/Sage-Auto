@@ -573,28 +573,34 @@ export class PaymentService {
     });
 
     if (dto.targetId) {
-      if (dto.purpose === "CUSTOMER_INVOICE") {
-        await this.allocatePayment(
-          tenantId,
-          {
-            paymentId: payment.id,
-            sourceType: "CUSTOMER_INVOICE",
-            sourceId: dto.targetId,
-            amount: payment.amount,
-          },
-          actor
-        );
-      } else if (dto.purpose === "RENTAL_DEPOSIT") {
-        await this.allocatePayment(
-          tenantId,
-          {
-            paymentId: payment.id,
-            sourceType: "RENTAL_DEPOSIT",
-            sourceId: dto.targetId,
-            amount: payment.amount,
-          },
-          actor
-        );
+      try {
+        if (dto.purpose === "CUSTOMER_INVOICE") {
+          await this.allocatePayment(
+            tenantId,
+            {
+              paymentId: payment.id,
+              sourceType: "CUSTOMER_INVOICE",
+              sourceId: dto.targetId,
+              amount: payment.amount,
+            },
+            actor
+          );
+        } else if (dto.purpose === "RENTAL_DEPOSIT") {
+          await this.allocatePayment(
+            tenantId,
+            {
+              paymentId: payment.id,
+              sourceType: "RENTAL_DEPOSIT",
+              sourceId: dto.targetId,
+              amount: payment.amount,
+            },
+            actor
+          );
+        }
+      } catch (allocationError) {
+        // Money was genuinely recorded. Never roll the Payment fact back because
+        // an obligation binding failed; reconciliation can safely resolve it.
+        console.error("Manual payment recorded but auto-allocation failed:", allocationError);
       }
     }
 
@@ -639,6 +645,13 @@ export class PaymentService {
 
       if (invoice.currency !== payment.currency) {
         throw new PaymentCurrencyMismatchError(invoice.currency, payment.currency);
+      }
+
+      const outstanding = parseFloat(invoice.amountOutstanding);
+      if (parseFloat(allocationAmount) > outstanding + 0.0001) {
+        throw new Error(
+          `Allocation ${allocationAmount} ${payment.currency} exceeds invoice outstanding balance ${invoice.amountOutstanding}.`
+        );
       }
 
       const newPaid = parseFloat(invoice.amountPaid) + parseFloat(allocationAmount);
