@@ -67,6 +67,7 @@ export const RentalsView: React.FC = () => {
     restoration,
     hasPermission,
     showNotification,
+    setCurrentView,
   } = useApp();
 
   const [rentals, setRentals] = useState<Rental[]>([]);
@@ -618,11 +619,20 @@ export const RentalsView: React.FC = () => {
                 <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4 text-xs dark:border-blue-900 dark:bg-blue-950/20">
                   <div className="flex items-start gap-3">
                     <ClipboardCheck className="mt-0.5 h-5 w-5 text-blue-600" />
-                    <div>
+                    <div className="flex-1">
                       <p className="font-bold text-blue-900 dark:text-blue-200">Return handoff is active</p>
                       <p className="mt-1 text-blue-700 dark:text-blue-300">
-                        Rental Operations has completed its handoff. Vehicle receipt, return inspection, damage assessment, final calculation and deposit settlement belong to the next Return & Final Calculation experience.
+                        Rental Operations has completed its handoff. Vehicle receipt, return inspection, damage assessment, final calculation and deposit settlement continue in the Return & Final Calculation experience.
                       </p>
+                      <button
+                        onClick={() => {
+                          setSelectedRentalId(null);
+                          setCurrentView("returns");
+                        }}
+                        className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-blue-700 px-3 py-1.5 text-[11px] font-bold text-white hover:bg-blue-800"
+                      >
+                        Open Return & Final Calculation <ArrowRight className="h-3.5 w-3.5" />
+                      </button>
                     </div>
                   </div>
                 </div>
