@@ -326,6 +326,7 @@ class ApiClient {
   public rentals = {
     listRentals: () => this.get<any[]>('/rentals'),
     getRental: (id: string) => this.get(`/rentals/${id}`),
+    getReadiness: (bookingId: string) => this.get(`/rentals/readiness/${bookingId}`),
     startRental: (bookingId: string) => this.post('/rentals/start', { bookingId }),
     extendRental: (id: string, dto: any) => this.post(`/rentals/${id}/extend`, dto),
     completeRental: (id: string, dto: any) => this.post(`/rentals/${id}/complete`, dto),
