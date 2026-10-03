@@ -120,6 +120,41 @@ export class FinanceService {
   }
 
   // --------------------------------------------------------------------------
+  // 0. AUTHORITATIVE FINANCE READ MODELS
+  // --------------------------------------------------------------------------
+
+  async listInvoices(tenantId: string, filter: Record<string, any> = {}): Promise<OperationalInvoice[]> {
+    return this.invoiceRepo.listByTenant(tenantId, filter as any);
+  }
+
+  async getInvoice(tenantId: string, invoiceId: string): Promise<OperationalInvoice> {
+    const invoice = await this.invoiceRepo.findById(invoiceId, tenantId);
+    if (!invoice) throw new OperationalInvoiceNotFoundError(invoiceId);
+    return invoice;
+  }
+
+  async getInvoiceStatusHistory(tenantId: string, invoiceId: string): Promise<any[]> {
+    await this.getInvoice(tenantId, invoiceId);
+    return this.invoiceRepo.getStatusHistory(invoiceId, tenantId);
+  }
+
+  async listCreditNotes(tenantId: string, filter: Record<string, any> = {}): Promise<CreditNote[]> {
+    return this.creditNoteRepo.listByTenant(tenantId, filter as any);
+  }
+
+  async listExpenses(tenantId: string, filter: Record<string, any> = {}): Promise<OperationalExpense[]> {
+    return this.expenseRepo.listByTenant(tenantId, filter as any);
+  }
+
+  async listDepositPositions(tenantId: string, filter: Record<string, any> = {}): Promise<DepositPosition[]> {
+    return this.depositPositionRepo.listByTenant(tenantId, filter as any);
+  }
+
+  async listRefundObligations(tenantId: string, filter: Record<string, any> = {}): Promise<RefundObligation[]> {
+    return this.refundObligationRepo.listByTenant(tenantId, filter as any);
+  }
+
+  // --------------------------------------------------------------------------
   // 1. INVOICE OPERATIONS
   // --------------------------------------------------------------------------
 
