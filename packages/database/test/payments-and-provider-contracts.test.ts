@@ -389,11 +389,22 @@ async function runPaymentSuite() {
   }
   console.log("  ✓ Refund exceeding payment balance strictly rejected");
 
+  assert.strictEqual(refundReq.requestedBy, actor.userId);
+
+  // Four-eyes: requester cannot approve their own refund.
+  await assert.rejects(
+    async () => paymentService.approveAndExecuteRefund(tenantId, refundReq.id, actor),
+    (err: any) => err?.code === "SEPARATION_OF_DUTIES"
+  );
+  console.log("  ✓ Refund requester cannot self-approve");
+
+  const refundApprover = { userId: "usr-finance-approver", actorType: "USER" as const, name: "Finance Approver" };
+
   // Approve and execute refund
   const executedRefund = await paymentService.approveAndExecuteRefund(
     tenantId,
     refundReq.id,
-    actor
+    refundApprover
   );
 
   assert.strictEqual(executedRefund.status, "COMPLETED");
