@@ -1,0 +1,25 @@
+{
+  "name": "@carhire/worker",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/main.js",
+    "dev": "tsx watch src/main.ts"
+  },
+  "dependencies": {
+    "@carhire/config": "workspace:*",
+    "@carhire/constants": "workspace:*",
+    "@carhire/contracts": "workspace:*",
+    "@carhire/database": "workspace:*",
+    "@carhire/types": "workspace:*",
+    "@carhire/utils": "workspace:*",
+    "@carhire/validation": "workspace:*",
+    "bullmq": "^5.41.6",
+    "ioredis": "^5.6.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.1",
+    "typescript": "^5.7.2"
+  }
+}

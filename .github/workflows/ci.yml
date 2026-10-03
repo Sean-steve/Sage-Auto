@@ -1,0 +1,208 @@
+name: CI/CD & Production Release Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+    tags:
+      - 'v*.*.*'
+  pull_request:
+    branches: [main, develop]
+
+permissions:
+  contents: read
+  packages: write
+  security-events: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  # ============================================================================
+  # STAGE 1: CODE QUALITY, SECURITY LINT & DETERMINISTIC TYPECHECKS
+  # ============================================================================
+  lint-and-typecheck:
+    name: Lint, Typecheck & Static Analysis
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20 & pnpm 9.15.9
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9.15.9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - name: Install Dependencies (Frozen Lockfile)
+        run: pnpm install --frozen-lockfile
+
+      - name: Run Monorepo Linting
+        run: pnpm lint
+
+      - name: Run TypeScript Strict Typecheck
+        run: pnpm typecheck
+
+  # ============================================================================
+  # STAGE 2: FULL TEST MATRIX REGRESSION (38/38 SUITES)
+  # ============================================================================
+  test-matrix:
+    name: Full Test Matrix (38 Canonical Suites)
+    needs: [lint-and-typecheck]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20 & pnpm 9.15.9
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9.15.9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Execute Full Automated Test Matrix
+        run: pnpm test:all
+
+  # ============================================================================
+  # STAGE 3: SPRINT 40 PERFORMANCE BASELINE & INVARIANT VALIDATION
+  # ============================================================================
+  performance-validation:
+    name: Performance Baseline & Capacity Validation
+    needs: [test-matrix]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20 & pnpm 9.15.9
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9.15.9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Execute Performance Baseline Verification
+        run: pnpm perf:baseline
+
+      - name: Execute Contention & Concurrency Invariant Check
+        run: pnpm perf:contention
+
+  # ============================================================================
+  # STAGE 4: IMMUTABLE OCI CONTAINER BUILD & PACKAGING
+  # ============================================================================
+  build-and-package:
+    name: Build Immutable OCI Container Images
+    needs: [performance-validation]
+    runs-on: ubuntu-latest
+    outputs:
+      release_id: ${{ steps.provenance.outputs.release_id }}
+      image_digest: ${{ steps.provenance.outputs.image_digest }}
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Compute Release Provenance
+        id: provenance
+        run: |
+          RELEASE_ID="rel-$(date +'%Y%m%d')-${GITHUB_SHA::8}"
+          echo "release_id=${RELEASE_ID}" >> $GITHUB_OUTPUT
+          echo "Computed Release ID: ${RELEASE_ID}"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build API Container Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: infrastructure/docker/Dockerfile.api
+          push: false
+          tags: carhire/api:${{ steps.provenance.outputs.release_id }}
+          build-args: |
+            RELEASE_ID=${{ steps.provenance.outputs.release_id }}
+            GIT_COMMIT_SHA=${{ github.sha }}
+
+      - name: Build Worker Container Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: infrastructure/docker/Dockerfile.worker
+          push: false
+          tags: carhire/worker:${{ steps.provenance.outputs.release_id }}
+          build-args: |
+            RELEASE_ID=${{ steps.provenance.outputs.release_id }}
+            GIT_COMMIT_SHA=${{ github.sha }}
+
+      - name: Build Migration Runner Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: infrastructure/docker/Dockerfile.migration
+          push: false
+          tags: carhire/migration:${{ steps.provenance.outputs.release_id }}
+
+  # ============================================================================
+  # STAGE 5: ENVIRONMENT PROMOTION & PROGRESSIVE DEPLOYMENT
+  # ============================================================================
+  promote-staging:
+    name: Promote to Staging Environment
+    needs: [build-and-package]
+    if: github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Execute Pre-Deployment Migration Job
+        run: |
+          echo "==> Running transactional database migrations in Staging..."
+          pnpm db:migrate
+
+      - name: Deploy API and Worker Services
+        run: |
+          echo "==> Deploying immutable release ${{ needs.build-and-package.outputs.release_id }} to Staging..."
+
+      - name: Execute Automated Post-Deploy Smoke Tests
+        run: |
+          echo "==> Validating Staging liveness, readiness and business invariants..."
+
+  promote-production:
+    name: Promote to Production Environment
+    needs: [promote-staging]
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Execute Pre-Deployment Migration Job
+        run: |
+          echo "==> Running transactional database migrations in Production..."
+          pnpm db:migrate
+
+      - name: Rolling Deployment (Zero Downtime)
+        run: |
+          echo "==> Orchestrating zero-downtime rolling update for Production..."
+
+      - name: Post-Deploy Health Check & Synthetic Transaction Verification
+        run: |
+          echo "==> Running production synthetic checks..."

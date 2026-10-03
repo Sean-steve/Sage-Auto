@@ -1,0 +1,18 @@
+{
+  "name": "@carhire/public-web",
+  "version": "0.1.0",
+  "private": true,
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "dependencies": {
+    "@carhire/config": "workspace:*",
+    "@carhire/constants": "workspace:*",
+    "@carhire/contracts": "workspace:*",
+    "@carhire/types": "workspace:*",
+    "@carhire/ui": "workspace:*",
+    "@carhire/utils": "workspace:*",
+    "lucide-react": "^0.546.0",
+    "react": "^19.0.1",
+    "react-dom": "^19.0.1"
+  }
+}

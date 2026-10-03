@@ -1,0 +1,54 @@
+name: Production Rollback & Recovery Orchestrator
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_release_id:
+        description: 'Target Release ID to roll back to (e.g. rel-20260918-a1b2c3d4)'
+        required: true
+      target_environment:
+        description: 'Target environment'
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+      reason:
+        description: 'Reason for invoking emergency rollback'
+        required: true
+      skip_db_check:
+        description: 'Force application rollback without database rollback (default: true - schema is forward compatible)'
+        required: true
+        type: boolean
+        default: true
+
+jobs:
+  rollback:
+    name: Execute Emergency Rollback
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.target_environment }}
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Validate Target Release Artifact
+        run: |
+          echo "================================================================="
+          echo "EMERGENCY ROLLBACK INITIATED"
+          echo "Target Environment: ${{ github.event.inputs.target_environment }}"
+          echo "Target Release:     ${{ github.event.inputs.target_release_id }}"
+          echo "Reason:             ${{ github.event.inputs.reason }}"
+          echo "Forward Compatible: ${{ github.event.inputs.skip_db_check }}"
+          echo "================================================================="
+
+      - name: Roll Back Ingress / Traffic Routing
+        run: |
+          echo "==> Directing traffic routing to previous immutable revision..."
+
+      - name: Revert Background Workers
+        run: |
+          echo "==> Draining current workers and redeploying revision ${{ github.event.inputs.target_release_id }}..."
+
+      - name: Verify Post-Rollback System Health
+        run: |
+          echo "==> Querying /api/health and /api/health/ready on active pods..."

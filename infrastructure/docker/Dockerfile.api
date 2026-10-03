@@ -1,0 +1,67 @@
+# ============================================================================
+# CAR HIRE OS — PRODUCTION API DOCKERFILE
+# Multi-stage, Distroless/Non-Root Hardened, Immutable OCI Image
+# ============================================================================
+
+# Stage 1: Base Environment
+FROM node:24-alpine AS base
+RUN apk add --no-cache dumb-init
+WORKDIR /app
+RUN npm install -g pnpm@9
+
+# Stage 2: Monorepo Dependencies
+FROM base AS dependencies
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml* ./
+COPY apps/api/package.json ./apps/api/
+COPY packages/ ./packages/
+RUN pnpm install --frozen-lockfile --prod=false
+
+# Stage 3: Immutable Build with Build Metadata
+FROM dependencies AS builder
+ARG RELEASE_ID=dev-unknown
+ARG GIT_COMMIT_SHA=unknown
+ARG BUILD_TIMESTAMP=unknown
+
+ENV RELEASE_ID=${RELEASE_ID} \
+    GIT_COMMIT_SHA=${GIT_COMMIT_SHA} \
+    BUILD_TIMESTAMP=${BUILD_TIMESTAMP}
+
+COPY . .
+RUN pnpm --filter @carhire/api build
+
+# Prune devDependencies for production runtime
+RUN pnpm prune --prod
+
+# Stage 4: Hardened Production Runner
+FROM node:24-alpine AS runner
+WORKDIR /app
+
+RUN apk add --no-cache dumb-init
+
+# Security: Dedicated unprivileged non-root user (UID 10001)
+RUN addgroup -g 10001 appgroup && \
+    adduser -u 10001 -G appgroup -s /bin/sh -D appuser
+
+ENV NODE_ENV=production \
+    PORT=3000 \
+    API_PORT=3001
+
+COPY --chown=appuser:appgroup --from=dependencies /app/node_modules ./node_modules
+COPY --chown=appuser:appgroup --from=builder /app/apps/api/dist ./apps/api/dist
+COPY --chown=appuser:appgroup --from=builder /app/packages ./packages
+COPY --chown=appuser:appgroup --from=builder /app/apps/api/package.json ./apps/api/package.json
+COPY --chown=appuser:appgroup --from=builder /app/package.json ./package.json
+
+RUN mkdir -p /app/.data && chown appuser:appgroup /app/.data
+ENV SQLITE_PATH=/app/.data/carhire.sqlite
+VOLUME ["/app/.data"]
+
+USER appuser
+
+EXPOSE 3000 3001
+
+HEALTHCHECK --interval=15s --timeout=3s --start-period=10s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:3001/api/health/live || exit 1
+
+ENTRYPOINT ["/usr/bin/dumb-init", "--"]
+CMD ["node", "apps/api/dist/apps/api/src/main.js"]

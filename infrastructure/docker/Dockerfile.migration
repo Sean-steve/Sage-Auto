@@ -1,0 +1,21 @@
+# ============================================================================
+# CAR HIRE OS — PRODUCTION IMMUTABLE MIGRATION RUNNER DOCKERFILE
+# Dedicated Ephemeral Job for Database Migrations in Staging/Production
+# ============================================================================
+
+FROM node:24-alpine AS base
+WORKDIR /app
+RUN npm install -g pnpm@9
+
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml* ./
+COPY packages/ ./packages/
+COPY infrastructure/database/ ./infrastructure/database/
+COPY scripts/ ./scripts/
+
+RUN pnpm install --frozen-lockfile --prod=false
+RUN pnpm --filter @carhire/database build
+
+USER node
+
+ENTRYPOINT ["node", "-e", "console.log('Production Migration Job Runner ready')"]
+CMD ["pnpm", "db:migrate"]

@@ -1,0 +1,304 @@
+// ============================================================================
+// CAR HIRE OS — PRISMA CANONICAL PERSISTENCE SCHEMA (SPRINT 2 FOUNDATION)
+// Adheres strictly to DATA-001, DATA-002, DATA-003, DATA-004, DEV-009
+// ============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ----------------------------------------------------------------------------
+// 1. GLOBAL IDENTITY & USERS (DEV-004, DATA-002 §4)
+// ----------------------------------------------------------------------------
+model User {
+  id               String             @id @default(uuid()) @db.Uuid
+  email            String             @unique @db.VarChar(255)
+  normalizedEmail  String             @unique @map("normalized_email") @db.VarChar(255)
+  passwordHash     String?            @map("password_hash") @db.VarChar(255)
+  fullName         String             @map("full_name") @db.VarChar(255)
+  phone            String?            @db.VarChar(50)
+  avatarUrl        String?            @map("avatar_url") @db.VarChar(1000)
+  emailVerifiedAt  DateTime?          @map("email_verified_at") @db.Timestamptz(6)
+  status           String             @default("ACTIVE") @db.VarChar(50)
+  isPlatformStaff  Boolean            @default(false) @map("is_platform_staff")
+  createdAt        DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt        DateTime?          @map("deleted_at") @db.Timestamptz(6)
+
+  // Relationships
+  memberships             TenantMembership[]
+  sessions                AuthSession[]
+  passwordResetTokens     PasswordResetToken[]
+  emailVerificationTokens EmailVerificationToken[]
+
+  @@map("users")
+}
+
+// ----------------------------------------------------------------------------
+// 1B. AUTH SESSIONS & SECURITY TOKENS (DEV-004, SEC-007)
+// ----------------------------------------------------------------------------
+model AuthSession {
+  id               String    @id @default(uuid()) @db.Uuid
+  userId           String    @map("user_id") @db.Uuid
+  refreshTokenHash String    @map("refresh_token_hash") @db.VarChar(255)
+  tokenFamilyId    String    @map("token_family_id") @db.VarChar(255)
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  lastUsedAt       DateTime  @default(now()) @map("last_used_at") @db.Timestamptz(6)
+  expiresAt        DateTime  @map("expires_at") @db.Timestamptz(6)
+  revokedAt        DateTime? @map("revoked_at") @db.Timestamptz(6)
+  revocationReason String?   @map("revocation_reason") @db.VarChar(255)
+  ipAddress        String?   @map("ip_address") @db.VarChar(100)
+  userAgent        String?   @map("user_agent") @db.VarChar(500)
+  deviceLabel      String?   @map("device_label") @db.VarChar(255)
+
+  // Relationships
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([refreshTokenHash])
+  @@index([tokenFamilyId])
+  @@index([expiresAt])
+  @@map("auth_sessions")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  tokenHash String    @unique @map("token_hash") @db.VarChar(255)
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz(6)
+  usedAt    DateTime? @map("used_at") @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  // Relationships
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([tokenHash])
+  @@map("password_reset_tokens")
+}
+
+model EmailVerificationToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  tokenHash String    @unique @map("token_hash") @db.VarChar(255)
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz(6)
+  usedAt    DateTime? @map("used_at") @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  // Relationships
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([tokenHash])
+  @@map("email_verification_tokens")
+}
+
+// ----------------------------------------------------------------------------
+// 2. TENANTS & TENANT SETTINGS (DEV-004, DATA-002 §5)
+// ----------------------------------------------------------------------------
+model Tenant {
+  id             String             @id @default(uuid()) @db.Uuid
+  name           String             @db.VarChar(255)
+  slug           String             @unique @db.VarChar(100)
+  status         String             @default("ACTIVE") @db.VarChar(50)
+  defaultCurrency String            @default("KES") @map("default_currency") @db.VarChar(10)
+  currencySymbol String             @default("KSh") @map("currency_symbol") @db.VarChar(10)
+  timezone       String             @default("Africa/Nairobi") @db.VarChar(100)
+  countryCode    String             @default("KE") @map("country_code") @db.VarChar(10)
+  createdAt      DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt      DateTime?          @map("deleted_at") @db.Timestamptz(6)
+
+  // Relationships
+  settings       TenantSetting?
+  memberships    TenantMembership[]
+
+  @@map("tenants")
+}
+
+model TenantSetting {
+  id                    String   @id @default(uuid()) @db.Uuid
+  tenantId              String   @unique @map("tenant_id") @db.Uuid
+  vatRatePercent        Decimal  @default(16.0000) @map("vat_rate_percent") @db.Decimal(7, 4)
+  mpesaPaybill          String?  @map("mpesa_paybill") @db.VarChar(50)
+  mpesaShortcode        String?  @map("mpesa_shortcode") @db.VarChar(50)
+  mpesaPasskeyHash      String?  @map("mpesa_passkey_hash") @db.VarChar(255)
+  mpesaSandbox          Boolean  @default(true) @map("mpesa_sandbox")
+  allowedDailyKm        Int      @default(250) @map("allowed_daily_km")
+  excessKmRate          Decimal  @default(25.0000) @map("excess_km_rate") @db.Decimal(19, 4)
+  depositDefaultAmount  Decimal  @default(25000.0000) @map("deposit_default_amount") @db.Decimal(19, 4)
+  cdwDailyRate          Decimal  @default(1500.0000) @map("cdw_daily_rate") @db.Decimal(19, 4)
+  enableGpsTracking     Boolean  @default(false) @map("enable_gps_tracking")
+  requirePreauthDeposit Boolean  @default(true) @map("require_preauth_deposit")
+  flexibleConfig        Json?    @map("flexible_config")
+  createdAt             DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relationships
+  tenant                Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("tenant_settings")
+}
+
+// ----------------------------------------------------------------------------
+// 3. TENANT MEMBERSHIPS (DEV-004, DATA-002 §6)
+// ----------------------------------------------------------------------------
+model TenantMembership {
+  id        String    @id @default(uuid()) @db.Uuid
+  tenantId  String    @map("tenant_id") @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  role      String    @default("TENANT_OPERATOR") @db.VarChar(50)
+  status    String    @default("ACTIVE") @db.VarChar(50)
+  joinedAt  DateTime  @default(now()) @map("joined_at") @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relationships
+  tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, userId])
+  @@index([tenantId])
+  @@index([userId])
+  @@map("tenant_memberships")
+}
+
+// ----------------------------------------------------------------------------
+// 4. IDEMPOTENCY PERSISTENCE (DEV-009, DATA-002 §10)
+// ----------------------------------------------------------------------------
+model IdempotencyKey {
+  id             String    @id @default(uuid()) @db.Uuid
+  tenantId       String?   @map("tenant_id") @db.Uuid
+  idempotencyKey String    @map("idempotency_key") @db.VarChar(255)
+  operationScope String    @map("operation_scope") @db.VarChar(100)
+  requestHash    String    @map("request_hash") @db.VarChar(255)
+  responseStatus Int?      @map("response_status")
+  responseBody   Json?     @map("response_body")
+  status         String    @default("PENDING") @db.VarChar(50)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  expiresAt      DateTime  @map("expires_at") @db.Timestamptz(6)
+
+  @@unique([idempotencyKey, operationScope])
+  @@index([tenantId])
+  @@index([expiresAt])
+  @@map("idempotency_keys")
+}
+
+// ----------------------------------------------------------------------------
+// 5. TRANSACTIONAL OUTBOX (DEV-010, BRS-002, DATA-002 §11)
+// ----------------------------------------------------------------------------
+model OutboxEvent {
+  id               String    @id @default(uuid()) @db.Uuid
+  eventType        String    @map("event_type") @db.VarChar(100)
+  eventVersion     String    @default("1") @map("event_version") @db.VarChar(20)
+  aggregateType    String    @map("aggregate_type") @db.VarChar(100)
+  aggregateId      String    @map("aggregate_id") @db.VarChar(255)
+  aggregateVersion Int       @default(1) @map("aggregate_version")
+  tenantId         String?   @map("tenant_id") @db.Uuid
+  source           String    @default("carhire.api") @db.VarChar(100)
+  actorType        String    @default("SYSTEM") @map("actor_type") @db.VarChar(50)
+  actorId          String?   @map("actor_id") @db.Uuid
+  supportActorId   String?   @map("support_actor_id") @db.Uuid
+  correlationId    String?   @map("correlation_id") @db.VarChar(255)
+  causationId      String?   @map("causation_id") @db.VarChar(255)
+  payload          Json
+  metadata         Json?
+  occurredAt       DateTime  @default(now()) @map("occurred_at") @db.Timestamptz(6)
+  status           String    @default("PENDING") @db.VarChar(50)
+  attemptCount     Int       @default(0) @map("attempt_count")
+  availableAt      DateTime  @default(now()) @map("available_at") @db.Timestamptz(6)
+  claimedAt        DateTime? @map("claimed_at") @db.Timestamptz(6)
+  claimedBy        String?   @map("claimed_by") @db.VarChar(255)
+  publishedAt      DateTime? @map("published_at") @db.Timestamptz(6)
+  processedAt      DateTime? @map("processed_at") @db.Timestamptz(6)
+  lastError        String?   @map("last_error") @db.Text
+  lastErrorCode    String?   @map("last_error_code") @db.VarChar(100)
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([status, availableAt])
+  @@index([tenantId])
+  @@index([aggregateType, aggregateId])
+  @@index([status, claimedAt])
+  @@map("outbox_events")
+}
+
+model EventConsumption {
+  id           String    @id @default(uuid()) @db.Uuid
+  consumerName String    @map("consumer_name") @db.VarChar(150)
+  eventId      String    @map("event_id") @db.Uuid
+  eventType    String    @map("event_type") @db.VarChar(100)
+  tenantId     String?   @map("tenant_id") @db.Uuid
+  status       String    @default("PROCESSING") @db.VarChar(50)
+  attemptCount Int       @default(1) @map("attempt_count")
+  processedAt  DateTime? @map("processed_at") @db.Timestamptz(6)
+  lastError    String?   @map("last_error") @db.Text
+  metadata     Json?
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([consumerName, eventId], name: "uq_event_consumptions_consumer_event")
+  @@index([tenantId])
+  @@index([consumerName, status])
+  @@map("event_consumptions")
+}
+
+
+// ----------------------------------------------------------------------------
+// 6. WEBHOOK EVENT PERSISTENCE (DEV-009, DATA-002 §12)
+// ----------------------------------------------------------------------------
+model WebhookEvent {
+  id              String    @id @default(uuid()) @db.Uuid
+  provider        String    @db.VarChar(50)
+  providerEventId String    @map("provider_event_id") @db.VarChar(255)
+  eventType       String    @map("event_type") @db.VarChar(100)
+  payload         Json
+  headers         Json?
+  receivedAt      DateTime  @default(now()) @map("received_at") @db.Timestamptz(6)
+  verifiedAt      DateTime? @map("verified_at") @db.Timestamptz(6)
+  processedAt     DateTime? @map("processed_at") @db.Timestamptz(6)
+  status          String    @default("RECEIVED") @db.VarChar(50)
+  attemptCount    Int       @default(0) @map("attempt_count")
+  lastError       String?   @map("last_error") @db.Text
+
+  @@unique([provider, providerEventId])
+  @@index([status, receivedAt])
+  @@map("webhook_events")
+}
+
+// ----------------------------------------------------------------------------
+// 7. AUDIT LOG PERSISTENCE (SEC-003, DATA-003, DATA-002 §13)
+// ----------------------------------------------------------------------------
+model AuditLog {
+  id             String    @id @default(uuid()) @db.Uuid
+  tenantId       String?   @map("tenant_id") @db.Uuid
+  actorType      String    @map("actor_type") @db.VarChar(50)
+  actorId        String?   @map("actor_id") @db.Uuid
+  action         String    @db.VarChar(100)
+  resourceType   String    @map("resource_type") @db.VarChar(100)
+  resourceId     String    @map("resource_id") @db.VarChar(255)
+  requestId      String?   @map("request_id") @db.VarChar(255)
+  beforeSnapshot Json?     @map("before_snapshot")
+  afterSnapshot  Json?     @map("after_snapshot")
+  metadata       Json?
+  occurredAt     DateTime  @default(now()) @map("occurred_at") @db.Timestamptz(6)
+
+  @@index([tenantId, occurredAt])
+  @@index([resourceType, resourceId])
+  @@map("audit_logs")
+}
+
+// ----------------------------------------------------------------------------
+// 8. SYSTEM HEALTH & READINESS PROBE (DEV-007, DATA-002 §14)
+// ----------------------------------------------------------------------------
+model SystemHealth {
+  id        String   @id @default(uuid()) @db.Uuid
+  service   String   @db.VarChar(100)
+  status    String   @db.VarChar(50)
+  checkedAt DateTime @default(now()) @map("checked_at") @db.Timestamptz(6)
+
+  @@map("system_health")
+}

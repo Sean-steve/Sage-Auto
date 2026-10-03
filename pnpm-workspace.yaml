@@ -1,0 +1,11 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+  - "tooling/*"
+  - "infrastructure/*"
+onlyBuiltDependencies:
+  - esbuild
+  - msgpackr-extract
+  - protobufjs
+neverBuiltDependencies:
+  - '@google/genai'
