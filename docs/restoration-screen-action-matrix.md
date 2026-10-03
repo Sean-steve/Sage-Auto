@@ -20,7 +20,7 @@ Status meanings:
 | Vehicle owners | UNCONNECTED | Not loaded by restored provider | DISABLED | `vehicle_owner.read` | Layout only |
 | Finance | UNCONNECTED | Not loaded by restored provider | DISABLED | `invoice.read` | No prototype/local financial total is authoritative |
 | Settlements | UNCONNECTED | Not loaded by restored provider | DISABLED | `settlement.read` | Layout only |
-| Pricing | UNCONNECTED | Not loaded by restored provider | DISABLED | `pricing.read` | Prototype/local quote calculations are not authoritative |
+| Pricing | PARTIAL / RECONSTRUCTED | Pricing REST API: plans, matrices, assignments, rules, fees, promos, `/pricing/calculate` | ENABLED FOR VERIFIED PRICING COMMANDS | Pricing permissions per action | Server-backed Pricing workspace; legacy in-browser quote calculation is no longer reachable |
 | Availability | UNCONNECTED | Not loaded by restored provider | DISABLED | `vehicle.read` | Layout only |
 | Public website settings | UNCONNECTED | Not loaded by restored provider | DISABLED | server portal/navigation | Layout only |
 | Company settings | UNCONNECTED | Not loaded by restored provider | DISABLED | server portal/navigation | Layout only |
@@ -36,7 +36,7 @@ Status meanings:
 
 ## Action-level rule
 
-Every button/form inside an unreconstructed legacy screen inherits **DISABLED** until explicit action evidence exists. Fleet and Customers/Drivers are no longer served by their legacy local-store screens in the restored company workspace; their reachable actions are governed by their experience contracts and targeted regression tests. Enabling an entire legacy screen because one read endpoint works remains prohibited.
+Every button/form inside an unreconstructed legacy screen inherits **DISABLED** until explicit action evidence exists. Fleet, Customers/Drivers and Pricing are no longer served by their legacy local-store screens in the restored company workspace; their reachable actions are governed by their experience contracts and targeted regression tests. Enabling an entire legacy screen because one read endpoint works remains prohibited.
 
 ## Restoration acceptance evidence required per writable action
 
