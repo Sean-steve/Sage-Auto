@@ -1627,7 +1627,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode; access?:{context
       );
 
       // Live backend API synchronization
-      apiClient.bookings.rescheduleBooking(bookingId, { startDate: newStart, endDate: newEnd }).catch(() => null);
+      apiClient.bookings.amendDates(bookingId, { pickupAt: newStart, returnAt: newEnd, recalculatePricing: true, reason: 'Legacy store synchronization' }).catch(() => null);
 
       emitDomainFact("BookingRescheduled", "Booking", bookingId, { newStart, newEnd }, "bookings.reschedule");
       showNotification(`Booking ${b.bookingNumber} rescheduled successfully.`);
@@ -1672,7 +1672,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode; access?:{context
       );
 
       // Live backend API synchronization
-      apiClient.bookings.substituteVehicle(bookingId, replacementVehicleId, reason).catch(() => null);
+      apiClient.bookings.substituteVehicle(bookingId, { replacementVehicleId, reason }).catch(() => null);
 
       // Free previous vehicle & reserve replacement
       setVehicles((prev) =>
