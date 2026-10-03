@@ -14,6 +14,7 @@ export type ActiveTab =
   | "owners"
   | "bookings"
   | "rentals"
+  | "returns"
   | "inspections"
   | "maintenance"
   | "compliance"
