@@ -328,6 +328,7 @@ export class OwnerSettlementsService {
       operatorNetRevenue: calculation.operatorNetRevenue,
       carriedForwardBalance: calculation.carriedForwardBalance,
       termsSnapshot: calculation.termsSnapshot,
+      termsSnapshots: calculation.termsSnapshots,
       rentalLines: calculation.rentalLines,
       expenseLines: calculation.expenseLines,
       adjustmentLines: calculation.adjustmentLines,
@@ -953,6 +954,20 @@ export class OwnerSettlementsService {
       ? vehicles.filter((v) => v.id === query.vehicleId)
       : vehicles;
 
+    const reportCurrencies = new Set<string>();
+    for (const settlement of settlements) {
+      if (settlement.currency) reportCurrencies.add(settlement.currency.toUpperCase());
+    }
+    for (const expense of allExpenses) {
+      if (expense.currency) reportCurrencies.add(expense.currency.toUpperCase());
+    }
+    if (reportCurrencies.size > 1) {
+      throw new Error(
+        `Vehicle profitability cannot aggregate multiple currencies (${Array.from(reportCurrencies).join(", ")}). Filter/report each currency separately.`
+      );
+    }
+    const reportCurrency = Array.from(reportCurrencies)[0] || "KES";
+
     const items: VehicleProfitabilityItem[] = [];
 
     let reportRentalRevenue = 0;
@@ -1016,7 +1031,7 @@ export class OwnerSettlementsService {
         profitMarginPercent: Math.round(profitMarginPercent * 100) / 100,
         rentalDays,
         utilizationRate,
-        currency: "KES",
+        currency: reportCurrency,
       });
 
       reportRentalRevenue += grossRevenue;
@@ -1031,7 +1046,7 @@ export class OwnerSettlementsService {
     return {
       periodStart: query.startDate,
       periodEnd: query.endDate,
-      currency: "KES",
+      currency: reportCurrency,
       items,
       summary: {
         totalVehicles: items.length,
