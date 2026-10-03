@@ -251,6 +251,7 @@ async function runSprint19FinanceTestSuite() {
     customerId: customerA.id,
     primaryDriverId: "drv_test_88",
     vehicleId: "veh_test_88",
+    status: "COMPLETED",
     pricingSnapshot: {
       currency: "KES",
       dailyRate: 10000,
@@ -344,6 +345,25 @@ async function runSprint19FinanceTestSuite() {
     ],
   });
 
+  // Deposit requirement is not payment evidence. Seed the actual received/held
+  // liability explicitly before applying it to the invoice.
+  await depositPositionRepo.create({
+    tenantId: tenantA,
+    rentalId: rental1.id,
+    bookingId: rental1.bookingId,
+    customerId: rental1.customerId,
+    currency: "KES",
+    requiredAmount: "20000.0000",
+    receivedAmount: "20000.0000",
+    heldAmount: "20000.0000",
+    appliedAmount: "0.0000",
+    refundDueAmount: "0.0000",
+    refundedAmount: "0.0000",
+    forfeitedAmount: "0.0000",
+    status: "HELD",
+    notes: "Verified deposit receipt seeded for finance regression",
+  });
+
   // Generate Authoritative Rental Invoice with deposit deduction
   const rentalInvoice = await financeService.generateRentalInvoice(
     tenantA,
@@ -383,7 +403,87 @@ async function runSprint19FinanceTestSuite() {
   );
   assert.strictEqual(reIngest.id, rentalInvoice.id);
 
-  console.log("✓ Rental invoice successfully generated, deposit reconciled, and idempotency verified.");
+  // A deposit requirement without a recorded DepositPosition must never be
+  // converted into received cash or reduce the customer receivable.
+  const rentalWithoutDeposit = await rentalRepo.create(tenantA, {
+    rentalNumber: "RNT-2026-00089",
+    bookingId: "bkg_test_89",
+    contractId: "ctr_test_89",
+    handoverId: "hnd_test_89",
+    customerId: customerA.id,
+    primaryDriverId: "drv_test_89",
+    vehicleId: "veh_test_89",
+    status: "COMPLETED",
+    pricingSnapshot: {
+      currency: "KES",
+      dailyRate: 5000,
+      totalDays: 2,
+      baseRentalAmount: 10000,
+      excessMileageRate: 0,
+      fuelPricePerLiter: 0,
+      surcharges: 0,
+      discounts: [],
+      taxRate: 0.16,
+      taxTotal: 1600,
+      grossTotal: 11600,
+      estimatedDeposit: 15000,
+      snapshotDate: "2026-09-05T00:00:00Z",
+    } as any,
+  });
+  await rentalRepo.saveStartSnapshot(tenantA, {
+    rentalId: rentalWithoutDeposit.id,
+    tenantId: tenantA,
+    actualVehicleId: "veh_test_89",
+    driverId: "drv_test_89",
+    startedAt: "2026-09-05T08:00:00Z",
+    scheduledReturnAt: "2026-09-07T08:00:00Z",
+    startOdometer: 1000,
+    startFuelLevel: 100,
+    contractVersion: 1,
+    depositRequirement: 15000,
+    pricingSnapshot: {
+      currency: "KES",
+      dailyRate: 5000,
+      totalDays: 2,
+      baseRentalAmount: 10000,
+      excessMileageRate: 0,
+      fuelPricePerLiter: 0,
+      surcharges: 0,
+      discounts: [],
+      taxRate: 0.16,
+      taxTotal: 1600,
+      grossTotal: 11600,
+      estimatedDeposit: 15000,
+      snapshotDate: "2026-09-05T00:00:00Z",
+    } as any,
+  });
+
+  const noDepositInvoice = await financeService.generateRentalInvoice(
+    tenantA,
+    { rentalId: rentalWithoutDeposit.id, applyDepositDeduction: true },
+    staffUser1
+  );
+  assert.strictEqual(noDepositInvoice.amountPaid, "0.0000");
+  assert.strictEqual(noDepositInvoice.amountOutstanding, noDepositInvoice.total);
+  assert.strictEqual(await depositPositionRepo.findByRentalId(rentalWithoutDeposit.id, tenantA), null);
+
+  const activeRental = await rentalRepo.create(tenantA, {
+    rentalNumber: "RNT-2026-00090",
+    bookingId: "bkg_test_90",
+    contractId: "ctr_test_90",
+    handoverId: "hnd_test_90",
+    customerId: customerA.id,
+    primaryDriverId: "drv_test_90",
+    vehicleId: "veh_test_90",
+    status: "ACTIVE_ON_ROAD",
+    pricingSnapshot: rentalWithoutDeposit.pricingSnapshot as any,
+  });
+  await assert.rejects(
+    () => financeService.generateRentalInvoice(tenantA, { rentalId: activeRental.id }, staffUser1),
+    /must complete the Return & Final Calculation lifecycle/i
+  );
+
+  console.log("✓ Rental invoice generation requires completed Return truth and never invents deposit receipts.");
 
   // --------------------------------------------------------------------------
   // TEST 5: Credit Note Reversal & Capping Invariant
