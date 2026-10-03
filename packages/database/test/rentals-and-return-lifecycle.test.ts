@@ -352,6 +352,13 @@ async function runTests() {
     actorUserId: actor.userId,
     actorType: actor.actorType,
   } as any);
+  await inspectionRepo.addAcknowledgement(returnInspection.id, tenantId, {
+    signerType: "INSPECTOR",
+    signerId: actor.userId,
+    signerName: actor.name || "Fleet Ops Manager",
+    signatureMethod: "MANUAL_UPLOAD",
+    signatureReference: "test-inspector-signature",
+  } as any);
   await inspectionRepo.update(returnInspection.id, tenantId, {
     status: "COMPLETED",
     completedAt: "2026-09-07T12:20:00Z",
