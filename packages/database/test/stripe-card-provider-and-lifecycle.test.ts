@@ -561,7 +561,11 @@ async function runStripeCardSuite() {
   );
 
   // Approve and execute refund via Stripe Refund API
-  const executedRefund = await paymentService.approveAndExecuteRefund(tenantId, refundReq.id, actor);
+  const executedRefund = await paymentService.approveAndExecuteRefund(
+    tenantId,
+    refundReq.id,
+    { userId: "user_finance_stripe_refund_approver", tenantId, role: "FINANCE_ADMIN" }
+  );
   assert.strictEqual(executedRefund.status, "COMPLETED");
   assert.ok(executedRefund.providerRefundReference?.startsWith("re_test_"));
 
