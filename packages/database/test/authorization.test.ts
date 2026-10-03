@@ -219,10 +219,14 @@ async function runTestSuite() {
 
     assert(financeManager!.permissions.includes(TENANT_PERMISSIONS.RENTAL_FINAL_CALCULATE), "Finance Manager can calculate final charges");
     assert(financeManager!.permissions.includes(TENANT_PERMISSIONS.RENTAL_FINAL_SETTLE), "Finance Manager can seal final settlement");
+    assert(financeManager!.permissions.includes(TENANT_PERMISSIONS.REFUND_APPROVE), "Finance Manager can approve refund obligations");
+    assert(financeManager!.permissions.includes(TENANT_PERMISSIONS.REFUND_EXECUTE), "Finance Manager can execute approved refunds");
     assert(!financeManager!.permissions.includes(TENANT_PERMISSIONS.RENTAL_RETURN_RECEIVE), "Finance Manager does not receive vehicles");
 
     assert(accountant!.permissions.includes(TENANT_PERMISSIONS.RENTAL_FINAL_CALCULATE), "Accountant can prepare final calculation");
     assert(!accountant!.permissions.includes(TENANT_PERMISSIONS.RENTAL_FINAL_SETTLE), "Accountant cannot seal settlement by default");
+    assert(!accountant!.permissions.includes(TENANT_PERMISSIONS.REFUND_APPROVE), "Accountant cannot approve refunds by default");
+    assert(!accountant!.permissions.includes(TENANT_PERMISSIONS.REFUND_EXECUTE), "Accountant cannot execute refunds by default");
 
     assert(!driver!.permissions.includes(TENANT_PERMISSIONS.RENTAL_READ), "Driver cannot read the tenant-wide Rental collection");
     assert(driver!.permissions.includes(TENANT_PERMISSIONS.RENTAL_INCIDENT_REPORT), "Driver can report incidents for assigned trips through scoped self-service context");
