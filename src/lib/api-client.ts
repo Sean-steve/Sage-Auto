@@ -246,12 +246,19 @@ class ApiClient {
       return this.get<any[]>(`/bookings${q ? `?${q}` : ''}`);
     },
     getBooking: (id: string) => this.get(`/bookings/${id}`),
+    previewQuote: (dto: any) => this.post('/bookings/quote', dto),
     createBooking: (dto: any) => this.post('/bookings', dto),
-    confirmBooking: (id: string, reason?: string) => this.post(`/bookings/${id}/confirm`, { reason }),
-    cancelBooking: (id: string, reason: string) => this.post(`/bookings/${id}/cancel`, { reason }),
-    rescheduleBooking: (id: string, dates: { startDate: string; endDate: string }) => this.post(`/bookings/${id}/reschedule`, dates),
-    substituteVehicle: (id: string, replacementVehicleId: string, reason: string) =>
-      this.post(`/bookings/${id}/substitute`, { replacementVehicleId, reason }),
+    updateDraft: (id: string, dto: any) => this.patch(`/bookings/${id}`, dto),
+    quoteBooking: (id: string, dto: any = {}) => this.post(`/bookings/${id}/quote`, dto),
+    requestPayment: (id: string) => this.post(`/bookings/${id}/request-payment`),
+    confirmBooking: (id: string, dto: any = {}) => this.post(`/bookings/${id}/confirm`, dto),
+    cancelBooking: (id: string, dto: any) => this.post(`/bookings/${id}/cancel`, dto),
+    rejectBooking: (id: string, dto: any) => this.post(`/bookings/${id}/reject`, dto),
+    expireBooking: (id: string, dto: any = {}) => this.post(`/bookings/${id}/expire`, dto),
+    markNoShow: (id: string, dto: any = {}) => this.post(`/bookings/${id}/no-show`, dto),
+    amendDates: (id: string, dto: any) => this.post(`/bookings/${id}/amend-dates`, dto),
+    substituteVehicle: (id: string, dto: any) => this.post(`/bookings/${id}/substitute-vehicle`, dto),
+    getHandoverReadiness: (id: string) => this.get(`/bookings/${id}/handover-readiness`),
   };
 
   // 6. Availability & Allocation Context
@@ -340,6 +347,14 @@ class ApiClient {
       this.get<any[]>(`/drivers/relationships/customer/${customerId}`),
     linkCustomer: (dto: any) => this.post('/drivers/relationships', dto),
     unlinkCustomer: (relationshipId: string) => this.delete(`/drivers/relationships/${relationshipId}`),
+  };
+
+  public agents = {
+    listAgents: (params?: Record<string, any>) => {
+      const q = new URLSearchParams(params).toString();
+      return this.get<any[]>(`/agents${q ? `?${q}` : ''}`);
+    },
+    getAgent: (id: string) => this.get(`/agents/${id}`),
   };
 
   public corporateAccounts = {
