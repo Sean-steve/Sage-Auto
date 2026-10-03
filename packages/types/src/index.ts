@@ -4145,7 +4145,11 @@ export interface ProcessDepositSettlementDto {
 
 export interface CompleteRentalDto {
   notes?: string;
-  releaseVehicleToStatus?: "AVAILABLE" | "MAINTENANCE" | "INSPECTION" | "GROUNDED";
+  /**
+   * Explicit post-return fleet disposition. Completion must never silently
+   * make a vehicle bookable when inspection/damage outcomes require a hold.
+   */
+  releaseVehicleToStatus: "AVAILABLE" | "MAINTENANCE" | "INSPECTION" | "GROUNDED";
   idempotencyKey?: string;
 }
 
