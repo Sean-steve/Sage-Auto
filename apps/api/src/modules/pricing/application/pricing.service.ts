@@ -430,23 +430,52 @@ export class PricingService {
   }
 
   async calculatePrice(tenantId: string, request: PricingRequest): Promise<PricingResult> {
-    // 1. Resolve effective rate plan
-    const effectiveMatch = await this.ratePlanRepo.findEffectiveRatePlan(tenantId, {
-      vehicleId: request.vehicleId,
-      vehicleCategoryId: request.vehicleCategoryId,
-      corporateAccountId: request.corporateAccountId,
-      customerId: request.customerId,
-      agentId: request.agentId,
-      dateTime: request.pickupDateTime,
-    });
-
+    // 1. Resolve explicit or effective rate plan
     let matchedPlan: RatePlan;
     let matchedRate: RatePlanRate;
 
-    if (effectiveMatch) {
-      matchedPlan = effectiveMatch.plan;
-      matchedRate = effectiveMatch.matchedRate;
+    if (request.ratePlanId) {
+      const explicitPlan = await this.ratePlanRepo.findById(request.ratePlanId, tenantId);
+      if (!explicitPlan) {
+        throw new Error(`Rate plan '${request.ratePlanId}' was not found for this tenant.`);
+      }
+
+      const evalTime = new Date(request.pickupDateTime).getTime();
+      const effectiveFrom = new Date(explicitPlan.effectiveFrom).getTime();
+      const effectiveTo = explicitPlan.effectiveTo ? new Date(explicitPlan.effectiveTo).getTime() : null;
+      if (
+        explicitPlan.status !== "ACTIVE" ||
+        evalTime < effectiveFrom ||
+        (effectiveTo !== null && evalTime > effectiveTo)
+      ) {
+        throw new Error(`Rate plan '${explicitPlan.code}' is not active/effective for the requested pickup time.`);
+      }
+
+      const explicitRate = await this.ratePlanRepo.getRateForCategoryOrVehicle(
+        explicitPlan.id,
+        tenantId,
+        request.vehicleCategoryId,
+        request.vehicleId
+      );
+      if (!explicitRate) {
+        throw new Error(`Rate plan '${explicitPlan.code}' has no matching Vehicle/Category/general rate for this quote.`);
+      }
+      matchedPlan = explicitPlan;
+      matchedRate = explicitRate;
     } else {
+      const effectiveMatch = await this.ratePlanRepo.findEffectiveRatePlan(tenantId, {
+        vehicleId: request.vehicleId,
+        vehicleCategoryId: request.vehicleCategoryId,
+        corporateAccountId: request.corporateAccountId,
+        customerId: request.customerId,
+        agentId: request.agentId,
+        dateTime: request.pickupDateTime,
+      });
+
+      if (effectiveMatch) {
+        matchedPlan = effectiveMatch.plan;
+        matchedRate = effectiveMatch.matchedRate;
+      } else {
       const vehicle = request.vehicleId ? await new VehicleRepository().findById(request.vehicleId, tenantId) : null;
       if (!vehicle || !Number.isFinite(vehicle.dailyRate) || vehicle.dailyRate <= 0) throw new Error("Configure a vehicle daily rate or a matching rate plan before booking.");
       const settings = await this.tenantSettingsRepo.findByTenantId(tenantId);
@@ -486,6 +515,7 @@ export class PricingService {
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
+      }
     }
 
     // 2. Resolve Corporate Account discount if specified
