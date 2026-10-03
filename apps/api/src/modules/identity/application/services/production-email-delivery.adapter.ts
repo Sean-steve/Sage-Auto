@@ -13,8 +13,29 @@ export class ProductionEmailDeliveryAdapter implements IEmailDeliveryPort {
   }
   private link(kind:string,token:string) {
     const origin=process.env.APP_PUBLIC_URL;
-    if(!origin||!origin.startsWith('https://')) throw unavailable('APP_PUBLIC_URL must be an HTTPS address for email links.');
-    return new URL(`/?${kind}=${encodeURIComponent(token)}`,origin).href;
+    if(!origin) throw unavailable('APP_PUBLIC_URL is required for account email links.');
+
+    let parsed: URL;
+    try {
+      parsed = new URL(origin);
+    } catch {
+      throw unavailable('APP_PUBLIC_URL must be a valid absolute URL.');
+    }
+
+    const environment=(process.env.APP_ENV||process.env.NODE_ENV||'development').toLowerCase();
+    const productionLike=environment==='production'||environment==='staging';
+    const localHosts=new Set(['localhost','127.0.0.1','[::1]']);
+    const secure=parsed.protocol==='https:';
+    const localDevelopment=parsed.protocol==='http:'&&localHosts.has(parsed.hostname);
+
+    if(productionLike&&!secure) {
+      throw unavailable('APP_PUBLIC_URL must use HTTPS in production and staging.');
+    }
+    if(!productionLike&&!secure&&!localDevelopment) {
+      throw unavailable('Development email links may use HTTP only for localhost/loopback; use HTTPS for any other host.');
+    }
+
+    return new URL(`/?${kind}=${encodeURIComponent(token)}`,parsed).href;
   }
   async sendPasswordResetEmail(email:string,token:string):Promise<void> {
     await this.send(email,'Reset your Car Hire OS password',`Choose a new password: ${this.link('reset',token)}\n\nReset code: ${token}\nExpires in one hour. Ignore this email if you did not request it.`);
