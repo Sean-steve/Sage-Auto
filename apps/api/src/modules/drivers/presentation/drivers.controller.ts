@@ -50,6 +50,58 @@ export function createDriversController(
     }
   );
 
+  // Customer ↔ Driver Relationships
+  router.get(
+    "/relationships/customer/:customerId",
+    permissionGuard(TENANT_PERMISSIONS.DRIVER_READ),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const tenantId = getTenantId(req);
+        const relationships = await driversService.listCustomerDrivers(req.params.customerId, tenantId);
+        res.json({ success: true, data: relationships, total: relationships.length });
+      } catch (err) {
+        next(err);
+      }
+    }
+  );
+
+  router.post(
+    "/relationships",
+    permissionGuard(TENANT_PERMISSIONS.DRIVER_ASSIGN),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const tenantId = getTenantId(req);
+        const { actorId } = getActor(req);
+        const relationship = await driversService.linkDriverToCustomer(
+          tenantId,
+          req.body.customerId,
+          req.body.driverId,
+          req.body.relationshipType,
+          req.body.isDefault,
+          actorId
+        );
+        res.status(201).json({ success: true, data: relationship });
+      } catch (err) {
+        next(err);
+      }
+    }
+  );
+
+  router.delete(
+    "/relationships/:id",
+    permissionGuard(TENANT_PERMISSIONS.DRIVER_ASSIGN),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const tenantId = getTenantId(req);
+        const { actorId } = getActor(req);
+        await driversService.unlinkDriverFromCustomer(req.params.id, tenantId, actorId);
+        res.json({ success: true });
+      } catch (err) {
+        next(err);
+      }
+    }
+  );
+
   // Get Driver by ID
   router.get(
     "/:id",
