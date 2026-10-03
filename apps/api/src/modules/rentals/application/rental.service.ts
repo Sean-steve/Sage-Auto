@@ -1270,7 +1270,13 @@ export class RentalService {
         const damageCases = await this.damageRepo.findByRentalId(rentalId, tenantId);
         damageCaseIds = damageCases.map((d) => d.id);
         totalDamageCharge = damageCases
-          .filter((d) => d.responsibleParty === "CUSTOMER" || !d.responsibleParty || d.preExisting !== true)
+          .filter(
+            (d) =>
+              d.preExisting !== true &&
+              (d.responsibleParty === "CUSTOMER" ||
+                d.responsibleParty === "UNASSIGNED" ||
+                !d.responsibleParty)
+          )
           .reduce(
             (sum, d) =>
               sum +
@@ -1778,7 +1784,10 @@ export class RentalService {
     }
 
     // 5. Update Vehicle Mileage, Fuel, and Availability Status
-    const targetVehicleStatus = (dto.releaseVehicleToStatus || "AVAILABLE") as any;
+    if (!dto.releaseVehicleToStatus) {
+      throw new Error("Rental completion requires an explicit vehicle disposition.");
+    }
+    const targetVehicleStatus = dto.releaseVehicleToStatus as any;
     try {
       const vehicle = await this.vehicleRepo.findById(rental.vehicleId, tenantId);
       if (vehicle) {
