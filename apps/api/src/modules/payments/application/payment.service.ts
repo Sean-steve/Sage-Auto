@@ -911,6 +911,7 @@ export class PaymentService {
       status: "PENDING",
       reason: dto.reason,
       requestedAt: new Date().toISOString(),
+      requestedBy: actor.userId,
       postedToLedger: false,
     });
 
@@ -936,6 +937,13 @@ export class PaymentService {
     const refund = await this.refundRepo.findById(refundId, tenantId);
     if (!refund) {
       throw new RefundNotFoundError(refundId);
+    }
+
+    if (refund.requestedBy && refund.requestedBy === actor.userId) {
+      const err: any = new Error("Refund approval requires a different authorized user from the requester.");
+      err.code = "SEPARATION_OF_DUTIES";
+      err.statusCode = 409;
+      throw err;
     }
 
     const payment = await this.paymentRepo.findById(refund.originalPaymentId, tenantId);
