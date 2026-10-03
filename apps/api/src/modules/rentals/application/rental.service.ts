@@ -182,7 +182,21 @@ export class RentalService {
       blockers.push(`Contract is not signed (status: ${contract.status})`);
     }
 
-    // Check 4: Handover checkpoints
+    // Check 4: Security deposit must be backed by Finance/Payments truth.
+    if ((booking.depositRequired || 0) > 0) {
+      const deposit = await this.depositPositionRepo.findByBookingId(booking.id, tenantId);
+      const held = Number(deposit?.heldAmount || 0);
+      if (!deposit || held + 0.0001 < Number(booking.depositRequired || 0)) {
+        blockers.push(
+          `Security deposit is not fully funded through an authoritative Payment allocation (required: ${booking.depositRequired}, held: ${held}).`
+        );
+      }
+      if (booking.depositStatus !== "HELD") {
+        blockers.push(`Booking security deposit status must be HELD (currently: ${booking.depositStatus || "REQUESTED"}).`);
+      }
+    }
+
+    // Check 5: Handover checkpoints
     const handovers = await this.handoverRepo.findByBookingId(booking.id, tenantId);
     const handover = handovers.length > 0 ? handovers[0] : null;
     const documentsVerified = !!handover?.documentsVerifiedAt;
@@ -375,6 +389,17 @@ export class RentalService {
       actorUserId: actor?.userId,
       actorType: actor?.actorType || "USER",
     });
+
+    // Link any pre-rental deposit liability to the newly created Rental.
+    const bookingDeposit = await this.depositPositionRepo.findByBookingId(booking.id, tenantId);
+    if (bookingDeposit && !bookingDeposit.rentalId) {
+      await this.depositPositionRepo.update(
+        bookingDeposit.id,
+        tenantId,
+        { rentalId: rental.id },
+        bookingDeposit.version
+      );
+    }
 
     // 6. Save immutable RentalStartSnapshot
     await this.rentalRepo.saveStartSnapshot(tenantId, {
