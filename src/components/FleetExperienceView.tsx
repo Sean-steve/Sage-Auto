@@ -182,8 +182,8 @@ export function FleetExperienceView({portal}:FleetExperienceProps) {
       !vehicles.length?<EmptyFleet canCreate={can("vehicle.create")} onCreate={()=>setCreateOpen(true)}/>:
       <FleetList vehicles={vehicles} owners={owners} onOpen={setSelectedId}/>}
 
-    {createOpen&&<RegisterVehicleDialog portal={portal} owners={owners} onClose={()=>setCreateOpen(false)} onCreated={async(id)=>{setCreateOpen(false);await refresh();setSelectedId(id);}}/>}
-    {selectedId&&<AssetProfile vehicleId={selectedId} portal={portal} owners={owners} onClose={()=>setSelectedId(null)} onChanged={refresh} navigate={navigateSection}/>}
+    {createOpen&&<RegisterVehicleDialog portal={portal} owners={owners} categoryOptions={categoryOptions} onClose={()=>setCreateOpen(false)} onCreated={async(id)=>{setCreateOpen(false);await refresh();setSelectedId(id);}}/>}
+    {selectedId&&<AssetProfile vehicleId={selectedId} portal={portal} owners={owners} categoryOptions={categoryOptions} onClose={()=>setSelectedId(null)} onChanged={refresh} navigate={navigateSection}/>} 
   </div>;
 }
 
