@@ -332,10 +332,28 @@ class ApiClient {
   // 10. Pricing & Rate Engine Context
   public pricing = {
     getRatePlans: () => this.get<any[]>('/pricing/rate-plans'),
+    getRatePlan: (id: string) => this.get(`/pricing/rate-plans/${id}`),
     createRatePlan: (dto: any) => this.post('/pricing/rate-plans', dto),
-    calculateQuote: (req: any) => this.post('/pricing/quote', req),
+    updateRatePlan: (id: string, dto: any) => this.patch(`/pricing/rate-plans/${id}`, dto),
+    activateRatePlan: (id: string) => this.post(`/pricing/rate-plans/${id}/activate`),
+    archiveRatePlan: (id: string) => this.post(`/pricing/rate-plans/${id}/archive`),
+    getRates: (id: string) => this.get<any[]>(`/pricing/rate-plans/${id}/rates`),
+    setRates: (id: string, rates: any[]) => this.post(`/pricing/rate-plans/${id}/rates`, { rates }),
+    getAssignments: (id: string) => this.get<any[]>(`/pricing/rate-plans/${id}/assignments`),
+    assignPlan: (id: string, dto: any) => this.post(`/pricing/rate-plans/${id}/assignments`, dto),
+    getSeasonalRules: (id: string) => this.get<any[]>(`/pricing/rate-plans/${id}/seasonal-rules`),
+    createSeasonalRule: (id: string, dto: any) => this.post(`/pricing/rate-plans/${id}/seasonal-rules`, dto),
+    deleteSeasonalRule: (id: string) => this.delete(`/pricing/seasonal-rules/${id}`),
+    getDurationTiers: (id: string) => this.get<any[]>(`/pricing/rate-plans/${id}/duration-tiers`),
+    createDurationTier: (id: string, dto: any) => this.post(`/pricing/rate-plans/${id}/duration-tiers`, dto),
+    deleteDurationTier: (id: string) => this.delete(`/pricing/duration-tiers/${id}`),
+    getFees: () => this.get<any[]>('/pricing/fees'),
+    createFee: (dto: any) => this.post('/pricing/fees', dto),
+    deleteFee: (id: string) => this.delete(`/pricing/fees/${id}`),
     getPromoCodes: () => this.get<any[]>('/pricing/promo-codes'),
     createPromoCode: (dto: any) => this.post('/pricing/promo-codes', dto),
+    updatePromoStatus: (id: string, status: string) => this.patch(`/pricing/promo-codes/${id}/status`, { status }),
+    calculateQuote: (req: any) => this.post('/pricing/calculate', req),
   };
 
   // 11. Operational Finance & General Ledger Context
