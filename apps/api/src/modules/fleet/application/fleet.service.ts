@@ -27,6 +27,7 @@ import {
   IVehicleDocumentRepository,
   IAuditRepository,
   IOutboxRepository,
+  IRentalRepository,
 } from "@carhire/database";
 import { EntitlementService } from "../../entitlements/application/entitlement.service";
 import { VehicleAggregate } from "../domain/vehicle.aggregate";
@@ -44,7 +45,8 @@ export class FleetService {
     private readonly documentRepository: IVehicleDocumentRepository,
     private readonly auditRepository: IAuditRepository,
     private readonly outboxRepository: IOutboxRepository,
-    private readonly entitlementService?: EntitlementService
+    private readonly entitlementService?: EntitlementService,
+    private readonly rentalRepository?: IRentalRepository
   ) {}
 
   async createVehicle(
@@ -195,6 +197,16 @@ export class FleetService {
     const recentFuel = await this.vehicleRepository.getFuelRecords(id, tenantId, 20);
     const statusHistory = await this.vehicleRepository.getStatusHistory(id, tenantId, 20);
 
+    const rentals = this.rentalRepository
+      ? (await this.rentalRepository.findMany(tenantId, { vehicleId: id, limit: 1000 })).items
+      : [];
+    const totalDaysOnRent = rentals.reduce((sum, rental) => {
+      const start = Date.parse(rental.actualStart || rental.scheduledStart);
+      const end = Date.parse(rental.actualEnd || rental.completedAt || rental.scheduledEnd);
+      if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return sum;
+      return sum + Math.max(1, Math.ceil((end - start) / 86_400_000));
+    }, 0);
+
     return {
       vehicle,
       category: category || undefined,
@@ -205,10 +217,10 @@ export class FleetService {
       recentFuel,
       statusHistory,
       stats: {
-        totalRentals: 14,
-        totalRevenue: vehicle.dailyRate * 42,
-        totalDaysOnRent: 42,
-        utilizationRatePercent: 78.5,
+        totalRentals: rentals.length,
+        totalRevenue: null,
+        totalDaysOnRent,
+        utilizationRatePercent: null,
       },
     };
   }
