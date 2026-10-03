@@ -11,6 +11,7 @@ import type {
   DurationTierRule,
   PricingFeeRule,
   PromoCode,
+  PromoCodeStatus,
   PricingRequest,
   PricingResult,
   CreateRatePlanDto,
@@ -267,8 +268,20 @@ export class PricingService {
     return this.ruleRepo.listSeasonalRules(tenantId, ratePlanId);
   }
 
-  async deleteSeasonalRule(tenantId: string, id: string): Promise<void> {
-    return this.ruleRepo.deleteSeasonalRule(id, tenantId);
+  async deleteSeasonalRule(
+    tenantId: string,
+    id: string,
+    actorUserId: string = "system"
+  ): Promise<void> {
+    await this.ruleRepo.deleteSeasonalRule(id, tenantId);
+    await this.auditRepo.record({
+      tenantId,
+      actorType: actorUserId === "system" ? "SYSTEM" : "USER",
+      actorId: actorUserId,
+      action: "pricing.seasonal_rule.deleted",
+      resourceType: "SeasonalRateRule",
+      resourceId: id,
+    });
   }
 
   async createDurationTier(
@@ -281,6 +294,22 @@ export class PricingService {
 
   async listDurationTiers(tenantId: string, ratePlanId: string): Promise<DurationTierRule[]> {
     return this.ruleRepo.listDurationTiers(tenantId, ratePlanId);
+  }
+
+  async deleteDurationTier(
+    tenantId: string,
+    id: string,
+    actorUserId: string = "system"
+  ): Promise<void> {
+    await this.ruleRepo.deleteDurationTier(id, tenantId);
+    await this.auditRepo.record({
+      tenantId,
+      actorType: actorUserId === "system" ? "SYSTEM" : "USER",
+      actorId: actorUserId,
+      action: "pricing.duration_tier.deleted",
+      resourceType: "DurationTierRule",
+      resourceId: id,
+    });
   }
 
   async createFeeRule(
@@ -303,6 +332,22 @@ export class PricingService {
 
   async listFeeRules(tenantId: string, ratePlanId?: string | null): Promise<PricingFeeRule[]> {
     return this.ruleRepo.listFeeRules(tenantId, ratePlanId);
+  }
+
+  async deleteFeeRule(
+    tenantId: string,
+    id: string,
+    actorUserId: string = "system"
+  ): Promise<void> {
+    await this.ruleRepo.deleteFeeRule(id, tenantId);
+    await this.auditRepo.record({
+      tenantId,
+      actorType: actorUserId === "system" ? "SYSTEM" : "USER",
+      actorId: actorUserId,
+      action: "pricing.fee_rule.deleted",
+      resourceType: "PricingFeeRule",
+      resourceId: id,
+    });
   }
 
   // --------------------------------------------------------------------------
@@ -333,6 +378,37 @@ export class PricingService {
 
   async getPromoCode(tenantId: string, code: string): Promise<PromoCode | null> {
     return this.promoRepo.findByCode(code, tenantId);
+  }
+
+  async updatePromoStatus(
+    tenantId: string,
+    id: string,
+    status: PromoCodeStatus,
+    actorUserId: string = "system"
+  ): Promise<PromoCode> {
+    if (!["ACTIVE", "DISABLED", "INACTIVE"].includes(status)) {
+      const err: any = new Error("Promo status may only be set to ACTIVE, DISABLED, or INACTIVE manually.");
+      err.statusCode = 400;
+      throw err;
+    }
+    const promo = await this.promoRepo.update(id, tenantId, { status });
+    await this.auditRepo.record({
+      tenantId,
+      actorType: actorUserId === "system" ? "SYSTEM" : "USER",
+      actorId: actorUserId,
+      action: "pricing.promo_code.status_changed",
+      resourceType: "PromoCode",
+      resourceId: id,
+      metadata: { status },
+    });
+    await this.outboxRepo.publish({
+      tenantId,
+      eventType: "pricing.promo_code.status_changed",
+      aggregateType: "PromoCode",
+      aggregateId: id,
+      payload: { promoCodeId: id, code: promo.code, status },
+    });
+    return promo;
   }
 
   async recordPromoUsage(tenantId: string, code: string): Promise<PromoCode> {
