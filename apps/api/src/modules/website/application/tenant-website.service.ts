@@ -33,6 +33,14 @@ export interface IEventPublisher {
   publish(eventType: string, payload: any): Promise<void>;
 }
 
+export interface IPlatformDomainProvisioner {
+  initializePlatformSubdomain(
+    tenantId: string,
+    websiteId: string,
+    subdomain: string
+  ): Promise<WebsiteDomainRecord>;
+}
+
 export class DefaultEventPublisher implements IEventPublisher {
   async publish(eventType: string, payload: any): Promise<void> {
     // In-memory / console publisher fallback
@@ -40,6 +48,12 @@ export class DefaultEventPublisher implements IEventPublisher {
 }
 
 export class TenantWebsiteService {
+  private platformDomainProvisioner?: IPlatformDomainProvisioner;
+
+  setPlatformDomainProvisioner(provisioner: IPlatformDomainProvisioner): void {
+    this.platformDomainProvisioner = provisioner;
+  }
+
   constructor(
     private readonly websiteRepo: ITenantWebsiteRepository,
     private readonly pageRepo: IWebPageRepository,
@@ -121,6 +135,17 @@ export class TenantWebsiteService {
     };
 
     const saved = await this.websiteRepo.save(website);
+
+    // Domain ownership is a separate bounded context. When the application
+    // composes it, provision the canonical platform subdomain through that
+    // service rather than creating an implicit website-only routing record.
+    if (this.platformDomainProvisioner) {
+      await this.platformDomainProvisioner.initializePlatformSubdomain(
+        tenantId,
+        saved.id,
+        saved.subdomain
+      );
+    }
 
     // Create standard default pages
     await this.seedStandardPages(saved);
