@@ -61,6 +61,9 @@ jobs:
       - name: Availability experience contract regression
         run: pnpm test:availability-experience
 
+      - name: Booking experience contract regression
+        run: pnpm test:booking-experience
+
       - name: Account and 20-role access regression
         run: pnpm test:access
 
