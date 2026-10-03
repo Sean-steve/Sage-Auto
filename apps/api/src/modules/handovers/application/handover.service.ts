@@ -522,6 +522,19 @@ export class HandoverService {
 
     HandoverStateMachine.validateTransition(handover.status, "HANDOVER_COMPLETED");
 
+    if (
+      dto.checkoutOdometer !== undefined &&
+      (!Number.isFinite(dto.checkoutOdometer) || dto.checkoutOdometer < handover.checkoutOdometer)
+    ) {
+      throw new Error(`Final Handover odometer cannot be lower than the verified key-handover reading (${handover.checkoutOdometer} km).`);
+    }
+    if (
+      dto.checkoutFuelLevel !== undefined &&
+      (!Number.isFinite(dto.checkoutFuelLevel) || dto.checkoutFuelLevel < 0 || dto.checkoutFuelLevel > 100)
+    ) {
+      throw new Error("Final Handover fuel level must be between 0 and 100.");
+    }
+
     const completedAt = new Date().toISOString();
     const updated = await this.handoverRepo.update(
       handoverId,
