@@ -198,6 +198,7 @@ async function runTestSuite() {
     const bookingManager = await roleRepo.findByCode("BOOKING_MANAGER");
     const financeManager = await roleRepo.findByCode("FINANCE_MANAGER");
     const accountant = await roleRepo.findByCode("ACCOUNTANT");
+    const driver = await roleRepo.findByCode("DRIVER");
     const customerService = await roleRepo.findByCode("CUSTOMER_SERVICE");
 
     assert(manager!.permissions.includes(TENANT_PERMISSIONS.RENTAL_RETURN_SCHEDULE), "Manager can schedule a rental return");
@@ -222,6 +223,10 @@ async function runTestSuite() {
 
     assert(accountant!.permissions.includes(TENANT_PERMISSIONS.RENTAL_FINAL_CALCULATE), "Accountant can prepare final calculation");
     assert(!accountant!.permissions.includes(TENANT_PERMISSIONS.RENTAL_FINAL_SETTLE), "Accountant cannot seal settlement by default");
+
+    assert(!driver!.permissions.includes(TENANT_PERMISSIONS.RENTAL_READ), "Driver cannot read the tenant-wide Rental collection");
+    assert(driver!.permissions.includes(TENANT_PERMISSIONS.RENTAL_INCIDENT_REPORT), "Driver can report incidents for assigned trips through scoped self-service context");
+
     assert(!customerService!.permissions.includes(TENANT_PERMISSIONS.RENTAL_FINAL_SETTLE), "Customer Service remains read/support only for settlement");
   });
 
