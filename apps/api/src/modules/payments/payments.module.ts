@@ -17,6 +17,7 @@ import {
   AuditRepository,
   OutboxRepository,
 } from "@carhire/database";
+import { TENANT_PERMISSIONS } from "@carhire/constants";
 import { PaymentService } from "./application/payment.service";
 import { PaymentsController } from "./presentation/payments.controller";
 import { PaymentProviderRegistry } from "./infrastructure/providers/provider-registry";
@@ -91,32 +92,32 @@ export class PaymentsModule {
       permissionGuard ? permissionGuard(perm) : (_req: Request, _res: Response, next: NextFunction) => next();
 
     // 1. Payment Attempts
-    this.router.post("/attempts", guard("payments.attempt.create"), this.controller.initiateAttempt);
-    this.router.get("/attempts", guard("payments.attempt.read"), this.controller.listAttempts);
-    this.router.get("/attempts/:id", guard("payments.attempt.read"), this.controller.getAttempt);
-    this.router.post("/attempts/:id/verify", guard("payments.attempt.verify"), this.controller.verifyAttempt);
+    this.router.post("/attempts", guard(TENANT_PERMISSIONS.PAYMENT_INITIATE), this.controller.initiateAttempt);
+    this.router.get("/attempts", guard(TENANT_PERMISSIONS.PAYMENT_READ), this.controller.listAttempts);
+    this.router.get("/attempts/:id", guard(TENANT_PERMISSIONS.PAYMENT_READ), this.controller.getAttempt);
+    this.router.post("/attempts/:id/verify", guard(TENANT_PERMISSIONS.PAYMENT_VERIFY), this.controller.verifyAttempt);
 
     // 2. Governed Manual Payments
-    this.router.post("/manual", guard("payments.manual.create"), this.controller.recordManualPayment);
+    this.router.post("/manual", guard(TENANT_PERMISSIONS.PAYMENT_RECORD), this.controller.recordManualPayment);
 
-    // 3. Verified Payments & Allocations
-    this.router.get("/", guard("payments.read"), this.controller.listPayments);
-    this.router.get("/:id", guard("payments.read"), this.controller.getPayment);
-    this.router.post("/:id/allocate", guard("payments.allocate"), this.controller.allocatePayment);
-    this.router.get("/:id/allocations", guard("payments.allocate.read"), this.controller.listAllocations);
+    // 3. Refunds — specific routes must be registered before /:id
+    this.router.post("/refunds", guard(TENANT_PERMISSIONS.REFUND_CREATE), this.controller.requestRefund);
+    this.router.post("/refunds/:id/approve-and-execute", guard(TENANT_PERMISSIONS.REFUND_APPROVE), this.controller.approveAndExecuteRefund);
+    this.router.get("/refunds", guard(TENANT_PERMISSIONS.REFUND_READ), this.controller.listRefunds);
 
-    // 4. Refunds
-    this.router.post("/refunds", guard("payments.refund.create"), this.controller.requestRefund);
-    this.router.post("/refunds/:id/approve-and-execute", guard("payments.refund.execute"), this.controller.approveAndExecuteRefund);
-    this.router.get("/refunds", guard("payments.refund.read"), this.controller.listRefunds);
+    // 4. Reconciliation — specific routes must be registered before /:id
+    this.router.post("/reconciliation/scan", guard(TENANT_PERMISSIONS.PAYMENT_RECONCILIATION_RUN), this.controller.runReconciliationScan);
+    this.router.get("/reconciliation/issues", guard(TENANT_PERMISSIONS.PAYMENT_RECONCILIATION_READ), this.controller.listReconciliationIssues);
+    this.router.post("/reconciliation/issues/:id/resolve", guard(TENANT_PERMISSIONS.PAYMENT_RECONCILIATION_RESOLVE), this.controller.resolveReconciliationIssue);
 
     // 5. Owner Settlement Payout
-    this.router.post("/payouts/owner-settlement", guard("payments.payout.execute"), this.controller.executeOwnerPayout);
+    this.router.post("/payouts/owner-settlement", guard(TENANT_PERMISSIONS.SETTLEMENT_PAY), this.controller.executeOwnerPayout);
 
-    // 6. Reconciliation Scanner
-    this.router.post("/reconciliation/scan", guard("payments.reconciliation.run"), this.controller.runReconciliationScan);
-    this.router.get("/reconciliation/issues", guard("payments.reconciliation.read"), this.controller.listReconciliationIssues);
-    this.router.post("/reconciliation/issues/:id/resolve", guard("payments.reconciliation.resolve"), this.controller.resolveReconciliationIssue);
+    // 6. Verified Payments & Allocations
+    this.router.get("/", guard(TENANT_PERMISSIONS.PAYMENT_READ), this.controller.listPayments);
+    this.router.get("/:id", guard(TENANT_PERMISSIONS.PAYMENT_READ), this.controller.getPayment);
+    this.router.post("/:id/allocate", guard(TENANT_PERMISSIONS.PAYMENT_ALLOCATE), this.controller.allocatePayment);
+    this.router.get("/:id/allocations", guard(TENANT_PERMISSIONS.PAYMENT_READ), this.controller.listAllocations);
 
     // 7. Unauthenticated Provider Webhooks (Signature verified by handler)
     this.router.post("/webhooks/:provider", this.controller.handleWebhook);
