@@ -26,6 +26,8 @@ import {
   VehicleRepository,
   IInspectionRepository,
   InspectionRepository,
+  IInspectionTemplateRepository,
+  InspectionTemplateRepository,
   IAuditRepository,
   AuditRepository,
   IOutboxRepository,
@@ -66,6 +68,7 @@ export class HandoverService {
   private readonly contractRepo: IContractRepository;
   private readonly vehicleRepo: IVehicleRepository;
   private readonly inspectionRepo: IInspectionRepository;
+  private readonly inspectionTemplateRepo: IInspectionTemplateRepository;
   private readonly auditRepo: IAuditRepository;
   private readonly outboxRepo: IOutboxRepository;
   private readonly idempotencyRepo: IIdempotencyRepository;
@@ -80,13 +83,15 @@ export class HandoverService {
     outboxRepo?: IOutboxRepository,
     idempotencyRepo?: IIdempotencyRepository,
     inspectionRepo?: IInspectionRepository,
-    complianceReadinessService?: any
+    complianceReadinessService?: any,
+    inspectionTemplateRepo?: IInspectionTemplateRepository
   ) {
     this.handoverRepo = handoverRepo || new HandoverRepository();
     this.bookingRepo = bookingRepo || new BookingRepository();
     this.contractRepo = contractRepo || new ContractRepository();
     this.vehicleRepo = vehicleRepo || new VehicleRepository();
     this.inspectionRepo = inspectionRepo || new InspectionRepository();
+    this.inspectionTemplateRepo = inspectionTemplateRepo || new InspectionTemplateRepository();
     this.auditRepo = auditRepo || new AuditRepository();
     this.outboxRepo = outboxRepo || new OutboxRepository();
     this.idempotencyRepo = idempotencyRepo || new IdempotencyRepository();
@@ -355,6 +360,29 @@ export class HandoverService {
     }
     if (inspection.odometer < 0 || inspection.fuelLevel < 0 || inspection.fuelLevel > 100) {
       throw new Error(`Inspection ${inspection.inspectionNumber} contains invalid odometer/fuel readings.`);
+    }
+
+    const template =
+      await this.inspectionTemplateRepo.findById(inspection.templateId, tenantId) ||
+      await this.inspectionTemplateRepo.findByCode(inspection.templateId, tenantId) ||
+      await this.inspectionTemplateRepo.findDefault(tenantId);
+    const requiredItems = template?.sections.flatMap((section) => section.items.filter((item) => item.required)) || [];
+    const answeredCodes = new Set((inspection.responses || []).map((response) => response.itemCode));
+    const missingRequired = requiredItems.filter((item) => !answeredCodes.has(item.code));
+    if (missingRequired.length > 0) {
+      throw new Error(
+        `Inspection ${inspection.inspectionNumber} is not Handover-ready; mandatory checklist items remain: ${missingRequired.map((item) => item.label).join(", ")}.`
+      );
+    }
+    const evidenceRequiredItems = template?.sections.flatMap((section) => section.items.filter((item) => item.requiresEvidence)) || [];
+    const missingEvidence = evidenceRequiredItems.filter((item) => {
+      const response = (inspection.responses || []).find((entry) => entry.itemCode === item.code);
+      return response && (!response.evidenceIds || response.evidenceIds.length === 0);
+    });
+    if (missingEvidence.length > 0) {
+      throw new Error(
+        `Inspection ${inspection.inspectionNumber} is not Handover-ready; evidence is missing for: ${missingEvidence.map((item) => item.label).join(", ")}.`
+      );
     }
 
     const inspectionCompletedAt = inspection.completedAt || new Date().toISOString();
