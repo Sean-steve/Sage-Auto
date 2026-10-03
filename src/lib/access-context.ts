@@ -18,7 +18,7 @@ export type RestorationScreenConnection = {
 // persistence, negative tests and reload/login persistence have been verified.
 export const RESTORATION_SCREEN_CONNECTIONS: Record<string, RestorationScreenConnection> = {
   overview:{status:'UNCONNECTED',readSource:'No verified dashboard aggregate',mutationsEnabled:false,note:'Layout preserved; dashboard figures are not authoritative business totals.'},
-  fleet:{status:'READ_VERIFIED',readSource:'GET /api/v1/fleet/vehicles',mutationsEnabled:false,note:'Saved vehicle reads are verified. Original mutations remain quarantined.'},
+  fleet:{status:'PARTIAL',readSource:'Fleet REST API + digital twin + permission-scoped linked domain reads',mutationsEnabled:true,note:'Fleet list, registration, asset edits, status, telemetry, ownership, documents and profile reads are server-backed. Maintenance, Compliance and Inspection execution remain in their dedicated modules.'},
   bookings:{status:'READ_VERIFIED',readSource:'GET /api/v1/bookings',mutationsEnabled:false,note:'Saved booking reads are verified. Original mutations remain quarantined.'},
   customers:{status:'READ_VERIFIED',readSource:'GET /api/v1/customers',mutationsEnabled:false,note:'Saved customer reads are verified. Original mutations remain quarantined.'},
   rentals:{status:'UNCONNECTED',readSource:'Not loaded by restoration provider',mutationsEnabled:false,note:'Layout preserved only.'},
