@@ -12,7 +12,7 @@ assert.equal(RESTORATION_SCREEN_CONNECTIONS.customers.status,'PARTIAL');
 assert.equal(RESTORATION_SCREEN_CONNECTIONS.customers.mutationsEnabled,true);
 
 assert.match(restored,/CustomersDriversExperienceView/,'restored Customers route must use reconstructed People experience');
-assert.doesNotMatch(view,/INITIAL_CUSTOMERS|mockData|updateCustomer\(/,'People experience must not use legacy customer store as business authority');
+assert.doesNotMatch(view,/INITIAL_CUSTOMERS|mockData|setIsNewCustomerOpen|const\s*\{[^}]*updateCustomer[^}]*\}\s*=\s*useApp/s,'People experience must not use legacy customer store as business authority');
 
 for (const call of [
   'apiClient.customers.listCustomers',
