@@ -198,6 +198,7 @@ async function runTestSuite() {
     const bookingManager = await roleRepo.findByCode("BOOKING_MANAGER");
     const financeManager = await roleRepo.findByCode("FINANCE_MANAGER");
     const accountant = await roleRepo.findByCode("ACCOUNTANT");
+    const vehicleOwner = await roleRepo.findByCode("VEHICLE_OWNER");
     const driver = await roleRepo.findByCode("DRIVER");
     const customerService = await roleRepo.findByCode("CUSTOMER_SERVICE");
 
@@ -227,6 +228,22 @@ async function runTestSuite() {
     assert(!accountant!.permissions.includes(TENANT_PERMISSIONS.RENTAL_FINAL_SETTLE), "Accountant cannot seal settlement by default");
     assert(!accountant!.permissions.includes(TENANT_PERMISSIONS.REFUND_APPROVE), "Accountant cannot approve refunds by default");
     assert(!accountant!.permissions.includes(TENANT_PERMISSIONS.REFUND_EXECUTE), "Accountant cannot execute refunds by default");
+
+    assert(financeManager!.permissions.includes(TENANT_PERMISSIONS.SETTLEMENT_CALCULATE), "Finance Manager can calculate owner settlements");
+    assert(financeManager!.permissions.includes(TENANT_PERMISSIONS.SETTLEMENT_APPROVE), "Finance Manager can independently approve owner settlements");
+    assert(financeManager!.permissions.includes(TENANT_PERMISSIONS.SETTLEMENT_ADJUST), "Finance Manager can record governed settlement adjustments");
+    assert(financeManager!.permissions.includes(TENANT_PERMISSIONS.SETTLEMENT_PAY), "Finance Manager can execute approved payout obligations");
+    assert(financeManager!.permissions.includes(TENANT_PERMISSIONS.SETTLEMENT_PERIOD_MANAGE), "Finance Manager can manage settlement periods");
+
+    assert(accountant!.permissions.includes(TENANT_PERMISSIONS.SETTLEMENT_CALCULATE), "Accountant can prepare settlement calculation");
+    assert(!accountant!.permissions.includes(TENANT_PERMISSIONS.SETTLEMENT_APPROVE), "Accountant cannot approve owner settlement by default");
+    assert(!accountant!.permissions.includes(TENANT_PERMISSIONS.SETTLEMENT_ADJUST), "Accountant cannot adjust owner settlement by default");
+    assert(!accountant!.permissions.includes(TENANT_PERMISSIONS.SETTLEMENT_PAY), "Accountant cannot execute owner payout by default");
+
+    assert(vehicleOwner!.permissions.includes(TENANT_PERMISSIONS.SETTLEMENT_SELF_READ), "Vehicle Owner can read own settlements through scoped self-service");
+    assert(vehicleOwner!.permissions.includes(TENANT_PERMISSIONS.SETTLEMENT_SELF_DISPUTE), "Vehicle Owner can dispute own settlement");
+    assert(!vehicleOwner!.permissions.includes(TENANT_PERMISSIONS.SETTLEMENT_READ), "Vehicle Owner cannot read tenant-wide settlements");
+    assert(!vehicleOwner!.permissions.includes(TENANT_PERMISSIONS.SETTLEMENT_PAY), "Vehicle Owner cannot execute own payout");
 
     assert(!driver!.permissions.includes(TENANT_PERMISSIONS.RENTAL_READ), "Driver cannot read the tenant-wide Rental collection");
     assert(driver!.permissions.includes(TENANT_PERMISSIONS.RENTAL_INCIDENT_REPORT), "Driver can report incidents for assigned trips through scoped self-service context");
