@@ -83,7 +83,8 @@
     "test:fleet-experience": "tsx packages/database/test/fleet-experience-contract.test.ts",
     "test:people-experience": "tsx packages/database/test/customers-drivers-experience-contract.test.ts",
     "test:pricing-experience": "tsx packages/database/test/pricing-experience-contract.test.ts",
-    "test:availability-experience": "tsx packages/database/test/availability-experience-contract.test.ts"
+    "test:availability-experience": "tsx packages/database/test/availability-experience-contract.test.ts",
+    "test:booking-experience": "tsx packages/database/test/booking-experience-contract.test.ts"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
