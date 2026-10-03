@@ -1275,7 +1275,14 @@ export class FinanceService {
     }
 
     const reqAmt = num(dto.requiredAmount);
-    const recAmt = num(dto.receivedAmount);
+    if (reqAmt < 0) {
+      throw new Error("Deposit requirement cannot be negative");
+    }
+    if (num(dto.receivedAmount) > 0) {
+      throw new Error(
+        "Deposit receipt cannot be created from a Finance liability command. Record/verify a Payment and allocate it to the deposit position."
+      );
+    }
     const currency = (dto.currency || "KES").toUpperCase();
 
     const deposit = await this.depositPositionRepo.create({
@@ -1285,17 +1292,15 @@ export class FinanceService {
       customerId: dto.customerId,
       currency,
       requiredAmount: to4Dec(reqAmt),
-      receivedAmount: to4Dec(recAmt),
-      heldAmount: to4Dec(recAmt),
+      receivedAmount: "0.0000",
+      heldAmount: "0.0000",
       appliedAmount: "0.0000",
       refundDueAmount: "0.0000",
       refundedAmount: "0.0000",
       forfeitedAmount: "0.0000",
-      status: "HELD",
+      status: "REQUIRED",
       notes: dto.notes,
     });
-
-    const postingContract = FinancialPostingContractFactory.createDepositReceivedPostingContract(deposit);
 
     await this.auditRepo?.create({
       tenantId,
@@ -1304,20 +1309,19 @@ export class FinanceService {
       action: "DEPOSIT_POSITION_CREATED",
       resourceType: "DEPOSIT_POSITION",
       resourceId: deposit.id,
-      description: `Deposit position created for rental ${dto.rentalId} (${deposit.heldAmount} held)`,
-      payload: { depositId: deposit.id, heldAmount: deposit.heldAmount },
+      description: `Deposit requirement recorded for rental ${dto.rentalId} (${deposit.requiredAmount} required)`,
+      payload: { depositId: deposit.id, requiredAmount: deposit.requiredAmount },
     });
 
     await this.outboxRepo?.publish({
       tenantId,
-      eventType: "finance.deposit.received",
+      eventType: "finance.deposit.position_created",
       aggregateType: "DEPOSIT_POSITION",
       aggregateId: deposit.id,
       payload: {
         depositId: deposit.id,
         rentalId: deposit.rentalId,
-        heldAmount: deposit.heldAmount,
-        postingContract,
+        requiredAmount: deposit.requiredAmount,
       },
     });
 
