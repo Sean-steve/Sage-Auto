@@ -878,6 +878,16 @@ export class PaymentService {
       throw new PaymentNotFoundError(refund.originalPaymentId);
     }
 
+    if (payment.provider === "MANUAL_RECORD") {
+      const error: any = new Error(
+        "Manual/offline payments require an explicitly confirmed offline refund workflow; automatic provider refund execution is not available."
+      );
+      error.name = "ManualRefundRequiresOfflineConfirmationError";
+      error.code = "MANUAL_REFUND_REQUIRES_OFFLINE_CONFIRMATION";
+      error.statusCode = 409;
+      throw error;
+    }
+
     const provider = this.providerRegistry.get(payment.provider);
     const refundResult = await provider.refundPayment({
       tenantId,

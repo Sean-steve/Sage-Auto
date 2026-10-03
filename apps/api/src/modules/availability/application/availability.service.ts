@@ -18,6 +18,7 @@ import type {
   CreateVehicleBlockDto,
   VehicleAvailabilityCalendarResponse,
 } from "@carhire/types";
+import type { AllocationFilter, HoldFilter, VehicleBlockFilter } from "@carhire/database";
 import {
   IVehicleAllocationRepository,
   VehicleAllocationRepository,
@@ -80,6 +81,27 @@ export class AvailabilityService {
       if (err instanceof SubscriptionSuspendedError) throw err;
       // Allow if no subscription repository or unconfigured
     }
+  }
+
+  async listAllocations(
+    tenantId: string,
+    filter?: AllocationFilter
+  ): Promise<VehicleAllocation[]> {
+    return this.allocationRepo.findAllocations(tenantId, filter);
+  }
+
+  async listHolds(
+    tenantId: string,
+    filter?: HoldFilter
+  ): Promise<AllocationHold[]> {
+    return this.allocationRepo.listHolds(tenantId, filter);
+  }
+
+  async listVehicleBlocks(
+    tenantId: string,
+    filter?: VehicleBlockFilter
+  ): Promise<VehicleBlock[]> {
+    return this.blockRepo.listBlocks(tenantId, filter);
   }
 
   /**

@@ -144,11 +144,13 @@ export class BookingService {
     return this.pricingService.calculatePrice(tenantId, {
       pickupDateTime: dto.pickupAt,
       returnDateTime: dto.returnAt,
+      ratePlanId: dto.ratePlanId || undefined,
       vehicleId: dto.vehicleId || undefined,
       vehicleCategoryId: dto.vehicleCategoryId || undefined,
       customerId: dto.customerId || undefined,
       corporateAccountId: dto.corporateAccountId || undefined,
       agentId: dto.agentId || undefined,
+      selectedFeeCodes: dto.requestedFeeCodes || undefined,
       promoCode: dto.promoCode || undefined,
       currency: dto.currency,
     });
@@ -421,6 +423,7 @@ export class BookingService {
         corporateAccountId: updates.corporateAccountId ?? booking.corporateAccountId,
         agentId: updates.agentId ?? booking.agentId,
         promoCode: dto.promoCode,
+        requestedFeeCodes: dto.requestedFeeCodes,
       });
 
       updates.pricingSnapshot = quote.pricingSnapshot;
@@ -486,6 +489,7 @@ export class BookingService {
       agentId: booking.agentId,
       ratePlanId: dto.ratePlanId,
       promoCode: dto.promoCode,
+      requestedFeeCodes: dto.requestedFeeCodes,
     });
 
     const newSnapshotVersion = (booking.pricingSnapshotVersion || 1) + 1;
@@ -1128,7 +1132,7 @@ export class BookingService {
       throw new BookingNotFoundError(bookingId);
     }
 
-    if (booking.status === "COMPLETED" || booking.status === "CANCELLED" || booking.status === "REJECTED" || booking.status === "EXPIRED") {
+    if (BookingStateMachine.isTerminal(booking.status)) {
       throw new BookingImmutableError(bookingId, booking.status);
     }
 

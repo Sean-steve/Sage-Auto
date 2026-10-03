@@ -37,6 +37,15 @@ export interface AllocationFilter {
   holdToken?: string;
 }
 
+export interface HoldFilter {
+  vehicleId?: string;
+  status?: HoldStatus | HoldStatus[];
+  from?: string;
+  to?: string;
+  customerId?: string;
+  bookingDraftId?: string;
+}
+
 export interface IVehicleAllocationRepository {
   createAllocation(
     tenantId: string,
@@ -120,6 +129,12 @@ export interface IVehicleAllocationRepository {
     tenantId: string,
     tx?: TransactionContext
   ): Promise<AllocationHold | null>;
+
+  listHolds(
+    tenantId: string,
+    filter?: HoldFilter,
+    tx?: TransactionContext
+  ): Promise<AllocationHold[]>;
 
   expireStaleHolds(tenantId?: string, tx?: TransactionContext): Promise<number>;
 
@@ -609,6 +624,41 @@ export class VehicleAllocationRepository implements IVehicleAllocationRepository
       }
     }
     return null;
+  }
+
+  async listHolds(
+    tenantId: string,
+    filter?: HoldFilter,
+    tx?: TransactionContext
+  ): Promise<AllocationHold[]> {
+    await this.expireStaleHolds(tenantId, tx);
+    const results: AllocationHold[] = [];
+
+    for (const hold of VehicleAllocationRepository.holdStore.values()) {
+      if (hold.tenantId !== tenantId) continue;
+      if (filter?.vehicleId && hold.vehicleId !== filter.vehicleId) continue;
+      if (filter?.customerId && hold.customerId !== filter.customerId) continue;
+      if (filter?.bookingDraftId && hold.bookingDraftId !== filter.bookingDraftId) continue;
+
+      if (filter?.status) {
+        if (Array.isArray(filter.status)) {
+          if (!filter.status.includes(hold.status)) continue;
+        } else if (hold.status !== filter.status) {
+          continue;
+        }
+      }
+
+      if (filter?.from || filter?.to) {
+        const holdStart = new Date(hold.startsAt).getTime();
+        const holdEnd = new Date(hold.endsAt).getTime();
+        if (filter.from && holdEnd <= new Date(filter.from).getTime()) continue;
+        if (filter.to && holdStart >= new Date(filter.to).getTime()) continue;
+      }
+
+      results.push({ ...hold });
+    }
+
+    return results.sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
   }
 
   async expireStaleHolds(tenantId?: string, tx?: TransactionContext): Promise<number> {

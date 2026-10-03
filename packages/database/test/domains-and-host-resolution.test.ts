@@ -87,6 +87,8 @@ async function runSprint30TestSuite() {
     }
   );
 
+  websiteService.setPlatformDomainProvisioner(domainService);
+
   const hostResolver = new HostResolutionService(
     domainRepo,
     websiteRepo,

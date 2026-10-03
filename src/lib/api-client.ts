@@ -60,7 +60,15 @@ class ApiClient {
 
   public setTenantId(tenantId: string) {
     this.tenantId = tenantId;
-    localStorage.setItem('carhire_active_tenant_id', tenantId);
+    if (tenantId) {
+      localStorage.setItem('carhire_active_tenant_id', tenantId);
+    } else {
+      localStorage.removeItem('carhire_active_tenant_id');
+    }
+  }
+
+  public clearTenantId() {
+    this.setTenantId('');
   }
 
   public getTenantId(): string {
@@ -207,7 +215,10 @@ class ApiClient {
       return this.get<any[]>(`/fleet/vehicles${q ? `?${q}` : ''}`);
     },
     getVehicle: (id: string) => this.get<{ vehicle: any }>(`/fleet/vehicles/${id}`),
-    getDigitalTwin: (id: string) => this.get<{ twin: any }>(`/fleet/vehicles/${id}/digital-twin`),
+    getDigitalTwin: (id: string) => this.get<any>(`/fleet/vehicles/${id}/digital-twin`),
+    getCategories: () => this.get<any[]>('/fleet/categories'),
+    getDocuments: (id: string) => this.get<any[]>(`/fleet/vehicles/${id}/documents`),
+    addDocument: (id: string, dto: any) => this.post(`/fleet/vehicles/${id}/documents`, dto),
     createVehicle: (dto: any) => this.post('/fleet/vehicles', dto),
     updateVehicle: (id: string, dto: any) => this.patch(`/fleet/vehicles/${id}`, dto),
     deleteVehicle: (id: string) => this.delete(`/fleet/vehicles/${id}`),
@@ -235,59 +246,188 @@ class ApiClient {
       return this.get<any[]>(`/bookings${q ? `?${q}` : ''}`);
     },
     getBooking: (id: string) => this.get(`/bookings/${id}`),
+    previewQuote: (dto: any) => this.post('/bookings/quote', dto),
     createBooking: (dto: any) => this.post('/bookings', dto),
-    confirmBooking: (id: string, reason?: string) => this.post(`/bookings/${id}/confirm`, { reason }),
-    cancelBooking: (id: string, reason: string) => this.post(`/bookings/${id}/cancel`, { reason }),
-    rescheduleBooking: (id: string, dates: { startDate: string; endDate: string }) => this.post(`/bookings/${id}/reschedule`, dates),
-    substituteVehicle: (id: string, replacementVehicleId: string, reason: string) =>
-      this.post(`/bookings/${id}/substitute`, { replacementVehicleId, reason }),
+    updateDraft: (id: string, dto: any) => this.patch(`/bookings/${id}`, dto),
+    quoteBooking: (id: string, dto: any = {}) => this.post(`/bookings/${id}/quote`, dto),
+    requestPayment: (id: string) => this.post(`/bookings/${id}/request-payment`),
+    confirmBooking: (id: string, dto: any = {}) => this.post(`/bookings/${id}/confirm`, dto),
+    cancelBooking: (id: string, dto: any) => this.post(`/bookings/${id}/cancel`, dto),
+    rejectBooking: (id: string, dto: any) => this.post(`/bookings/${id}/reject`, dto),
+    expireBooking: (id: string, dto: any = {}) => this.post(`/bookings/${id}/expire`, dto),
+    markNoShow: (id: string, dto: any = {}) => this.post(`/bookings/${id}/no-show`, dto),
+    amendDates: (id: string, dto: any) => this.post(`/bookings/${id}/amend-dates`, dto),
+    substituteVehicle: (id: string, dto: any) => this.post(`/bookings/${id}/substitute-vehicle`, dto),
+    getHandoverReadiness: (id: string) => this.get(`/bookings/${id}/handover-readiness`),
   };
 
   // 6. Availability & Allocation Context
   public availability = {
-    checkAvailability: (params: { vehicleId: string; startDate: string; endDate: string }) =>
-      this.get('/availability/check', params),
-    getTimeline: (params: { startDate: string; endDate: string }) => this.get('/availability/timeline', params),
+    checkAvailability: (dto: any) => this.post('/availability/check', dto),
+    searchAvailableVehicles: (dto: any) => this.post('/availability/search', dto),
+    listAllocations: (params?: Record<string, any>) => {
+      const q = new URLSearchParams(params).toString();
+      return this.get<any[]>(`/availability/allocations${q ? `?${q}` : ''}`);
+    },
+    createAllocation: (dto: any) => this.post('/availability/allocations', dto),
+    releaseAllocation: (id: string, reason: string) =>
+      this.post(`/availability/allocations/${id}/release`, { reason }),
+    substituteAllocation: (id: string, newVehicleId: string) =>
+      this.post(`/availability/allocations/${id}/substitute`, { newVehicleId }),
+    listHolds: (params?: Record<string, any>) => {
+      const q = new URLSearchParams(params).toString();
+      return this.get<any[]>(`/availability/holds${q ? `?${q}` : ''}`);
+    },
+    createHold: (dto: any) => this.post('/availability/holds', dto),
+    confirmHold: (dto: any) => this.post('/availability/holds/confirm', dto),
+    releaseHold: (idOrToken: string) => this.post(`/availability/holds/${idOrToken}/release`),
+    listBlocks: (params?: Record<string, any>) => {
+      const q = new URLSearchParams(params).toString();
+      return this.get<any[]>(`/availability/blocks${q ? `?${q}` : ''}`);
+    },
+    createBlock: (dto: any) => this.post('/availability/blocks', dto),
+    releaseBlock: (id: string, reason: string) =>
+      this.post(`/availability/blocks/${id}/release`, { reason }),
+    getVehicleCalendar: (vehicleId: string, start: string, end: string) => {
+      const q = new URLSearchParams({ start, end }).toString();
+      return this.get(`/availability/calendar/${vehicleId}?${q}`);
+    },
   };
 
-  // 7. On-Road Rentals & Operations Context
+  // 7. Contracts & Handover Context
+  public contracts = {
+    listContracts: (params?: Record<string, any>) => {
+      const q = new URLSearchParams(params).toString();
+      return this.get<any[]>(`/contracts${q ? `?${q}` : ''}`);
+    },
+    getContract: (id: string) => this.get(`/contracts/${id}`),
+    generateContract: (dto: any) => this.post('/contracts/generate', dto),
+    sendContract: (id: string, dto: any) => this.post(`/contracts/${id}/send`, dto),
+    signContract: (id: string, dto: any) => this.post(`/contracts/${id}/sign`, dto),
+    amendContract: (id: string, dto: any) => this.post(`/contracts/${id}/amend`, dto),
+  };
+
+  public handovers = {
+    listHandovers: (params?: Record<string, any>) => {
+      const q = new URLSearchParams(params).toString();
+      return this.get<any[]>(`/handovers${q ? `?${q}` : ''}`);
+    },
+    getHandover: (id: string) => this.get(`/handovers/${id}`),
+    schedule: (dto: any) => this.post('/handovers/schedule', dto),
+    recordArrival: (id: string, dto: any) => this.post(`/handovers/${id}/arrive`, dto),
+    verifyDocuments: (id: string, dto: any) => this.post(`/handovers/${id}/verify-documents`, dto),
+    completeInspection: (id: string, dto: any) => this.post(`/handovers/${id}/inspection`, dto),
+    confirmSignature: (id: string, dto: any) => this.post(`/handovers/${id}/confirm-signature`, dto),
+    handoverKeys: (id: string, dto: any) => this.post(`/handovers/${id}/handover-keys`, dto),
+    complete: (id: string, dto: any = {}) => this.post(`/handovers/${id}/complete`, dto),
+  };
+
+  // 8. On-Road Rentals & Operations Context
   public rentals = {
     listRentals: () => this.get<any[]>('/rentals'),
     getRental: (id: string) => this.get(`/rentals/${id}`),
+    getReadiness: (bookingId: string) => this.get(`/rentals/readiness/${bookingId}`),
     startRental: (bookingId: string) => this.post('/rentals/start', { bookingId }),
     extendRental: (id: string, dto: any) => this.post(`/rentals/${id}/extend`, dto),
     completeRental: (id: string, dto: any) => this.post(`/rentals/${id}/complete`, dto),
     recordIncident: (id: string, incident: any) => this.post(`/rentals/${id}/incidents`, incident),
   };
 
-  // 8. Vehicle Inspections & Damage Mapping Context
+  // 9. Vehicle Inspections & Damage Mapping Context
   public inspections = {
-    listInspections: () => this.get<any[]>('/inspections'),
+    listInspections: (params?: Record<string, any>) => {
+      const q = new URLSearchParams(params).toString();
+      return this.get<any[]>(`/inspections${q ? `?${q}` : ''}`);
+    },
+    listDamageCases: (params?: Record<string, any>) => {
+      const q = new URLSearchParams(params).toString();
+      return this.get<any[]>(`/inspections/damage-cases/list${q ? `?${q}` : ''}`);
+    },
     createInspection: (dto: any) => this.post('/inspections', dto),
     getInspection: (id: string) => this.get(`/inspections/${id}`),
+    getReadiness: (id: string) => this.get(`/inspections/${id}/readiness`),
   };
 
-  // 9. Customers & Parties Context
+  // 10. Customers & Parties Context
   public customers = {
-    listCustomers: () => this.get<any[]>('/customers'),
+    listCustomers: (params?: Record<string, any>) => {
+      const q = new URLSearchParams(params).toString();
+      return this.get<any[]>(`/customers${q ? `?${q}` : ''}`);
+    },
     getCustomer: (id: string) => this.get(`/customers/${id}`),
     createCustomer: (dto: any) => this.post('/customers', dto),
     updateCustomer: (id: string, dto: any) => this.put(`/customers/${id}`, dto),
     verifyCustomer: (id: string, dto: any) => this.patch(`/customers/${id}/verify`, dto),
     changeStatus: (id: string, dto: any) => this.patch(`/customers/${id}/status`, dto),
-    blockCustomer: (id: string, reason: string) => this.patch(`/customers/${id}/status`, { status: "BLOCKED", reason }),
+    blockCustomer: (id: string, reason: string, expectedVersion?: number) =>
+      this.patch(`/customers/${id}/status`, { status: "BLOCKED", reason, expectedVersion }),
   };
 
-  // 10. Pricing & Rate Engine Context
+  public drivers = {
+    listDrivers: (params?: Record<string, any>) => {
+      const q = new URLSearchParams(params).toString();
+      return this.get<any[]>(`/drivers${q ? `?${q}` : ''}`);
+    },
+    getDriver: (id: string) => this.get(`/drivers/${id}`),
+    createDriver: (dto: any) => this.post('/drivers', dto),
+    updateDriver: (id: string, dto: any) => this.put(`/drivers/${id}`, dto),
+    changeStatus: (id: string, dto: any) => this.patch(`/drivers/${id}/status`, dto),
+    verifyDriver: (id: string, dto: any) => this.patch(`/drivers/${id}/verify`, dto),
+    listCustomerRelationships: (customerId: string) =>
+      this.get<any[]>(`/drivers/relationships/customer/${customerId}`),
+    linkCustomer: (dto: any) => this.post('/drivers/relationships', dto),
+    unlinkCustomer: (relationshipId: string) => this.delete(`/drivers/relationships/${relationshipId}`),
+  };
+
+  public agents = {
+    listAgents: (params?: Record<string, any>) => {
+      const q = new URLSearchParams(params).toString();
+      return this.get<any[]>(`/agents${q ? `?${q}` : ''}`);
+    },
+    getAgent: (id: string) => this.get(`/agents/${id}`),
+  };
+
+  public corporateAccounts = {
+    listAccounts: (params?: Record<string, any>) => {
+      const q = new URLSearchParams(params).toString();
+      return this.get<any[]>(`/corporate-accounts${q ? `?${q}` : ''}`);
+    },
+    getAccount: (id: string) => this.get(`/corporate-accounts/${id}`),
+    createAccount: (dto: any) => this.post('/corporate-accounts', dto),
+    updateAccount: (id: string, dto: any) => this.put(`/corporate-accounts/${id}`, dto),
+    authorizeDriver: (id: string, dto: any) => this.post(`/corporate-accounts/${id}/authorized-drivers`, dto),
+    revokeAuthorizedDriver: (id: string, authorizationId: string) =>
+      this.delete(`/corporate-accounts/${id}/authorized-drivers/${authorizationId}`),
+  };
+
+  // 11. Pricing & Rate Engine Context
   public pricing = {
     getRatePlans: () => this.get<any[]>('/pricing/rate-plans'),
+    getRatePlan: (id: string) => this.get(`/pricing/rate-plans/${id}`),
     createRatePlan: (dto: any) => this.post('/pricing/rate-plans', dto),
-    calculateQuote: (req: any) => this.post('/pricing/quote', req),
+    updateRatePlan: (id: string, dto: any) => this.patch(`/pricing/rate-plans/${id}`, dto),
+    activateRatePlan: (id: string) => this.post(`/pricing/rate-plans/${id}/activate`),
+    archiveRatePlan: (id: string) => this.post(`/pricing/rate-plans/${id}/archive`),
+    getRates: (id: string) => this.get<any[]>(`/pricing/rate-plans/${id}/rates`),
+    setRates: (id: string, rates: any[]) => this.post(`/pricing/rate-plans/${id}/rates`, { rates }),
+    getAssignments: (id: string) => this.get<any[]>(`/pricing/rate-plans/${id}/assignments`),
+    assignPlan: (id: string, dto: any) => this.post(`/pricing/rate-plans/${id}/assignments`, dto),
+    getSeasonalRules: (id: string) => this.get<any[]>(`/pricing/rate-plans/${id}/seasonal-rules`),
+    createSeasonalRule: (id: string, dto: any) => this.post(`/pricing/rate-plans/${id}/seasonal-rules`, dto),
+    deleteSeasonalRule: (id: string) => this.delete(`/pricing/seasonal-rules/${id}`),
+    getDurationTiers: (id: string) => this.get<any[]>(`/pricing/rate-plans/${id}/duration-tiers`),
+    createDurationTier: (id: string, dto: any) => this.post(`/pricing/rate-plans/${id}/duration-tiers`, dto),
+    deleteDurationTier: (id: string) => this.delete(`/pricing/duration-tiers/${id}`),
+    getFees: () => this.get<any[]>('/pricing/fees'),
+    createFee: (dto: any) => this.post('/pricing/fees', dto),
+    deleteFee: (id: string) => this.delete(`/pricing/fees/${id}`),
     getPromoCodes: () => this.get<any[]>('/pricing/promo-codes'),
     createPromoCode: (dto: any) => this.post('/pricing/promo-codes', dto),
+    updatePromoStatus: (id: string, status: string) => this.patch(`/pricing/promo-codes/${id}/status`, { status }),
+    calculateQuote: (req: any) => this.post('/pricing/calculate', req),
   };
 
-  // 11. Operational Finance & General Ledger Context
+  // 12. Operational Finance & General Ledger Context
   public finance = {
     getInvoices: () => this.get<any[]>('/finance/invoices'),
     getExpenses: () => this.get<any[]>('/finance/expenses'),
@@ -297,7 +437,7 @@ class ApiClient {
     getLedgerTransactions: () => this.get<any[]>('/ledger/transactions'),
   };
 
-  // 12. Vehicle Owner Settlements Context
+  // 13. Vehicle Owner Settlements Context
   public ownerSettlements = {
     listSettlements: () => this.get<any[]>('/owner-settlements'),
     calculateSettlement: (dto: any) => this.post('/owner-settlements/calculate', dto),
@@ -305,7 +445,7 @@ class ApiClient {
     paySettlement: (id: string, payoutRef: string) => this.post(`/owner-settlements/${id}/pay`, { payoutRef }),
   };
 
-  // 13. Payments & M-Pesa Integration Context
+  // 14. Payments & M-Pesa Integration Context
   public payments = {
     stkPush: (dto: { bookingId: string; phoneNumber: string; amount: number }) =>
       this.post('/payments/attempts', {
@@ -318,9 +458,12 @@ class ApiClient {
     getAttempts: (bookingId?: string) => this.get('/payments/attempts', bookingId ? { bookingId } : undefined),
   };
 
-  // 14. Fleet Maintenance & Servicing Context
+  // 15. Fleet Maintenance & Servicing Context
   public maintenance = {
-    listWorkOrders: () => this.get<any[]>('/maintenance/work-orders'),
+    listWorkOrders: (params?: Record<string, any>) => {
+      const q = new URLSearchParams(params).toString();
+      return this.get<any[]>(`/maintenance/work-orders${q ? `?${q}` : ''}`);
+    },
     createWorkOrder: (dto: any) => this.post('/maintenance/work-orders', dto),
     updateWorkOrder: (id: string, dto: any) => {
       const { status, ...payload } = dto;
@@ -343,14 +486,20 @@ class ApiClient {
     createProvider: (dto: any) => this.post('/maintenance/providers', dto),
   };
 
-  // 15. Regulatory Compliance & Expiry Alerts Context
+  // 16. Regulatory Compliance & Expiry Alerts Context
   public compliance = {
+    listRecords: (params?: Record<string, any>) => {
+      const q = new URLSearchParams(params).toString();
+      return this.get<any[]>(`/compliance/records${q ? `?${q}` : ''}`);
+    },
+    getVehicleReadiness: (vehicleId: string) => this.get<any>(`/compliance/readiness/vehicle/${vehicleId}`),
+    getDriverReadiness: (driverId: string) => this.get<any>(`/compliance/readiness/driver/${driverId}`),
     listDocuments: () => this.get<any[]>('/compliance/documents'),
     addDocument: (dto: any) => this.post('/compliance/documents', dto),
     overrideHold: (id: string, reason: string) => this.post(`/compliance/documents/${id}/override-hold`, { reason }),
   };
 
-  // 16. Analytics & Reports Engine Context
+  // 17. Analytics & Reports Engine Context
   public analytics = {
     getDashboard: (params?: Record<string, any>) => {
       const q = new URLSearchParams(params).toString();
@@ -366,7 +515,7 @@ class ApiClient {
       this.post(`/reports/export/${reportKey}`, { format }),
   };
 
-  // 17. SaaS Control Plane & Platform Operations Context
+  // 18. SaaS Control Plane & Platform Operations Context
   public platform = {
     getAnalyticsOverview: () => this.get('/platform/analytics/overview'),
     getMrrMovements: () => this.get('/platform/analytics/mrr-movements'),

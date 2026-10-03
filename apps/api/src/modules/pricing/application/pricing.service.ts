@@ -11,6 +11,7 @@ import type {
   DurationTierRule,
   PricingFeeRule,
   PromoCode,
+  PromoCodeStatus,
   PricingRequest,
   PricingResult,
   CreateRatePlanDto,
@@ -267,8 +268,20 @@ export class PricingService {
     return this.ruleRepo.listSeasonalRules(tenantId, ratePlanId);
   }
 
-  async deleteSeasonalRule(tenantId: string, id: string): Promise<void> {
-    return this.ruleRepo.deleteSeasonalRule(id, tenantId);
+  async deleteSeasonalRule(
+    tenantId: string,
+    id: string,
+    actorUserId: string = "system"
+  ): Promise<void> {
+    await this.ruleRepo.deleteSeasonalRule(id, tenantId);
+    await this.auditRepo.record({
+      tenantId,
+      actorType: actorUserId === "system" ? "SYSTEM" : "USER",
+      actorId: actorUserId,
+      action: "pricing.seasonal_rule.deleted",
+      resourceType: "SeasonalRateRule",
+      resourceId: id,
+    });
   }
 
   async createDurationTier(
@@ -281,6 +294,22 @@ export class PricingService {
 
   async listDurationTiers(tenantId: string, ratePlanId: string): Promise<DurationTierRule[]> {
     return this.ruleRepo.listDurationTiers(tenantId, ratePlanId);
+  }
+
+  async deleteDurationTier(
+    tenantId: string,
+    id: string,
+    actorUserId: string = "system"
+  ): Promise<void> {
+    await this.ruleRepo.deleteDurationTier(id, tenantId);
+    await this.auditRepo.record({
+      tenantId,
+      actorType: actorUserId === "system" ? "SYSTEM" : "USER",
+      actorId: actorUserId,
+      action: "pricing.duration_tier.deleted",
+      resourceType: "DurationTierRule",
+      resourceId: id,
+    });
   }
 
   async createFeeRule(
@@ -303,6 +332,22 @@ export class PricingService {
 
   async listFeeRules(tenantId: string, ratePlanId?: string | null): Promise<PricingFeeRule[]> {
     return this.ruleRepo.listFeeRules(tenantId, ratePlanId);
+  }
+
+  async deleteFeeRule(
+    tenantId: string,
+    id: string,
+    actorUserId: string = "system"
+  ): Promise<void> {
+    await this.ruleRepo.deleteFeeRule(id, tenantId);
+    await this.auditRepo.record({
+      tenantId,
+      actorType: actorUserId === "system" ? "SYSTEM" : "USER",
+      actorId: actorUserId,
+      action: "pricing.fee_rule.deleted",
+      resourceType: "PricingFeeRule",
+      resourceId: id,
+    });
   }
 
   // --------------------------------------------------------------------------
@@ -335,6 +380,37 @@ export class PricingService {
     return this.promoRepo.findByCode(code, tenantId);
   }
 
+  async updatePromoStatus(
+    tenantId: string,
+    id: string,
+    status: PromoCodeStatus,
+    actorUserId: string = "system"
+  ): Promise<PromoCode> {
+    if (!["ACTIVE", "DISABLED", "INACTIVE"].includes(status)) {
+      const err: any = new Error("Promo status may only be set to ACTIVE, DISABLED, or INACTIVE manually.");
+      err.statusCode = 400;
+      throw err;
+    }
+    const promo = await this.promoRepo.update(id, tenantId, { status });
+    await this.auditRepo.record({
+      tenantId,
+      actorType: actorUserId === "system" ? "SYSTEM" : "USER",
+      actorId: actorUserId,
+      action: "pricing.promo_code.status_changed",
+      resourceType: "PromoCode",
+      resourceId: id,
+      metadata: { status },
+    });
+    await this.outboxRepo.publish({
+      tenantId,
+      eventType: "pricing.promo_code.status_changed",
+      aggregateType: "PromoCode",
+      aggregateId: id,
+      payload: { promoCodeId: id, code: promo.code, status },
+    });
+    return promo;
+  }
+
   async recordPromoUsage(tenantId: string, code: string): Promise<PromoCode> {
     return this.promoRepo.recordUsage(code, tenantId);
   }
@@ -354,23 +430,52 @@ export class PricingService {
   }
 
   async calculatePrice(tenantId: string, request: PricingRequest): Promise<PricingResult> {
-    // 1. Resolve effective rate plan
-    const effectiveMatch = await this.ratePlanRepo.findEffectiveRatePlan(tenantId, {
-      vehicleId: request.vehicleId,
-      vehicleCategoryId: request.vehicleCategoryId,
-      corporateAccountId: request.corporateAccountId,
-      customerId: request.customerId,
-      agentId: request.agentId,
-      dateTime: request.pickupDateTime,
-    });
-
+    // 1. Resolve explicit or effective rate plan
     let matchedPlan: RatePlan;
     let matchedRate: RatePlanRate;
 
-    if (effectiveMatch) {
-      matchedPlan = effectiveMatch.plan;
-      matchedRate = effectiveMatch.matchedRate;
+    if (request.ratePlanId) {
+      const explicitPlan = await this.ratePlanRepo.findById(request.ratePlanId, tenantId);
+      if (!explicitPlan) {
+        throw new Error(`Rate plan '${request.ratePlanId}' was not found for this tenant.`);
+      }
+
+      const evalTime = new Date(request.pickupDateTime).getTime();
+      const effectiveFrom = new Date(explicitPlan.effectiveFrom).getTime();
+      const effectiveTo = explicitPlan.effectiveTo ? new Date(explicitPlan.effectiveTo).getTime() : null;
+      if (
+        explicitPlan.status !== "ACTIVE" ||
+        evalTime < effectiveFrom ||
+        (effectiveTo !== null && evalTime > effectiveTo)
+      ) {
+        throw new Error(`Rate plan '${explicitPlan.code}' is not active/effective for the requested pickup time.`);
+      }
+
+      const explicitRate = await this.ratePlanRepo.getRateForCategoryOrVehicle(
+        explicitPlan.id,
+        tenantId,
+        request.vehicleCategoryId,
+        request.vehicleId
+      );
+      if (!explicitRate) {
+        throw new Error(`Rate plan '${explicitPlan.code}' has no matching Vehicle/Category/general rate for this quote.`);
+      }
+      matchedPlan = explicitPlan;
+      matchedRate = explicitRate;
     } else {
+      const effectiveMatch = await this.ratePlanRepo.findEffectiveRatePlan(tenantId, {
+        vehicleId: request.vehicleId,
+        vehicleCategoryId: request.vehicleCategoryId,
+        corporateAccountId: request.corporateAccountId,
+        customerId: request.customerId,
+        agentId: request.agentId,
+        dateTime: request.pickupDateTime,
+      });
+
+      if (effectiveMatch) {
+        matchedPlan = effectiveMatch.plan;
+        matchedRate = effectiveMatch.matchedRate;
+      } else {
       const vehicle = request.vehicleId ? await new VehicleRepository().findById(request.vehicleId, tenantId) : null;
       if (!vehicle || !Number.isFinite(vehicle.dailyRate) || vehicle.dailyRate <= 0) throw new Error("Configure a vehicle daily rate or a matching rate plan before booking.");
       const settings = await this.tenantSettingsRepo.findByTenantId(tenantId);
@@ -410,6 +515,7 @@ export class PricingService {
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
+      }
     }
 
     // 2. Resolve Corporate Account discount if specified

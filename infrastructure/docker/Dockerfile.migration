@@ -13,9 +13,9 @@ COPY infrastructure/database/ ./infrastructure/database/
 COPY scripts/ ./scripts/
 
 RUN pnpm install --frozen-lockfile --prod=false
-RUN pnpm --filter @carhire/database build
 
+# The canonical migration CLI executes the TypeScript migration engine through
+# tsx, so this image does not perform a separate package-level tsc build.
 USER node
 
-ENTRYPOINT ["node", "-e", "console.log('Production Migration Job Runner ready')"]
 CMD ["pnpm", "db:migrate"]

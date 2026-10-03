@@ -75,6 +75,32 @@ export function createAvailabilityController(
   // Allocations Endpoints
   // --------------------------------------------------------------------------
 
+  // List allocations for dispatch/operations
+  router.get(
+    "/allocations",
+    guard("availability.read"),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const tenantId = getTenantId(req);
+        const status = req.query.status
+          ? String(req.query.status).split(",").filter(Boolean)
+          : undefined;
+        const allocations = await availabilityService.listAllocations(tenantId, {
+          vehicleId: req.query.vehicleId ? String(req.query.vehicleId) : undefined,
+          status: status as any,
+          from: req.query.from ? String(req.query.from) : undefined,
+          to: req.query.to ? String(req.query.to) : undefined,
+          allocationType: req.query.allocationType ? String(req.query.allocationType) as any : undefined,
+          sourceType: req.query.sourceType ? String(req.query.sourceType) : undefined,
+          sourceId: req.query.sourceId ? String(req.query.sourceId) : undefined,
+        });
+        res.json({ success: true, data: allocations, total: allocations.length });
+      } catch (err) {
+        next(err);
+      }
+    }
+  );
+
   // Create an allocation
   router.post(
     "/allocations",
@@ -138,6 +164,31 @@ export function createAvailabilityController(
   // Temporary Holds Endpoints
   // --------------------------------------------------------------------------
 
+  // List temporary holds
+  router.get(
+    "/holds",
+    guard("availability.read"),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const tenantId = getTenantId(req);
+        const status = req.query.status
+          ? String(req.query.status).split(",").filter(Boolean)
+          : undefined;
+        const holds = await availabilityService.listHolds(tenantId, {
+          vehicleId: req.query.vehicleId ? String(req.query.vehicleId) : undefined,
+          status: status as any,
+          from: req.query.from ? String(req.query.from) : undefined,
+          to: req.query.to ? String(req.query.to) : undefined,
+          customerId: req.query.customerId ? String(req.query.customerId) : undefined,
+          bookingDraftId: req.query.bookingDraftId ? String(req.query.bookingDraftId) : undefined,
+        });
+        res.json({ success: true, data: holds, total: holds.length });
+      } catch (err) {
+        next(err);
+      }
+    }
+  );
+
   // Create checkout hold
   router.post(
     "/holds",
@@ -199,6 +250,30 @@ export function createAvailabilityController(
   // --------------------------------------------------------------------------
   // Vehicle Blocks Endpoints (Maintenance, Impound, Compliance, Admin)
   // --------------------------------------------------------------------------
+
+  // List vehicle blocks
+  router.get(
+    "/blocks",
+    guard("availability.read"),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const tenantId = getTenantId(req);
+        const status = req.query.status
+          ? String(req.query.status).split(",").filter(Boolean)
+          : undefined;
+        const blocks = await availabilityService.listVehicleBlocks(tenantId, {
+          vehicleId: req.query.vehicleId ? String(req.query.vehicleId) : undefined,
+          status: status as any,
+          from: req.query.from ? String(req.query.from) : undefined,
+          to: req.query.to ? String(req.query.to) : undefined,
+          blockType: req.query.blockType ? String(req.query.blockType) as any : undefined,
+        });
+        res.json({ success: true, data: blocks, total: blocks.length });
+      } catch (err) {
+        next(err);
+      }
+    }
+  );
 
   // Create vehicle block
   router.post(

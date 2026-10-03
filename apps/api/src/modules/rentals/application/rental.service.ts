@@ -157,7 +157,9 @@ export class RentalService {
 
     // Check 3: Contract status
     const contracts = await this.contractRepo.findByBookingId(booking.id, tenantId);
-    const contract = contracts.length > 0 ? contracts[0] : null;
+    const contract = contracts
+      .filter((item) => item.status !== "ARCHIVED")
+      .sort((a, b) => b.contractVersion - a.contractVersion || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0] || null;
     const contractSigned = contract?.status === "SIGNED" || contract?.status === "ACTIVE";
     if (!contract) {
       blockers.push("No contract generated for this booking");
@@ -167,7 +169,8 @@ export class RentalService {
 
     // Check 4: Handover checkpoints
     const handovers = await this.handoverRepo.findByBookingId(booking.id, tenantId);
-    const handover = handovers.length > 0 ? handovers[0] : null;
+    const handover = handovers
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0] || null;
     const documentsVerified = !!handover?.documentsVerifiedAt;
     const inspectionCompleted = !!handover?.inspectionCompletedAt;
 
@@ -179,6 +182,12 @@ export class RentalService {
       }
       if (!inspectionCompleted) {
         blockers.push("Pre-rental inspection not completed in handover workflow");
+      }
+      if (handover.status !== "HANDOVER_COMPLETED") {
+        blockers.push(`Handover must be completed before Rental start (currently: ${handover.status})`);
+      }
+      if (contract && handover.contractId !== contract.id) {
+        blockers.push("Handover is not linked to the current Contract version");
       }
     }
 
@@ -200,7 +209,17 @@ export class RentalService {
     }
 
     // Check 6: Allocation validity
-    const allocationValid = !!booking.assignedVehicleId;
+    let allocationValid = false;
+    const allocations = await this.allocationRepo.findBySource("BOOKING", booking.id, tenantId);
+    const activeBookingAllocation = allocations.find(
+      (allocation) =>
+        allocation.vehicleId === vehicleId &&
+        ["CONFIRMED", "ACTIVE"].includes(allocation.status)
+    );
+    allocationValid = !!activeBookingAllocation;
+    if (!allocationValid) {
+      blockers.push("Booking has no active confirmed Vehicle allocation for Rental start");
+    }
 
     // Check 7: Regulatory Compliance Readiness (Sprint 18)
     if (this.complianceReadinessService && vehicleId) {
@@ -300,11 +319,29 @@ export class RentalService {
     if (!handover) {
       throw new HandoverNotFoundError(dto.handoverId);
     }
+    if (contract.bookingId !== booking.id) {
+      throw new RentalNotEligibleToStartError(["Selected Contract does not belong to the Booking"]);
+    }
+    if (handover.bookingId !== booking.id) {
+      throw new RentalNotEligibleToStartError(["Selected Handover does not belong to the Booking"]);
+    }
+    if (handover.contractId !== contract.id) {
+      throw new RentalNotEligibleToStartError(["Selected Handover is not linked to the selected Contract"]);
+    }
+    if (contract.status !== "SIGNED") {
+      throw new RentalNotEligibleToStartError([`Contract must be SIGNED before Rental start (currently: ${contract.status})`]);
+    }
+    if (handover.status !== "HANDOVER_COMPLETED") {
+      throw new RentalNotEligibleToStartError([`Handover must be HANDOVER_COMPLETED before Rental start (currently: ${handover.status})`]);
+    }
 
     const vehicleId = booking.assignedVehicleId || handover.vehicleId;
     const vehicle = await this.vehicleRepo.findById(vehicleId, tenantId);
     if (!vehicle) {
       throw new RecordNotFoundError("Vehicle", vehicleId);
+    }
+    if (contract.vehicleId !== vehicleId || handover.vehicleId !== vehicleId) {
+      throw new RentalNotEligibleToStartError(["Booking, Contract and Handover Vehicle references do not match"]);
     }
 
     // 4. Validate readiness

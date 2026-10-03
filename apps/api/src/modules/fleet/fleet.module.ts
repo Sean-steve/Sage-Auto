@@ -11,6 +11,7 @@ import {
   VehicleDocumentRepository,
   AuditRepository,
   OutboxRepository,
+  RentalRepository,
 } from "@carhire/database";
 import { FleetService } from "./application/fleet.service";
 import { createFleetController } from "./presentation/fleet.controller";
@@ -41,7 +42,8 @@ export class FleetModule {
       documentRepo,
       auditRepo,
       outboxRepo,
-      entitlementService
+      entitlementService,
+      new RentalRepository()
     );
 
     this.router = createFleetController(this.fleetService, permissionGuard);

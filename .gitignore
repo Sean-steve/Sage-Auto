@@ -13,3 +13,5 @@ coverage/
 *.sqlite-shm
 
 .review/
+
+.checkpoints/local-data/

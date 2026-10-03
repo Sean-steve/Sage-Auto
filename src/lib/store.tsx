@@ -97,6 +97,7 @@ interface AppContextType {
   // Current Navigation & Context
   currentView: ActiveTab;
   setCurrentView: (view: ActiveTab) => void;
+  navigateSection: (section: string) => void;
   activeTenantId: string;
   setActiveTenantId: (id: string) => void;
   activeTenant: Tenant;
@@ -1626,7 +1627,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode; access?:{context
       );
 
       // Live backend API synchronization
-      apiClient.bookings.rescheduleBooking(bookingId, { startDate: newStart, endDate: newEnd }).catch(() => null);
+      apiClient.bookings.amendDates(bookingId, { pickupAt: newStart, returnAt: newEnd, recalculatePricing: true, reason: 'Legacy store synchronization' }).catch(() => null);
 
       emitDomainFact("BookingRescheduled", "Booking", bookingId, { newStart, newEnd }, "bookings.reschedule");
       showNotification(`Booking ${b.bookingNumber} rescheduled successfully.`);
@@ -1671,7 +1672,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode; access?:{context
       );
 
       // Live backend API synchronization
-      apiClient.bookings.substituteVehicle(bookingId, replacementVehicleId, reason).catch(() => null);
+      apiClient.bookings.substituteVehicle(bookingId, { replacementVehicleId, reason }).catch(() => null);
 
       // Free previous vehicle & reserve replacement
       setVehicles((prev) =>
@@ -3853,6 +3854,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode; access?:{context
       value={{
         currentView: access ? (originalViews[access.section] || access.section) as ActiveTab : currentView,
         setCurrentView: access ? (view)=>{const section=Object.keys(originalViews).find(id=>originalViews[id]===view);if(section&&access.portal.sections.some(s=>s.id===section))access.onSection(section);} : setCurrentView,
+        navigateSection: (section:string)=>{if(access){if(access.portal.sections.some(s=>s.id===section))access.onSection(section);}else setCurrentView(section as ActiveTab);},
         activeTenantId,
         setActiveTenantId,
         activeTenant,

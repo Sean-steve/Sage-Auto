@@ -596,6 +596,46 @@ export class SalesQuoteService {
     let bookingId: string;
 
     if (this.bookingService) {
+      const pickupMs = new Date(quote.pickupDate).getTime();
+      const returnMs = new Date(quote.returnDate).getTime();
+      const totalHours = Math.max(1, (returnMs - pickupMs) / 3_600_000);
+      const billableDays = Math.max(1, Math.ceil(totalHours / 24));
+      const netRentalSubtotal = Math.max(0, quote.grandTotal - quote.taxTotal);
+      const acceptedQuoteSnapshot = {
+        snapshotId: `sales-quote-${quote.id}-v${quote.currentVersion}`,
+        calculatedAt: new Date().toISOString(),
+        ratePlanId: "accepted-sales-quote",
+        ratePlanCode: "ACCEPTED_SALES_QUOTE",
+        ratePlanName: `Accepted Sales Quote ${quote.quoteNumber}`,
+        ratePlanVersion: quote.currentVersion,
+        currency: quote.currency,
+        pickupDateTime: quote.pickupDate,
+        returnDateTime: quote.returnDate,
+        totalHours,
+        billableDays,
+        baseDailyRate: quote.subtotal / billableDays,
+        appliedAverageDailyRate: quote.subtotal / billableDays,
+        baseRentalAmount: quote.subtotal,
+        dayBreakdown: [],
+        driverCharges: { primaryDriverCharge: 0, additionalDriversCharge: 0, chauffeurCharge: 0, youngDriverSurcharge: 0, totalDriverCharges: 0 },
+        locationCharges: { deliveryCharge: 0, collectionCharge: 0, oneWayFee: 0, totalLocationCharges: 0 },
+        fees: [],
+        totalFees: 0,
+        discounts: quote.discountTotal > 0 ? [{ description: "Accepted sales quote discount", type: "MANUAL", amount: quote.discountTotal }] : [],
+        totalDiscount: quote.discountTotal,
+        netRentalSubtotal,
+        tax: {
+          taxRatePercent: netRentalSubtotal > 0 ? (quote.taxTotal / netRentalSubtotal) * 100 : 0,
+          isTaxInclusive: false,
+          taxableAmount: netRentalSubtotal,
+          taxAmount: quote.taxTotal,
+        },
+        grossRentalTotal: quote.grandTotal,
+        securityDeposit: { required: quote.depositTotal > 0, model: "FIXED", amount: quote.depositTotal, isRefundable: true },
+        mileageAllowance: { model: "UNLIMITED", includedKm: 0, excessKmRate: 0 },
+        appliedRules: ["ACCEPTED_SALES_QUOTE"],
+      };
+
       const booking = await this.bookingService.createBooking(
         tenantId,
         {
@@ -610,17 +650,7 @@ export class SalesQuoteService {
           source: "SALES_QUOTE" as any,
           customerNotes: quote.customerNotes,
           internalNotes: `Converted from Sales Quote ${quote.quoteNumber}`,
-          pricing: {
-            currency: quote.currency,
-            dailyRate: quote.subtotal,
-            baseRental: quote.subtotal,
-            taxAmount: quote.taxTotal,
-            discountAmount: quote.discountTotal,
-            securityDeposit: quote.depositTotal,
-            grossTotal: quote.grandTotal,
-            netPayable: quote.grandTotal,
-            frozenAt: new Date().toISOString(),
-          } as any,
+          pricing: acceptedQuoteSnapshot as any,
         },
         { userId: actorId, actorType: "USER", name: "CRM Conversion Agent" }
       );

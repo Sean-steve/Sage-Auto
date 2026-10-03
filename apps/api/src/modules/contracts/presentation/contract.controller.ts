@@ -94,7 +94,7 @@ export function createContractController(
   // --------------------------------------------------------------------------
   router.post(
     "/:id/send",
-    guard(TENANT_PERMISSIONS.CONTRACT_READ || "contract.read"),
+    guard(TENANT_PERMISSIONS.CONTRACT_GENERATE || "contract.generate"),
     async (req: Request, res: Response, next: NextFunction) => {
       try {
         const tenantId = getTenantId(req);
