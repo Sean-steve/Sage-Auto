@@ -1,7 +1,7 @@
 import React, { lazy, Suspense } from 'react';
 import { Building2, ChevronLeft, LogOut } from 'lucide-react';
 import { AppProvider, useApp } from '../lib/store';
-import type { AccessContext, AccessPortal } from '../lib/access-context';
+import { RESTORATION_SCREEN_CONNECTIONS, type AccessContext, type AccessPortal } from '../lib/access-context';
 
 const screens: Record<string, React.LazyExoticComponent<React.ComponentType>> = {
   overview:lazy(()=>import('./DashboardView').then(m=>({default:m.DashboardView}))),
@@ -23,11 +23,12 @@ const screens: Record<string, React.LazyExoticComponent<React.ComponentType>> = 
 function Screen({section}:{section:string}) {
   const {workspaceLoading,workspaceError,searchQuery,setSearchQuery}=useApp();
   const View=screens[section];
+  const connection=RESTORATION_SCREEN_CONNECTIONS[section] || {status:'UNCONNECTED',readSource:'Not verified',mutationsEnabled:false,note:'This screen has not been connected yet.'};
   if(workspaceLoading)return <p role="status" className="p-8">Loading saved workspace records…</p>;
   return <>{workspaceError&&<p role="alert" className="m-6 rounded border border-red-200 bg-red-50 p-4 text-red-900">{workspaceError}</p>}
-    <div id="restoration-actions-note" className="m-6 rounded border border-amber-200 bg-amber-50 p-4 text-amber-950"><strong>Original screen — read-only restoration</strong><p>Browse the original screens, filters and tabs. Changes are disabled until their saved-data connections are verified. Fleet, booking and customer lists use saved records; other screens remain unconnected and their empty figures are not business totals.</p></div>
+    <div id="restoration-actions-note" className="m-6 rounded border border-amber-200 bg-amber-50 p-4 text-amber-950"><strong>Original screen — {connection.status.replaceAll('_',' ').toLowerCase()}</strong><p>{connection.note}</p><p><small>Read source: {connection.readSource}. Mutations: {connection.mutationsEnabled?'verified and enabled':'disabled until the mutation acceptance gate passes'}.</small></p></div>
     {['fleet','bookings','customers'].includes(section)&&<label className="block mx-6 text-sm">Search saved records<input className="block mt-1 border rounded px-3 py-2" value={searchQuery} onChange={e=>setSearchQuery(e.target.value)}/></label>}
-    {View?<fieldset disabled={['overview','website'].includes(section)} className="min-w-0 border-0 p-0"><Suspense fallback={<p role="status" className="p-8">Opening your screen…</p>}><View/></Suspense></fieldset>:<p className="p-8">This role's workflow is not connected yet.</p>}
+    {View?<fieldset disabled={!connection.mutationsEnabled} aria-describedby="restoration-actions-note" className="min-w-0 border-0 p-0"><Suspense fallback={<p role="status" className="p-8">Opening your screen…</p>}><View/></Suspense></fieldset>:<p className="p-8">This role's workflow is not connected yet.</p>}
   </>;
 }
 export function RestoredWorkspace({context,portal,section,onSection,onSwitch,onSignOut}:{context:AccessContext;portal:AccessPortal;section:string;onSection:(s:string)=>void;onSwitch:()=>void;onSignOut:()=>void}) {
