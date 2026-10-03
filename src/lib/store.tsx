@@ -261,7 +261,7 @@ interface AppContextType {
   substituteVehicle: (bookingId: string, replacementVehicleId: string, reason: string) => boolean;
 
   // Domain Actions - Rental Operations (BRS-001 §28-39, Amendment A06)
-  createRentalFromBooking: (bookingId: string) => Rental | null;
+  createRentalFromBooking: (bookingId: string) => Promise<Rental | null>;
   startRental: (rentalId: string) => void;
   extendRental: (rentalId: string, newEndDate: string, additionalDays: number, additionalCost: number) => boolean;
   completeRental: (rentalId: string, returnOdometer: number, returnFuelLevel: number) => void;
@@ -1693,53 +1693,57 @@ export const AppProvider: React.FC<{ children: React.ReactNode; access?:{context
   // DOMAIN ACTIONS: RENTAL OPERATIONS SEPARATE FROM BOOKING (DOM-003 §18-20, Amendment A06)
   // --------------------------------------------------------------------------
   const createRentalFromBooking = useCallback(
-    (bookingId: string): Rental | null => {
+    async (bookingId: string): Promise<Rental | null> => {
       const b = bookings.find((item) => item.id === bookingId && item.tenantId === activeTenantId);
       if (!b) return null;
-      const v = vehicles.find((veh) => veh.id === b.vehicleId && veh.tenantId === activeTenantId);
-      if (!v) return null;
 
-      const newRentalId = `rnt-${Date.now().toString(36)}`;
-      const nextSeq = 400 + rentals.length + 1;
-      const newRental: Rental = {
-        id: newRentalId,
-        tenantId: activeTenantId,
-        rentalNumber: `RNT-2026-${nextSeq}`,
-        bookingId: b.id,
-        vehicleId: b.vehicleId || b.assignedVehicleId || "",
-        customerId: b.customerId,
-        driverId: b.driverId || b.primaryDriverId || "",
-        state: "SCHEDULED_HANDOVER",
-        scheduledStart: b.startDate || b.pickupAt || "",
-        scheduledEnd: b.endDate || b.returnAt || "",
-        checkoutOdometer: v.odometer,
-        checkoutFuelLevel: v.fuelLevel,
-        extensions: [],
-        incidents: [],
-        finalExcessKmCharge: 0,
-        finalFuelDeficitCharge: 0,
-        finalDamageCharge: 0,
-        finalLateReturnFee: 0,
-        depositRefundedAmount: 0,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
+      const readiness = await apiClient.rentals.getReadiness(bookingId);
+      if (readiness.error) {
+        showNotification(readiness.error.message || "Unable to verify rental dispatch readiness.", "error");
+        return null;
+      }
+      if (!(readiness.data as any)?.isReady) {
+        const blockers = ((readiness.data as any)?.blockers || []) as string[];
+        showNotification(blockers[0] || "Rental dispatch is blocked by incomplete prerequisites.", "error");
+        return null;
+      }
 
-      setRentals((prev) => [newRental, ...prev]);
+      const response = await apiClient.rentals.startRental({
+        bookingId,
+        idempotencyKey: `dispatch:${activeTenantId}:${bookingId}`,
+      });
+      if (response.error || !response.data) {
+        showNotification(response.error?.message || "Rental dispatch failed.", "error");
+        return null;
+      }
 
-      // Link rental ID back to booking
+      const rental = response.data as Rental;
+      setRentals((prev) => [rental, ...prev.filter((item) => item.id !== rental.id && item.bookingId !== bookingId)]);
       setBookings((prev) =>
-        prev.map((item) => (item.id === bookingId ? { ...item, activeRentalId: newRentalId } : item))
+        prev.map((item) =>
+          item.id === bookingId && item.tenantId === activeTenantId
+            ? { ...item, status: "ACTIVE", activeRentalId: rental.id, updatedAt: new Date().toISOString() }
+            : item
+        )
+      );
+      setVehicles((prev) =>
+        prev.map((vehicle) =>
+          vehicle.id === rental.vehicleId && vehicle.tenantId === activeTenantId
+            ? {
+                ...vehicle,
+                availabilityStatus: "ON_RENT",
+                odometer: rental.checkoutOdometer,
+                fuelLevel: rental.checkoutFuelLevel,
+              }
+            : vehicle
+        )
       );
 
-      // Live backend API synchronization
-      apiClient.rentals.startRental(bookingId).catch(() => null);
-
-      emitDomainFact("RentalCreated", "Rental", newRental.id, { rentalNumber: newRental.rentalNumber, bookingId: b.id }, "rentals.create");
-      showNotification(`Operational Rental dossier ${newRental.rentalNumber} created.`);
-      return newRental;
+      emitDomainFact("RentalStarted", "Rental", rental.id, { rentalNumber: rental.rentalNumber, bookingId }, "rentals.start");
+      showNotification(`Rental ${rental.rentalNumber} dispatched and ACTIVE ON ROAD.`);
+      return rental;
     },
-    [bookings, activeTenantId, vehicles, rentals.length, emitDomainFact, showNotification]
+    [bookings, activeTenantId, emitDomainFact, showNotification]
   );
 
   const startRental = useCallback(
