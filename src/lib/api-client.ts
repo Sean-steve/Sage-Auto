@@ -293,9 +293,25 @@ class ApiClient {
 
   // 8. Vehicle Inspections & Damage Mapping Context
   public inspections = {
-    listInspections: () => this.get<any[]>('/inspections'),
+    listInspections: (params?: Record<string, any>) => {
+      const q = new URLSearchParams(params).toString();
+      return this.get<any[]>(`/inspections${q ? `?${q}` : ''}`);
+    },
     createInspection: (dto: any) => this.post('/inspections', dto),
     getInspection: (id: string) => this.get(`/inspections/${id}`),
+    startInspection: (id: string, dto: any = {}) => this.post(`/inspections/${id}/start`, dto),
+    recordResponses: (id: string, dto: any) => this.post(`/inspections/${id}/responses`, dto),
+    recordDamage: (id: string, dto: any) => this.post(`/inspections/${id}/damages`, dto),
+    addEvidence: (id: string, dto: any) => this.post(`/inspections/${id}/evidence`, dto),
+    addSignature: (id: string, dto: any) => this.post(`/inspections/${id}/signatures`, dto),
+    getReadiness: (id: string) => this.get(`/inspections/${id}/readiness`),
+    completeInspection: (id: string, dto: any) => this.post(`/inspections/${id}/complete`, dto),
+    compare: (baselineId: string, returnId: string) => this.post('/inspections/compare', { baselineId, returnId }),
+    getRentalComparison: (rentalId: string) => this.get(`/inspections/rentals/${rentalId}/comparison`),
+    listDamageCases: (params?: Record<string, any>) => {
+      const q = new URLSearchParams(params).toString();
+      return this.get<any[]>(`/inspections/damage-cases/list${q ? `?${q}` : ''}`);
+    },
   };
 
   // 9. Customers & Parties Context
