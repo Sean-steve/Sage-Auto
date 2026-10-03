@@ -6,17 +6,14 @@ import {
   Car,
   CheckCircle2,
   ClipboardCheck,
-  Clock3,
   Coins,
   FileCheck2,
   Fuel,
   Gauge,
   Loader2,
-  MapPin,
   ReceiptText,
   RefreshCw,
   ShieldCheck,
-  UserRoundCheck,
   Wrench,
   X,
 } from "lucide-react";
@@ -68,8 +65,6 @@ export const ReturnFinalCalculationView: React.FC = () => {
   const {
     vehicles,
     customers,
-    drivers,
-    bookings,
     activeTenant,
     activeTenantId,
     currentUser,
@@ -821,21 +816,26 @@ export const ReturnFinalCalculationView: React.FC = () => {
                     </div>
                     <span className="rounded bg-slate-100 px-2 py-1 text-[10px] font-bold dark:bg-slate-800">{damages.length} added</span>
                   </div>
+                  {!hasPermission("damage.record") && (
+                    <div className="mb-3 rounded-xl bg-amber-50 p-3 text-[11px] text-amber-800 dark:bg-amber-950/30 dark:text-amber-300">
+                      You can complete the return inspection, but recording new damage requires the damage.record permission.
+                    </div>
+                  )}
                   <div className="grid gap-2 sm:grid-cols-3">
-                    <select value={damageZone} onChange={(e) => setDamageZone(e.target.value)} className="rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs dark:border-slate-700 dark:bg-slate-950">
+                    <select disabled={!hasPermission("damage.record")} value={damageZone} onChange={(e) => setDamageZone(e.target.value)} className="rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs dark:border-slate-700 dark:bg-slate-950">
                       {["FRONT_BUMPER","REAR_BUMPER","HOOD","ROOF","WINDSHIELD","REAR_GLASS","LEFT_FRONT_DOOR","RIGHT_FRONT_DOOR","LEFT_REAR_DOOR","RIGHT_REAR_DOOR","LEFT_MIRROR","RIGHT_MIRROR","WHEELS_TIRES","INTERIOR","UNDERBODY"].map((zone) => <option key={zone} value={zone}>{stateLabel(zone)}</option>)}
                     </select>
-                    <select value={damageType} onChange={(e) => setDamageType(e.target.value)} className="rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs dark:border-slate-700 dark:bg-slate-950">
+                    <select disabled={!hasPermission("damage.record")} value={damageType} onChange={(e) => setDamageType(e.target.value)} className="rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs dark:border-slate-700 dark:bg-slate-950">
                       {["SCRATCH","DENT","CRACK","BROKEN","MISSING","STAIN","MECHANICAL","TIRE","GLASS","INTERIOR","OTHER"].map((type) => <option key={type} value={type}>{stateLabel(type)}</option>)}
                     </select>
-                    <select value={damageSeverity} onChange={(e) => setDamageSeverity(e.target.value)} className="rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs dark:border-slate-700 dark:bg-slate-950">
+                    <select disabled={!hasPermission("damage.record")} value={damageSeverity} onChange={(e) => setDamageSeverity(e.target.value)} className="rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs dark:border-slate-700 dark:bg-slate-950">
                       {["MINOR","MODERATE","MAJOR"].map((severity) => <option key={severity} value={severity}>{severity}</option>)}
                     </select>
                   </div>
                   <div className="mt-2 grid gap-2 sm:grid-cols-[1fr_140px_auto]">
-                    <input value={damageDescription} onChange={(e) => setDamageDescription(e.target.value)} placeholder="Observed damage description" className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs dark:border-slate-700 dark:bg-slate-950" />
-                    <input type="number" min="0" value={damageCost} onChange={(e) => setDamageCost(e.target.value)} placeholder="Est. cost" className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs dark:border-slate-700 dark:bg-slate-950" />
-                    <button type="button" onClick={addDamage} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold dark:border-slate-700">Add damage</button>
+                    <input disabled={!hasPermission("damage.record")} value={damageDescription} onChange={(e) => setDamageDescription(e.target.value)} placeholder="Observed damage description" className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs dark:border-slate-700 dark:bg-slate-950" />
+                    <input disabled={!hasPermission("damage.record")} type="number" min="0" value={damageCost} onChange={(e) => setDamageCost(e.target.value)} placeholder="Est. cost" className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs dark:border-slate-700 dark:bg-slate-950" />
+                    <button disabled={!hasPermission("damage.record")} type="button" onClick={addDamage} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold dark:border-slate-700">Add damage</button>
                   </div>
                   {damages.length > 0 && (
                     <div className="mt-3 space-y-2">
