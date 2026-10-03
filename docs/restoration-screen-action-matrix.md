@@ -12,6 +12,7 @@ Status meanings:
 | Overview | UNCONNECTED | No verified dashboard aggregate | DISABLED | server portal/navigation | Preserve layout only; do not treat prototype totals as business truth |
 | Fleet | PARTIAL / RECONSTRUCTED | Fleet REST API + digital twin + linked domain reads | ENABLED FOR VERIFIED FLEET COMMANDS | Fleet/ownership permissions per action | New Fleet experience is server-backed for list, register, edit, status, telemetry, ownership and Fleet documents; Maintenance/Compliance/Inspection execution remains in dedicated modules |
 | Bookings | PARTIAL / RECONSTRUCTED | Booking REST API: register/detail/quote/lifecycle/amendment/substitution/readiness | ENABLED FOR VERIFIED BOOKING COMMANDS | Booking permissions per action | Server-backed Booking dossier with PricingSnapshot, Availability confirmation, lifecycle history and Handover readiness |
+| Handover | PARTIAL / RECONSTRUCTED | Contracts + Handovers REST APIs with Inspection and Rental-readiness boundaries | ENABLED FOR VERIFIED CONTRACT/HANDOVER COMMANDS | Contract/Rental/Inspection permissions per action | Server-backed Contract generation/version/signature and sequential physical Handover checkpoints; Rental start remains separate |
 | Customers & Drivers | PARTIAL / RECONSTRUCTED | Customers + Drivers + Corporate Accounts APIs | ENABLED FOR VERIFIED PEOPLE COMMANDS | Customer/Driver permissions per action | Server-backed Customer KYC/status, Driver eligibility/status, Customer↔Driver relationships and Corporate authorized-driver workflows |
 | Rentals | UNCONNECTED | Not loaded by restored provider | DISABLED | `rental.read` | Layout only |
 | Inspections | UNCONNECTED | Not loaded by restored provider | DISABLED | `inspection.read` | Layout only |
@@ -36,7 +37,7 @@ Status meanings:
 
 ## Action-level rule
 
-Every button/form inside an unreconstructed legacy screen inherits **DISABLED** until explicit action evidence exists. Fleet, Customers/Drivers, Pricing, Availability and Bookings are no longer served by their legacy local-store screens in the restored company workspace; their reachable actions are governed by their experience contracts and targeted regression tests. Enabling an entire legacy screen because one read endpoint works remains prohibited.
+Every button/form inside an unreconstructed legacy screen inherits **DISABLED** until explicit action evidence exists. Fleet, Customers/Drivers, Pricing, Availability, Bookings and Contract/Handover are no longer served by their legacy/local placeholder screens in the restored company workspace; their reachable actions are governed by their experience contracts and targeted regression tests. Enabling an entire legacy screen because one read endpoint works remains prohibited.
 
 ## Restoration acceptance evidence required per writable action
 
