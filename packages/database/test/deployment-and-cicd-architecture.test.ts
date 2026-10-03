@@ -141,7 +141,9 @@ async function runSprint41DeploymentTests() {
   // --------------------------------------------------------------------------
   console.log("\n[Test 4] Validating Zero-Downtime Rolling Update Probes (Liveness & Readiness)...");
   
-  // Check health controllers logic
+  // Check health controllers logic. Readiness is intentionally DB-coupled, so
+  // provide an explicit isolated database for this deployment-contract test.
+  process.env.SQLITE_PATH ||= ":memory:";
   const { healthController, livenessController, readinessController, metadataController } = await import(
     "../../../apps/api/src/health/health.controller"
   );
