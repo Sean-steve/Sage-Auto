@@ -15,6 +15,7 @@ import type {
   RentalExtension,
   RentalReturnRecord,
   RentalFinalCalculation,
+  RentalIncident,
 } from "@carhire/types";
 import {
   RecordNotFoundError,
@@ -23,6 +24,7 @@ import {
   CrossTenantViolationError,
   RentalInvalidStateTransitionError,
   RentalExtensionNotFoundError,
+  RentalFinalCalculationImmutableError,
 } from "../errors";
 import { TransactionContext } from "../transaction-manager";
 
@@ -154,6 +156,19 @@ export interface IRentalRepository {
     tenantId: string,
     tx?: TransactionContext
   ): Promise<RentalExtension[]>;
+
+  recordIncident(
+    rentalId: string,
+    tenantId: string,
+    incident: Omit<RentalIncident, "id" | "rentalId">,
+    tx?: TransactionContext
+  ): Promise<RentalIncident>;
+
+  getIncidents(
+    rentalId: string,
+    tenantId: string,
+    tx?: TransactionContext
+  ): Promise<RentalIncident[]>;
 
   saveFinalCalculation(
     tenantId: string,
@@ -452,13 +467,17 @@ export class RentalRepository implements IRentalRepository {
     returnRecord: Omit<RentalReturnRecord, "id" | "createdAt" | "updatedAt">,
     _tx?: TransactionContext
   ): Promise<RentalReturnRecord> {
+    await this.findById(returnRecord.rentalId, tenantId);
+    const existing = RentalRepository.returnRecordStore.get(returnRecord.rentalId);
+    const now = new Date().toISOString();
     const record: RentalReturnRecord = {
+      ...(existing || {}),
       ...returnRecord,
-      id: `rr-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      id: existing?.id || `rr-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
       tenantId,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
+      createdAt: existing?.createdAt || now,
+      updatedAt: now,
+    } as RentalReturnRecord;
 
     RentalRepository.returnRecordStore.set(returnRecord.rentalId, record);
     return JSON.parse(JSON.stringify(record));
@@ -558,17 +577,63 @@ export class RentalRepository implements IRentalRepository {
     return JSON.parse(JSON.stringify(exts));
   }
 
+  async recordIncident(
+    rentalId: string,
+    tenantId: string,
+    incident: Omit<RentalIncident, "id" | "rentalId">,
+    _tx?: TransactionContext
+  ): Promise<RentalIncident> {
+    const rental = await this.findById(rentalId, tenantId);
+    if (!rental) {
+      throw new RentalNotFoundError(rentalId);
+    }
+
+    const record: RentalIncident = {
+      ...incident,
+      id: `inc-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      rentalId,
+      reportedAt: incident.reportedAt || new Date().toISOString(),
+      estimatedCost: incident.estimatedCost ?? 0,
+      resolved: incident.resolved ?? false,
+    };
+
+    await this.update(rentalId, tenantId, {
+      incidents: [record, ...(rental.incidents || [])],
+    });
+
+    return JSON.parse(JSON.stringify(record));
+  }
+
+  async getIncidents(
+    rentalId: string,
+    tenantId: string,
+    _tx?: TransactionContext
+  ): Promise<RentalIncident[]> {
+    const rental = await this.findById(rentalId, tenantId);
+    if (!rental) {
+      throw new RentalNotFoundError(rentalId);
+    }
+    return JSON.parse(JSON.stringify(rental.incidents || []));
+  }
+
   async saveFinalCalculation(
     tenantId: string,
     finalCalc: Omit<RentalFinalCalculation, "id" | "calculatedAt">,
     _tx?: TransactionContext
   ): Promise<RentalFinalCalculation> {
-    const id = `rfc-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+    await this.findById(finalCalc.rentalId, tenantId);
+    const existing = RentalRepository.finalCalculationStore.get(finalCalc.rentalId);
+    if (existing?.isImmutable) {
+      throw new RentalFinalCalculationImmutableError(finalCalc.rentalId);
+    }
+
+    const id = existing?.id || `rfc-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
     const record: RentalFinalCalculation = {
+      ...(existing || {}),
       ...finalCalc,
       id,
       tenantId,
-      calculatedAt: new Date().toISOString(),
+      calculatedAt: existing?.calculatedAt || new Date().toISOString(),
     };
 
     RentalRepository.finalCalculationStore.set(finalCalc.rentalId, record);

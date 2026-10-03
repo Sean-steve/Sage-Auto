@@ -147,8 +147,8 @@ export function createOwnerSettlementsController(
       try {
         const tenantId = getTenantId(req);
         const periodId = req.query.periodId as string;
-        const settlements = await settlementService.listSettlements(tenantId, { periodId });
-        res.json({ success: true, data: settlements });
+        const batches = await settlementService.listBatches(tenantId, periodId);
+        res.json({ success: true, data: batches });
       } catch (err) {
         next(err);
       }
@@ -229,6 +229,58 @@ export function createOwnerSettlementsController(
           actor
         );
         res.status(201).json({ success: true, data: settlement });
+      } catch (err) {
+        next(err);
+      }
+    }
+  );
+
+  // Vehicle Owner self-service — linked owner record only.
+  router.get(
+    "/mine",
+    guard(TENANT_PERMISSIONS.SETTLEMENT_SELF_READ),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const tenantId = getTenantId(req);
+        const actor = getActor(req);
+        const settlements = await settlementService.listMySettlements(tenantId, actor);
+        res.json({ success: true, data: settlements });
+      } catch (err) {
+        next(err);
+      }
+    }
+  );
+
+  router.get(
+    "/mine/:id/statement",
+    guard(TENANT_PERMISSIONS.SETTLEMENT_SELF_READ),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const tenantId = getTenantId(req);
+        const actor = getActor(req);
+        const statement = await settlementService.getMyStatement(tenantId, req.params.id, actor);
+        res.json({ success: true, data: statement });
+      } catch (err) {
+        next(err);
+      }
+    }
+  );
+
+  router.post(
+    "/mine/:id/dispute",
+    guard(TENANT_PERMISSIONS.SETTLEMENT_SELF_DISPUTE),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const tenantId = getTenantId(req);
+        const actor = getActor(req);
+        const validated = DisputeSettlementSchema.parse(req.body);
+        const settlement = await settlementService.disputeMySettlement(
+          tenantId,
+          req.params.id,
+          validated.reason,
+          actor
+        );
+        res.json({ success: true, data: settlement });
       } catch (err) {
         next(err);
       }
@@ -329,7 +381,7 @@ export function createOwnerSettlementsController(
             resolutionNotes: validated.resolutionNotes,
             adjustmentAmount: adjustment?.amount,
             adjustmentReason: adjustment?.reason,
-            approveImmediately: true,
+            approveImmediately: false,
           },
           actor
         );
@@ -343,7 +395,7 @@ export function createOwnerSettlementsController(
   // Add adjustment
   router.post(
     "/:id/adjustments",
-    guard(TENANT_PERMISSIONS.SETTLEMENT_APPROVE),
+    guard(TENANT_PERMISSIONS.SETTLEMENT_ADJUST),
     async (req: Request, res: Response, next: NextFunction) => {
       try {
         const tenantId = getTenantId(req);

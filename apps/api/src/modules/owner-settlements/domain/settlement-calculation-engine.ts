@@ -14,6 +14,7 @@ import type {
   OwnerSettlementExpenseLine,
   OwnerSettlementAdjustmentLine,
   OwnerSettlementTermsSnapshot,
+  SettledRentalRevenueComponent,
   Money,
 } from "@carhire/types";
 import {
@@ -29,7 +30,8 @@ export interface CalculationInput {
   owner: VehicleOwner;
   ownerships: VehicleOwnership[];
   vehicles: Vehicle[];
-  rentals: Array<Rental & { booking?: any }>;
+  rentals: Rental[];
+  rentalRevenueFacts: Map<string, SettledRentalRevenueComponent>;
   expenses: OperationalExpense[];
   adjustments?: Array<Omit<OwnerSettlementAdjustmentLine, "id" | "settlementId" | "createdAt">>;
   periodStart: string; // YYYY-MM-DD
@@ -51,6 +53,7 @@ export interface CalculationResult {
   operatorNetRevenue: string;
   carriedForwardBalance: string;
   termsSnapshot: OwnerSettlementTermsSnapshot;
+  termsSnapshots: OwnerSettlementTermsSnapshot[];
   rentalLines: OwnerSettlementRentalLine[];
   expenseLines: OwnerSettlementExpenseLine[];
   adjustmentLines: OwnerSettlementAdjustmentLine[];
@@ -76,16 +79,9 @@ export class SettlementCalculationEngine {
         o.startDate <= eventDate &&
         (!o.endDate || o.endDate >= eventDate)
     );
-    if (matching) return matching;
-
-    // 2. Look for active contract for this vehicle and owner
-    const active = ownerships.find(
-      (o) => o.vehicleId === vehicleId && o.ownerId === ownerId && o.isActive
-    );
-    if (active) return active;
-
-    // 3. Fallback to any contract for this vehicle and owner
-    return ownerships.find((o) => o.vehicleId === vehicleId && o.ownerId === ownerId) || null;
+    // Historical settlement authority is strict: current or arbitrary terms
+    // must never substitute for the agreement that governed the rental event.
+    return matching || null;
   }
 
   /**
@@ -96,21 +92,64 @@ export class SettlementCalculationEngine {
     const zeroMoney = createMoney("0.0000", currency);
 
     // 1. Resolve Primary Commercial Terms Snapshot
-    const primaryOwnership =
-      input.ownerships.find((o) => o.ownerId === input.owner.id && o.isActive) ||
-      input.ownerships.find((o) => o.ownerId === input.owner.id) ||
-      null;
+    const primaryOwnership = input.ownerships.find(
+      (o) =>
+        o.ownerId === input.owner.id &&
+        o.startDate <= input.periodEnd &&
+        (!o.endDate || o.endDate >= input.periodStart)
+    );
+
+    if (!primaryOwnership) {
+      throw new Error(
+        `No historical ownership agreement covers settlement period ${input.periodStart} to ${input.periodEnd} for owner ${input.owner.id}.`
+      );
+    }
+
+    const unsupportedFixedTerms = input.ownerships.find(
+      (o) =>
+        o.ownerId === input.owner.id &&
+        o.startDate <= input.periodEnd &&
+        (!o.endDate || o.endDate >= input.periodStart) &&
+        o.fixedMonthlyPayout != null
+    );
+    if (unsupportedFixedTerms) {
+      throw new Error(
+        `Ownership agreement ${unsupportedFixedTerms.id} uses fixedMonthlyPayout. A fixed/minimum/tier settlement strategy must be explicitly modeled before calculation; percentage revenue share cannot be substituted.`
+      );
+    }
 
     const termsSnapshot: OwnerSettlementTermsSnapshot = {
-      ownershipId: primaryOwnership?.id || "fallback-terms",
-      ownershipType: primaryOwnership?.ownershipType || "THIRD_PARTY_OWNED",
-      revenueSharePercent: primaryOwnership ? Number(primaryOwnership.revenueSharePercent) : 75.0,
-      fixedMonthlyPayout: primaryOwnership?.fixedMonthlyPayout != null ? String(primaryOwnership.fixedMonthlyPayout) : undefined,
-      allowableExpenseDeductions: primaryOwnership ? primaryOwnership.allowableExpenseDeductions : true,
-      termsVersion: primaryOwnership?.version || 1,
-      agreementStartDate: primaryOwnership?.startDate || input.periodStart,
-      agreementEndDate: primaryOwnership?.endDate || undefined,
+      ownershipId: primaryOwnership.id,
+      ownershipType: primaryOwnership.ownershipType,
+      revenueSharePercent: Number(primaryOwnership.revenueSharePercent),
+      fixedMonthlyPayout:
+        primaryOwnership.fixedMonthlyPayout != null
+          ? String(primaryOwnership.fixedMonthlyPayout)
+          : undefined,
+      allowableExpenseDeductions: primaryOwnership.allowableExpenseDeductions,
+      termsVersion: primaryOwnership.version || 1,
+      agreementStartDate: primaryOwnership.startDate,
+      agreementEndDate: primaryOwnership.endDate || undefined,
     };
+
+    const termsSnapshots: OwnerSettlementTermsSnapshot[] = input.ownerships
+      .filter(
+        (o) =>
+          o.ownerId === input.owner.id &&
+          o.startDate <= input.periodEnd &&
+          (!o.endDate || o.endDate >= input.periodStart)
+      )
+      .map((o) => ({
+        ownershipId: o.id,
+        ownershipType: o.ownershipType,
+        revenueSharePercent: Number(o.revenueSharePercent),
+        fixedMonthlyPayout:
+          o.fixedMonthlyPayout != null ? String(o.fixedMonthlyPayout) : undefined,
+        allowableExpenseDeductions: o.allowableExpenseDeductions,
+        termsVersion: o.version || 1,
+        agreementStartDate: o.startDate,
+        agreementEndDate: o.endDate || undefined,
+      }));
 
     // 2. Process Rental Lines
     const rentalLines: OwnerSettlementRentalLine[] = [];
@@ -122,11 +161,17 @@ export class SettlementCalculationEngine {
 
     const ownedVehicleIds = new Set(input.vehicles.map((v) => v.id));
 
-    // Filter rentals that completed within period and belong to one of owner's vehicles
+    // Only completed rentals backed by settled Finance facts are eligible for owner payout.
     const eligibleRentals = input.rentals.filter((r) => {
       if (!ownedVehicleIds.has(r.vehicleId)) return false;
+      if (!["COMPLETED", "RETURN_COMPLETED"].includes(r.state)) return false;
       const rentalDate = (r.actualEnd || r.completedAt || r.scheduledEnd || r.actualStart || r.scheduledStart).split("T")[0];
-      return rentalDate >= input.periodStart && rentalDate <= input.periodEnd;
+      const financeFact = input.rentalRevenueFacts.get(r.id);
+      return (
+        rentalDate >= input.periodStart &&
+        rentalDate <= input.periodEnd &&
+        Boolean(financeFact?.isPaidOrSettled)
+      );
     });
 
     for (let i = 0; i < eligibleRentals.length; i++) {
@@ -147,43 +192,38 @@ export class SettlementCalculationEngine {
         input.ownerships
       );
 
-      const splitPercent = historicalOwnership
-        ? Number(historicalOwnership.revenueSharePercent)
-        : termsSnapshot.revenueSharePercent;
+      if (!historicalOwnership) {
+        throw new Error(
+          `Missing historical ownership terms for vehicle ${rental.vehicleId} on rental ${rental.rentalNumber} (${rentalStartDateStr}).`
+        );
+      }
+      const splitPercent = Number(historicalOwnership.revenueSharePercent);
 
-      // Pricing decomposition (Base Rental + Distance vs Fines/Damages/Fuel)
-      const booking = rental.booking || {};
-      const pricing = booking.pricingSnapshot || booking.pricing || {};
+      // Finance is the commercial authority. Settlement never re-prices a rental
+      // and never invents a fallback daily rate.
+      const financeFact = input.rentalRevenueFacts.get(rental.id);
+      if (!financeFact || !financeFact.isPaidOrSettled) {
+        throw new Error(
+          `Rental ${rental.rentalNumber} has no settled Finance revenue fact and cannot enter owner settlement.`
+        );
+      }
+      if (financeFact.currency.toUpperCase() !== currency) {
+        throw new Error(
+          `Settlement currency ${currency} does not match invoice ${financeFact.invoiceNumber} currency ${financeFact.currency}.`
+        );
+      }
 
       const baseAmountNum =
-        pricing.baseRentalAmount ??
-        pricing.baseRental ??
-        pricing.dailyRateTotal ??
-        (rental as any).basePrice ??
-        (rental as any).dailyRate ??
-        5000;
-
-      const excessMileageNum =
-        pricing.extraMileageAmount ??
-        pricing.excessMileageRevenue ??
-        rental.finalExcessKmCharge ??
-        (rental as any).excessMileageCharge ??
-        0;
-
-      // Excluded / Non-Shareable revenue items
-      const trafficFinesNum = pricing.trafficFinesAmount ?? (rental as any).trafficFines ?? 0;
-      const damageRecoveriesNum = pricing.damageRecoveryAmount ?? rental.finalDamageCharge ?? (rental as any).damageCharges ?? 0;
-      const fuelDeficitNum = pricing.fuelDeficitAmount ?? rental.finalFuelDeficitCharge ?? (rental as any).fuelDeficitCharges ?? 0;
-      const incidentalFeesNum = pricing.incidentalFeesAmount ?? rental.finalLateReturnFee ?? (rental as any).lateFees ?? 0;
+        Number(financeFact.baseRentalGross) + Number(financeFact.extensionsGross);
+      const excessMileageNum = Number(financeFact.excessMileageGross);
+      const eligibleAmountNum = baseAmountNum + excessMileageNum;
+      const totalGrossNum = Number(financeFact.totalGross);
+      const nonShareableAmountNum = Math.max(0, totalGrossNum - eligibleAmountNum);
 
       const baseMoney = createMoney(baseAmountNum, currency);
       const excessMileageMoney = createMoney(excessMileageNum, currency);
       const eligibleRentalMoney = addMoney(baseMoney, excessMileageMoney);
-
-      const nonShareableMoney = createMoney(
-        trafficFinesNum + damageRecoveriesNum + fuelDeficitNum + incidentalFeesNum,
-        currency
-      );
+      const nonShareableMoney = createMoney(nonShareableAmountNum, currency);
 
       // Revenue share calculations using exact BigInt math
       const ownerShareMoney = multiplyMoney(eligibleRentalMoney, splitPercent / 100);
@@ -212,6 +252,9 @@ export class SettlementCalculationEngine {
         rentalStartDate: startIso,
         rentalEndDate: endIso,
         eligibleDays: diffDays,
+        invoiceId: financeFact.invoiceId,
+        invoiceNumber: financeFact.invoiceNumber,
+        financeSourceSettled: financeFact.isPaidOrSettled,
         baseRentalRevenue: baseMoney.amount,
         excessMileageRevenue: excessMileageMoney.amount,
         totalRentalRevenue: eligibleRentalMoney.amount,
@@ -232,6 +275,8 @@ export class SettlementCalculationEngine {
 
     const allowableExpenses = input.expenses.filter((e) => {
       if (!e.vehicleId || !ownedVehicleIds.has(e.vehicleId)) return false;
+      if (e.status !== "APPROVED") return false;
+      if (e.currency.toUpperCase() !== currency) return false;
       const expenseDate = (e.expenseDate || (e as any).createdAt || "").split("T")[0];
       return expenseDate >= input.periodStart && expenseDate <= input.periodEnd;
     });
@@ -250,9 +295,12 @@ export class SettlementCalculationEngine {
         input.ownerships
       );
 
-      const allowable = historicalOwnership
-        ? historicalOwnership.allowableExpenseDeductions
-        : termsSnapshot.allowableExpenseDeductions;
+      if (exp.ownerDeductible && !historicalOwnership) {
+        throw new Error(
+          `Owner-deductible expense ${exp.expenseNumber || exp.id} has no historical ownership terms for ${expDate}.`
+        );
+      }
+      const allowable = Boolean(exp.ownerDeductible) && Boolean(historicalOwnership?.allowableExpenseDeductions);
 
       const grossMoney = createMoney(exp.grossAmount, currency);
 
@@ -373,6 +421,7 @@ export class SettlementCalculationEngine {
       operatorNetRevenue: operatorNetRevenueMoney.amount,
       carriedForwardBalance: carriedForwardMoney.amount,
       termsSnapshot,
+      termsSnapshots,
       rentalLines,
       expenseLines,
       adjustmentLines,

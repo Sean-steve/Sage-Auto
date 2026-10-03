@@ -424,10 +424,27 @@ async function runMpesaSuite() {
   // TEST 12: B2C Owner Settlement Payout Execution
   // --------------------------------------------------------------------------
   console.log("TEST 12: B2C Vehicle Owner Settlement Payout Execution");
+  const mpesaSettlement = await settlementRepo.create({
+    tenantId,
+    settlementNumber: "SET-2026-MPESA-002",
+    ownerId: "owner_serena_holdings",
+    ownerName: "Serena Holdings Fleet Account",
+    periodStart: "2026-08-01",
+    periodEnd: "2026-08-31",
+    currency: "KES",
+    status: "APPROVED",
+    calculatedAt: "2026-09-01T08:00:00Z",
+    calculatedBy: "user_finance_calculator",
+    approvedAt: "2026-09-01T09:00:00Z",
+    approvedBy: "user_finance_approver",
+    totalDeductions: "0.0000",
+    netPayoutAmount: "45000.0000",
+  });
+
   const payable = await settlementRepo.createPayable({
     tenantId,
     payableNumber: "PAY-2026-0002",
-    settlementId: "settlement_002",
+    settlementId: mpesaSettlement.id,
     ownerId: "owner_serena_holdings",
     recipientName: "Serena Holdings Fleet Account",
     destinationMpesaNumber: "+254722000111",
@@ -457,7 +474,9 @@ async function runMpesaSuite() {
   assert.strictEqual(payoutResult.payment.amount, "45000.0000");
   assert.strictEqual(payoutResult.payment.provider, "MPESA_DARAJA");
   assert.ok(payoutResult.payment.providerTransactionId.startsWith("AG_"), "ConversationID stored as transaction ID");
-  console.log("  ✓ B2C payout disbursed to vehicle owner; payable transitioned to PAID\n");
+  const sealedMpesaSettlement = await settlementRepo.findById(mpesaSettlement.id, tenantId);
+  assert.strictEqual(sealedMpesaSettlement?.status, "PAID");
+  console.log("  ✓ B2C payout disbursed to vehicle owner; payable and settlement transitioned to PAID\n");
 
   // --------------------------------------------------------------------------
   // TEST 13: M-Pesa Reversal & Refund Execution
@@ -475,7 +494,11 @@ async function runMpesaSuite() {
     actor
   );
 
-  const executedRefund = await paymentService.approveAndExecuteRefund(tenantId, refund.id, actor);
+  const executedRefund = await paymentService.approveAndExecuteRefund(
+    tenantId,
+    refund.id,
+    { userId: "user_finance_refund_approver", tenantId, role: "FINANCE_ADMIN" }
+  );
   assert.strictEqual(executedRefund.status, "COMPLETED");
   assert.ok(executedRefund.providerRefundReference?.startsWith("REV_"), "Reversal conversation ID captured");
 

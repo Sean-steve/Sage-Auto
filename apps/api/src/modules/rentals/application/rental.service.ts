@@ -25,6 +25,8 @@ import type {
   CalculateFinalRentalDto,
   ProcessDepositSettlementDto,
   CompleteRentalDto,
+  RecordRentalIncidentDto,
+  RentalIncident,
 } from "@carhire/types";
 import {
   IRentalRepository,
@@ -49,6 +51,12 @@ import {
   InspectionRepository,
   IDamageRepository,
   DamageRepository,
+  IDepositPositionRepository,
+  DepositPositionRepository,
+  IOperationalInvoiceRepository,
+  OperationalInvoiceRepository,
+  IRefundRepository,
+  RefundRepository,
   RentalNotFoundError,
   BookingNotFoundError,
   ContractNotFoundError,
@@ -100,6 +108,9 @@ export class RentalService {
   private readonly inspectionRepo: IInspectionRepository;
   private readonly damageRepo: IDamageRepository;
   private readonly complianceReadinessService?: any;
+  private readonly depositPositionRepo: IDepositPositionRepository;
+  private readonly operationalInvoiceRepo: IOperationalInvoiceRepository;
+  private readonly refundRepo: IRefundRepository;
 
   constructor(
     rentalRepo?: IRentalRepository,
@@ -113,7 +124,10 @@ export class RentalService {
     idempotencyRepo?: IIdempotencyRepository,
     inspectionRepo?: IInspectionRepository,
     damageRepo?: IDamageRepository,
-    complianceReadinessService?: any
+    complianceReadinessService?: any,
+    depositPositionRepo?: IDepositPositionRepository,
+    operationalInvoiceRepo?: IOperationalInvoiceRepository,
+    refundRepo?: IRefundRepository
   ) {
     this.rentalRepo = rentalRepo || new RentalRepository();
     this.bookingRepo = bookingRepo || new BookingRepository();
@@ -127,6 +141,9 @@ export class RentalService {
     this.inspectionRepo = inspectionRepo || new InspectionRepository();
     this.damageRepo = damageRepo || new DamageRepository();
     this.complianceReadinessService = complianceReadinessService;
+    this.depositPositionRepo = depositPositionRepo || new DepositPositionRepository();
+    this.operationalInvoiceRepo = operationalInvoiceRepo || new OperationalInvoiceRepository();
+    this.refundRepo = refundRepo || new RefundRepository();
   }
 
   /**
@@ -167,7 +184,21 @@ export class RentalService {
       blockers.push(`Contract is not signed (status: ${contract.status})`);
     }
 
-    // Check 4: Handover checkpoints
+    // Check 4: Security deposit must be backed by Finance/Payments truth.
+    if ((booking.depositRequired || 0) > 0) {
+      const deposit = await this.depositPositionRepo.findByBookingId(booking.id, tenantId);
+      const held = Number(deposit?.heldAmount || 0);
+      if (!deposit || held + 0.0001 < Number(booking.depositRequired || 0)) {
+        blockers.push(
+          `Security deposit is not fully funded through an authoritative Payment allocation (required: ${booking.depositRequired}, held: ${held}).`
+        );
+      }
+      if (booking.depositStatus !== "HELD") {
+        blockers.push(`Booking security deposit status must be HELD (currently: ${booking.depositStatus || "REQUESTED"}).`);
+      }
+    }
+
+    // Check 5: Handover checkpoints
     const handovers = await this.handoverRepo.findByBookingId(booking.id, tenantId);
     const handover = handovers
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0] || null;
@@ -307,17 +338,29 @@ export class RentalService {
       throw new RentalAlreadyStartedError(existingRental.id);
     }
 
-    // 3. Fetch contract, handover & vehicle
-    const [contract, handover] = await Promise.all([
-      this.contractRepo.findById(dto.contractId, tenantId),
-      this.handoverRepo.findById(dto.handoverId, tenantId),
+    // 3. Resolve the authoritative booking-linked contract and handover.
+    // The browser may provide IDs, but the server does not require stale UI state to start a rental.
+    const [bookingContracts, bookingHandovers] = await Promise.all([
+      this.contractRepo.findByBookingId(booking.id, tenantId),
+      this.handoverRepo.findByBookingId(booking.id, tenantId),
     ]);
+    const currentContracts = [...bookingContracts]
+      .filter((item) => item.status !== "ARCHIVED")
+      .sort((a, b) => b.contractVersion - a.contractVersion || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    const currentHandovers = [...bookingHandovers]
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    const contract = dto.contractId
+      ? await this.contractRepo.findById(dto.contractId, tenantId)
+      : currentContracts.find((item: any) => item.status === "SIGNED") || currentContracts[0];
+    const handover = dto.handoverId
+      ? await this.handoverRepo.findById(dto.handoverId, tenantId)
+      : currentHandovers.find((item: any) => item.status === "HANDOVER_COMPLETED") || currentHandovers[0];
 
     if (!contract) {
-      throw new ContractNotFoundError(dto.contractId);
+      throw new ContractNotFoundError(dto.contractId || booking.id);
     }
     if (!handover) {
-      throw new HandoverNotFoundError(dto.handoverId);
+      throw new HandoverNotFoundError(dto.handoverId || booking.id);
     }
     if (contract.bookingId !== booking.id) {
       throw new RentalNotEligibleToStartError(["Selected Contract does not belong to the Booking"]);
@@ -351,8 +394,8 @@ export class RentalService {
     }
 
     const now = new Date().toISOString();
-    const startOdometer = dto.startOdometer || handover.checkoutOdometer || vehicle.odometer || 0;
-    const startFuel = dto.startFuelLevel || handover.checkoutFuelLevel || vehicle.fuelLevel || 100;
+    const startOdometer = dto.startOdometer ?? handover.checkoutOdometer ?? vehicle.odometer ?? 0;
+    const startFuel = dto.startFuelLevel ?? handover.checkoutFuelLevel ?? vehicle.fuelLevel ?? 100;
     const scheduledReturn = booking.returnAt || new Date(Date.now() + 86400000).toISOString();
 
     const rentalNumber = await this.rentalRepo.generateNextRentalNumber(tenantId);
@@ -379,6 +422,17 @@ export class RentalService {
       actorUserId: actor?.userId,
       actorType: actor?.actorType || "USER",
     });
+
+    // Link any pre-rental deposit liability to the newly created Rental.
+    const bookingDeposit = await this.depositPositionRepo.findByBookingId(booking.id, tenantId);
+    if (bookingDeposit && !bookingDeposit.rentalId) {
+      await this.depositPositionRepo.update(
+        bookingDeposit.id,
+        tenantId,
+        { rentalId: rental.id },
+        bookingDeposit.version
+      );
+    }
 
     // 6. Save immutable RentalStartSnapshot
     await this.rentalRepo.saveStartSnapshot(tenantId, {
@@ -821,6 +875,66 @@ export class RentalService {
     return this.rentalRepo.getExtensions(rentalId, tenantId);
   }
 
+  async recordIncident(
+    tenantId: string,
+    rentalId: string,
+    dto: RecordRentalIncidentDto,
+    actor: RentalActor
+  ): Promise<RentalIncident> {
+    const rental = await this.rentalRepo.findById(rentalId, tenantId);
+    if (!rental) {
+      throw new RentalNotFoundError(rentalId);
+    }
+    if (RentalStateMachine.TERMINAL_STATES.has(rental.state)) {
+      throw new RentalAlreadyCompletedError(rentalId);
+    }
+
+    const incident = await this.rentalRepo.recordIncident(rentalId, tenantId, {
+      type: dto.type,
+      description: dto.description.trim(),
+      location: dto.location.trim(),
+      reportedAt: dto.reportedAt || new Date().toISOString(),
+      policeReportNumber: dto.policeReportNumber,
+      estimatedCost: dto.estimatedCost ?? 0,
+      resolved: false,
+    });
+
+    await this.auditRepo.record({
+      tenantId,
+      actorUserId: actor.userId,
+      actorType: toAuditActorType(actor.actorType),
+      actorName: actor.name,
+      action: "rental.incident.recorded",
+      resourceType: "RentalIncident",
+      resourceId: incident.id,
+      details: {
+        rentalId,
+        type: incident.type,
+        location: incident.location,
+        estimatedCost: incident.estimatedCost,
+      },
+    });
+
+    await this.outboxRepo.enqueue({
+      tenantId,
+      eventType: "rental.incident_recorded",
+      aggregateType: "Rental",
+      aggregateId: rentalId,
+      payload: {
+        rentalId,
+        incidentId: incident.id,
+        type: incident.type,
+        reportedAt: incident.reportedAt,
+      },
+    });
+
+    return incident;
+  }
+
+  async getRentalIncidents(tenantId: string, rentalId: string): Promise<RentalIncident[]> {
+    return this.rentalRepo.getIncidents(rentalId, tenantId);
+  }
+
   // ==========================================================================
   // SPRINT 16: RETURN WORKFLOW & VEHICLE RECEIPT (DOM-003 §20)
   // ==========================================================================
@@ -831,6 +945,13 @@ export class RentalService {
     dto: ScheduleRentalReturnDto,
     actor: RentalActor
   ): Promise<Rental> {
+    if (dto.idempotencyKey) {
+      const cached = await this.idempotencyRepo.findByKey(tenantId, dto.idempotencyKey);
+      if (cached?.responseBody) {
+        return cached.responseBody as unknown as Rental;
+      }
+    }
+
     const rental = await this.rentalRepo.findById(rentalId, tenantId);
     if (!rental) {
       throw new RentalNotFoundError(rentalId);
@@ -894,6 +1015,17 @@ export class RentalService {
       },
     });
 
+    if (dto.idempotencyKey) {
+      await this.idempotencyRepo.record({
+        tenantId,
+        idempotencyKey: dto.idempotencyKey,
+        resourceType: "RentalReturnSchedule",
+        resourceId: rentalId,
+        responseStatus: 200,
+        responseBody: updated as unknown as Record<string, unknown>,
+      });
+    }
+
     return updated;
   }
 
@@ -903,6 +1035,13 @@ export class RentalService {
     dto: ReceiveReturnedVehicleDto,
     actor: RentalActor
   ): Promise<Rental> {
+    if (dto.idempotencyKey) {
+      const cached = await this.idempotencyRepo.findByKey(tenantId, dto.idempotencyKey);
+      if (cached?.responseBody) {
+        return cached.responseBody as unknown as Rental;
+      }
+    }
+
     const rental = await this.rentalRepo.findById(rentalId, tenantId);
     if (!rental) {
       throw new RentalNotFoundError(rentalId);
@@ -984,6 +1123,17 @@ export class RentalService {
       },
     });
 
+    if (dto.idempotencyKey) {
+      await this.idempotencyRepo.record({
+        tenantId,
+        idempotencyKey: dto.idempotencyKey,
+        resourceType: "RentalReturnReceipt",
+        resourceId: rentalId,
+        responseStatus: 200,
+        responseBody: updated as unknown as Record<string, unknown>,
+      });
+    }
+
     return updated;
   }
 
@@ -997,30 +1147,67 @@ export class RentalService {
     if (!rental) {
       throw new RentalNotFoundError(rentalId);
     }
-
-    const updateData: Partial<Rental> = {
-      returnInspectionId: dto.inspectionId,
-    };
-
-    if (dto.odometer !== undefined) {
-      if (dto.odometer < rental.checkoutOdometer) {
-        throw new InspectionOdometerRegressionError(rental.checkoutOdometer, dto.odometer);
-      }
-      updateData.returnOdometer = dto.odometer;
+    if (RentalStateMachine.TERMINAL_STATES.has(rental.state)) {
+      throw new RentalAlreadyCompletedError(rentalId);
     }
 
-    if (dto.fuelLevel !== undefined) {
-      if (dto.fuelLevel < 0 || dto.fuelLevel > 100) {
-        throw new InspectionInvalidFuelLevelError(dto.fuelLevel);
-      }
-      updateData.returnFuelLevel = dto.fuelLevel;
+    const inspection = await this.inspectionRepo.findById(dto.inspectionId, tenantId);
+    if (!inspection) {
+      throw new RecordNotFoundError("Inspection", dto.inspectionId);
+    }
+    if (inspection.inspectionType !== "RETURN") {
+      throw new Error("Only a RETURN inspection can be linked to the return workflow.");
+    }
+    if (inspection.status !== "COMPLETED") {
+      throw new Error("Return inspection must be completed and sealed before it can advance the rental.");
+    }
+    if (!inspection.acknowledgements || inspection.acknowledgements.length === 0) {
+      throw new Error("Return inspection requires at least one captured acknowledgement/signature before it can advance the rental.");
+    }
+    if (inspection.vehicleId !== rental.vehicleId) {
+      throw new Error("Return inspection vehicle does not match the rental vehicle.");
+    }
+    if (inspection.rentalId && inspection.rentalId !== rental.id) {
+      throw new Error("Return inspection belongs to a different rental.");
+    }
+    if (inspection.odometer < rental.checkoutOdometer) {
+      throw new InspectionOdometerRegressionError(rental.checkoutOdometer, inspection.odometer);
+    }
+    if (inspection.fuelLevel < 0 || inspection.fuelLevel > 100) {
+      throw new InspectionInvalidFuelLevelError(inspection.fuelLevel);
     }
 
-    if (RentalStateMachine.canTransition(rental.state, "DAMAGE_ASSESSMENT")) {
-      updateData.state = "DAMAGE_ASSESSMENT";
-    }
+    RentalStateMachine.validateTransition(rental.state, "DAMAGE_ASSESSMENT", "Completed return inspection linked");
 
-    const updated = await this.rentalRepo.update(rentalId, tenantId, updateData);
+    const now = new Date().toISOString();
+    const updated = await this.rentalRepo.update(rentalId, tenantId, {
+      state: "DAMAGE_ASSESSMENT",
+      returnInspectionId: inspection.id,
+      returnOdometer: inspection.odometer,
+      returnFuelLevel: inspection.fuelLevel,
+    });
+
+    await this.rentalRepo.saveReturnRecord(tenantId, {
+      tenantId,
+      rentalId,
+      returnInspectionId: inspection.id,
+      returnOdometer: inspection.odometer,
+      returnFuelLevel: inspection.fuelLevel,
+      status: "DAMAGE_ASSESSMENT",
+    });
+
+    await this.rentalRepo.appendStatusHistory(tenantId, {
+      tenantId,
+      rentalId,
+      fromStatus: rental.state,
+      toStatus: "DAMAGE_ASSESSMENT",
+      actorType: (actor.actorType as any) || "USER",
+      actorId: actor.userId,
+      actorName: actor.name,
+      reason: `Completed return inspection ${inspection.inspectionNumber} linked`,
+      changedByUserId: actor.userId,
+      occurredAt: now,
+    });
 
     await this.auditRepo.record({
       tenantId,
@@ -1031,8 +1218,23 @@ export class RentalService {
       resourceType: "Rental",
       resourceId: rentalId,
       details: {
-        inspectionId: dto.inspectionId,
+        inspectionId: inspection.id,
+        inspectionNumber: inspection.inspectionNumber,
         damageCaseIds: dto.damageCaseIds,
+        returnOdometer: inspection.odometer,
+        returnFuelLevel: inspection.fuelLevel,
+      },
+    });
+
+    await this.outboxRepo.enqueue({
+      tenantId,
+      eventType: "rental.return_inspection_completed",
+      aggregateType: "Rental",
+      aggregateId: rentalId,
+      payload: {
+        rentalId,
+        inspectionId: inspection.id,
+        damageCaseIds: dto.damageCaseIds || [],
       },
     });
 
@@ -1052,6 +1254,21 @@ export class RentalService {
     const rental = await this.rentalRepo.findById(rentalId, tenantId);
     if (!rental) {
       throw new RentalNotFoundError(rentalId);
+    }
+
+    if (RentalStateMachine.TERMINAL_STATES.has(rental.state)) {
+      throw new RentalAlreadyCompletedError(rentalId);
+    }
+    if (!rental.returnInspectionId) {
+      throw new Error("Final calculation requires a completed return inspection.");
+    }
+
+    const existingCalculation = await this.rentalRepo.getFinalCalculation(rentalId, tenantId);
+    if (existingCalculation?.isImmutable) {
+      return { calculation: existingCalculation, rental };
+    }
+    if (rental.state !== "DAMAGE_ASSESSMENT" && rental.state !== "FINAL_CALCULATION") {
+      throw new Error(`Final calculation cannot run while rental is in state '${rental.state}'. Complete vehicle receipt and return inspection first.`);
     }
 
     const startSnapshot = await this.rentalRepo.getStartSnapshot(rentalId, tenantId);
@@ -1126,7 +1343,13 @@ export class RentalService {
         const damageCases = await this.damageRepo.findByRentalId(rentalId, tenantId);
         damageCaseIds = damageCases.map((d) => d.id);
         totalDamageCharge = damageCases
-          .filter((d) => d.responsibleParty === "CUSTOMER" || !d.responsibleParty || d.preExisting !== true)
+          .filter(
+            (d) =>
+              d.preExisting !== true &&
+              (d.responsibleParty === "CUSTOMER" ||
+                d.responsibleParty === "UNASSIGNED" ||
+                !d.responsibleParty)
+          )
           .reduce(
             (sum, d) =>
               sum +
@@ -1278,7 +1501,10 @@ export class RentalService {
     const netFinalTotal = Math.round((grossFinalTotal - totalTaxAmount) * 100) / 100;
 
     // 6. Deposit Reconciliation Math
-    const depositHeldAmount = startSnapshot?.depositRequirement ?? 0;
+    // Requirement is contractual; heldAmount is financial truth and can only
+    // increase through Payment allocation to the DepositPosition.
+    const depositPosition = await this.depositPositionRepo.findByRentalId(rentalId, tenantId);
+    const depositHeldAmount = depositPosition ? Number(depositPosition.heldAmount || 0) : 0;
     const postRentalIncidentalCharges = Math.round(
       (excessKmCharge +
         fuelDeficitCharge +
@@ -1346,11 +1572,9 @@ export class RentalService {
     });
 
     // 8. Update Rental State
-    let targetState: RentalState = "FINAL_CALCULATION";
-    if (RentalStateMachine.canTransition(rental.state, "FINAL_CALCULATION")) {
-      targetState = "FINAL_CALCULATION";
-    } else if (RentalStateMachine.canTransition(rental.state, "FINAL_SETTLEMENT_PENDING")) {
-      targetState = "FINAL_SETTLEMENT_PENDING";
+    const targetState: RentalState = "FINAL_CALCULATION";
+    if (rental.state !== "FINAL_CALCULATION") {
+      RentalStateMachine.validateTransition(rental.state, targetState, "Return inspection assessed and final charges calculated");
     }
 
     const updatedRental = await this.rentalRepo.update(rentalId, tenantId, {
@@ -1363,6 +1587,30 @@ export class RentalService {
       finalDamageCharge: totalDamageCharge,
       finalLateReturnFee: lateReturnFee,
       depositRefundedAmount: depositRefundDue,
+    });
+
+    if (rental.state !== "FINAL_CALCULATION") {
+      await this.rentalRepo.appendStatusHistory(tenantId, {
+        tenantId,
+        rentalId,
+        fromStatus: rental.state,
+        toStatus: "FINAL_CALCULATION",
+        actorType: (actor.actorType as any) || "USER",
+        actorId: actor.userId,
+        actorName: actor.name,
+        reason: "Return charges calculated from sealed start/return evidence",
+        changedByUserId: actor.userId,
+        occurredAt: now,
+      });
+    }
+    await this.rentalRepo.saveReturnRecord(tenantId, {
+      tenantId,
+      rentalId,
+      returnOdometer,
+      returnFuelLevel,
+      actualReturnAt,
+      returnInspectionId: rental.returnInspectionId,
+      status: "FINAL_CALCULATION",
     });
 
     await this.auditRepo.record({
@@ -1409,6 +1657,81 @@ export class RentalService {
     if (!calc) {
       throw new Error(`Final calculation for rental '${rentalId}' not found. Please calculate final rental charges first.`);
     }
+    if (calc.isImmutable) {
+      return calc;
+    }
+
+    const rental = await this.rentalRepo.findById(rentalId, tenantId);
+    if (!rental) {
+      throw new RentalNotFoundError(rentalId);
+    }
+    if (rental.state !== "FINAL_CALCULATION" && rental.state !== "FINAL_SETTLEMENT_PENDING") {
+      throw new Error(`Deposit settlement cannot run while rental is in state '${rental.state}'.`);
+    }
+
+    const terminalSettlementStatuses = new Set(["REFUNDED", "CHARGED", "SETTLED", "WAIVED"]);
+    if (!terminalSettlementStatuses.has(dto.settlementStatus)) {
+      throw new Error("Deposit settlement must be finalized as REFUNDED, CHARGED, SETTLED or WAIVED.");
+    }
+
+    if (calc.depositRefundDue > 0 && dto.settlementStatus !== "WAIVED") {
+      if (dto.settlementStatus !== "REFUNDED") {
+        throw new Error("A refundable deposit balance must be marked REFUNDED before completion.");
+      }
+      const refundAmount = dto.refundAmount ?? calc.depositRefundDue;
+      if (Math.abs(refundAmount - calc.depositRefundDue) > 0.01) {
+        throw new Error("Refund amount must match the authoritative deposit refund due.");
+      }
+    }
+
+    if (calc.depositAdditionalPaymentDue > 0 && dto.settlementStatus !== "WAIVED") {
+      if (dto.settlementStatus !== "CHARGED") {
+        throw new Error("An additional customer balance must be marked CHARGED before completion.");
+      }
+      const chargedAmount = dto.additionalChargedAmount ?? calc.depositAdditionalPaymentDue;
+      if (Math.abs(chargedAmount - calc.depositAdditionalPaymentDue) > 0.01) {
+        throw new Error("Additional charged amount must match the authoritative amount due.");
+      }
+    }
+
+    if (dto.settlementStatus === "CHARGED") {
+      if (!dto.invoiceId) {
+        throw new Error("A fully settled Finance invoice is required to prove the additional customer balance was charged.");
+      }
+      const invoice = await this.operationalInvoiceRepo.findById(dto.invoiceId, tenantId);
+      if (!invoice || invoice.rentalId !== rentalId) {
+        throw new Error("Settlement invoice does not belong to this Rental.");
+      }
+      if (invoice.status !== "PAID" || Number(invoice.amountOutstanding || 0) > 0.0001) {
+        throw new Error("Settlement invoice must be fully PAID before the Rental can be marked CHARGED.");
+      }
+    }
+
+    if (dto.settlementStatus === "REFUNDED") {
+      if (!dto.refundId) {
+        throw new Error("A completed provider Refund is required to prove the refundable deposit was disbursed.");
+      }
+      const refund = await this.refundRepo.findById(dto.refundId, tenantId);
+      if (!refund || refund.status !== "COMPLETED") {
+        throw new Error("Settlement refund must be COMPLETED before the Rental can be marked REFUNDED.");
+      }
+      const deposit = await this.depositPositionRepo.findByRentalId(rentalId, tenantId);
+      const validSourceIds = new Set([rentalId, deposit?.id].filter(Boolean) as string[]);
+      if (
+        refund.sourceObligationType !== "RENTAL_DEPOSIT" ||
+        !refund.sourceObligationId ||
+        !validSourceIds.has(refund.sourceObligationId)
+      ) {
+        throw new Error("Completed Refund is not tied to this Rental deposit obligation.");
+      }
+      if (Math.abs(Number(refund.amount) - calc.depositRefundDue) > 0.01) {
+        throw new Error("Completed Refund amount must match the authoritative deposit refund due.");
+      }
+    }
+
+    if (dto.settlementStatus === "WAIVED" && !dto.notes?.trim()) {
+      throw new Error("A documented reason is required when a final Rental balance is waived.");
+    }
 
     const now = new Date().toISOString();
     const updatedCalc = await this.rentalRepo.saveFinalCalculation(tenantId, {
@@ -1421,12 +1744,31 @@ export class RentalService {
       isImmutable: true,
     });
 
-    const rental = await this.rentalRepo.findById(rentalId, tenantId);
-    if (rental && RentalStateMachine.canTransition(rental.state, "DEPOSIT_PROCESSING")) {
-      await this.rentalRepo.update(rentalId, tenantId, {
-        state: "DEPOSIT_PROCESSING",
-      });
-    }
+    RentalStateMachine.validateTransition(rental.state, "DEPOSIT_PROCESSING", "Deposit/final settlement sealed");
+    await this.rentalRepo.update(rentalId, tenantId, {
+      state: "DEPOSIT_PROCESSING",
+    });
+    await this.rentalRepo.saveReturnRecord(tenantId, {
+      tenantId,
+      rentalId,
+      returnOdometer: rental.returnOdometer,
+      returnFuelLevel: rental.returnFuelLevel,
+      actualReturnAt: rental.actualEnd,
+      returnInspectionId: rental.returnInspectionId,
+      status: "DEPOSIT_PROCESSING",
+    });
+    await this.rentalRepo.appendStatusHistory(tenantId, {
+      tenantId,
+      rentalId,
+      fromStatus: rental.state,
+      toStatus: "DEPOSIT_PROCESSING",
+      actorType: (actor.actorType as any) || "USER",
+      actorId: actor.userId,
+      actorName: actor.name,
+      reason: `Final settlement sealed as ${dto.settlementStatus}`,
+      changedByUserId: actor.userId,
+      occurredAt: now,
+    });
 
     await this.auditRepo.record({
       tenantId,
@@ -1441,6 +1783,8 @@ export class RentalService {
         settlementStatus: dto.settlementStatus,
         paymentMethod: dto.paymentMethod,
         transactionReference: dto.transactionReference,
+        invoiceId: dto.invoiceId,
+        refundId: dto.refundId,
       },
     });
 
@@ -1453,6 +1797,8 @@ export class RentalService {
         rentalId,
         settlementStatus: dto.settlementStatus,
         transactionReference: dto.transactionReference,
+        invoiceId: dto.invoiceId,
+        refundId: dto.refundId,
       },
     });
 
@@ -1469,6 +1815,13 @@ export class RentalService {
     dto: CompleteRentalDto,
     actor: RentalActor
   ): Promise<Rental> {
+    if (dto.idempotencyKey) {
+      const cached = await this.idempotencyRepo.findByKey(tenantId, dto.idempotencyKey);
+      if (cached?.responseBody) {
+        return cached.responseBody as unknown as Rental;
+      }
+    }
+
     const rental = await this.rentalRepo.findById(rentalId, tenantId);
     if (!rental) {
       throw new RentalNotFoundError(rentalId);
@@ -1476,6 +1829,12 @@ export class RentalService {
 
     if (RentalStateMachine.TERMINAL_STATES.has(rental.state)) {
       throw new RentalAlreadyCompletedError(rentalId);
+    }
+
+    const finalCalculation = await this.rentalRepo.getFinalCalculation(rentalId, tenantId);
+    const completedSettlementStatuses = new Set(["REFUNDED", "CHARGED", "SETTLED", "WAIVED"]);
+    if (!finalCalculation?.isImmutable || !completedSettlementStatuses.has(finalCalculation.depositSettlementStatus)) {
+      throw new Error("Rental completion requires a sealed final calculation and completed deposit settlement.");
     }
 
     const now = new Date().toISOString();
@@ -1537,7 +1896,10 @@ export class RentalService {
     }
 
     // 5. Update Vehicle Mileage, Fuel, and Availability Status
-    const targetVehicleStatus = (dto.releaseVehicleToStatus || "AVAILABLE") as any;
+    if (!dto.releaseVehicleToStatus) {
+      throw new Error("Rental completion requires an explicit vehicle disposition.");
+    }
+    const targetVehicleStatus = dto.releaseVehicleToStatus as any;
     try {
       const vehicle = await this.vehicleRepo.findById(rental.vehicleId, tenantId);
       if (vehicle) {
@@ -1619,6 +1981,27 @@ export class RentalService {
         status: targetVehicleStatus,
       },
     });
+
+    await this.rentalRepo.saveReturnRecord(tenantId, {
+      tenantId,
+      rentalId,
+      returnOdometer,
+      returnFuelLevel,
+      actualReturnAt: completedRental.actualEnd,
+      returnInspectionId: completedRental.returnInspectionId,
+      status: "COMPLETED",
+    });
+
+    if (dto.idempotencyKey) {
+      await this.idempotencyRepo.record({
+        tenantId,
+        idempotencyKey: dto.idempotencyKey,
+        resourceType: "RentalCompletion",
+        resourceId: rentalId,
+        responseStatus: 200,
+        responseBody: completedRental as unknown as Record<string, unknown>,
+      });
+    }
 
     return completedRental;
   }

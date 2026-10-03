@@ -224,8 +224,8 @@ export const BookingsView: React.FC = () => {
                   {b.status === "CONFIRMED" && (
                     <>
                       <button disabled={restoration} aria-describedby="restoration-actions-note"
-                        onClick={() => {
-                          const rental = createRentalFromBooking(b.id);
+                        onClick={async () => {
+                          const rental = await createRentalFromBooking(b.id);
                           if (rental) {
                             setCurrentView("rentals");
                           }

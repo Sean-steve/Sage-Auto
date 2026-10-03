@@ -85,7 +85,9 @@
     "test:pricing-experience": "tsx packages/database/test/pricing-experience-contract.test.ts",
     "test:availability-experience": "tsx packages/database/test/availability-experience-contract.test.ts",
     "test:booking-experience": "tsx packages/database/test/booking-experience-contract.test.ts",
-    "test:contract-handover-experience": "tsx packages/database/test/contract-handover-experience-contract.test.ts"
+    "test:contract-handover-experience": "tsx packages/database/test/contract-handover-experience-contract.test.ts",
+    "test:email": "tsx packages/database/test/email-delivery.test.ts",
+    "test:owner-settlements": "tsx packages/database/test/owner-settlements-blueprint.test.ts"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",

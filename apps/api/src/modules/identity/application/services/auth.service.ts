@@ -66,6 +66,47 @@ export class AuthService {
     private readonly rateLimiter: RateLimiterService
   ) {}
 
+  private shouldAutoVerifyEmail(email: string): boolean {
+    const environments=[process.env.APP_ENV,process.env.NODE_ENV]
+      .filter(Boolean)
+      .map(value=>String(value).toLowerCase());
+    if(environments.some(value=>value==="production"||value==="staging")) {
+      return false;
+    }
+
+    const allowlist=(process.env.DEV_AUTO_VERIFY_EMAILS||"")
+      .split(",")
+      .map(value=>value.trim().toLowerCase())
+      .filter(Boolean);
+
+    return allowlist.includes(email.trim().toLowerCase());
+  }
+
+  private async autoVerifyDevelopmentUser(user: User, meta?: RequestMeta): Promise<User> {
+    if(Boolean(user.emailVerified||user.emailVerifiedAt) || !this.shouldAutoVerifyEmail(user.email)) {
+      return user;
+    }
+
+    const verifiedAt=new Date();
+    await this.userRepo.updateEmailVerified(user.id, verifiedAt);
+    await this.verifyTokenRepo.invalidateAllForUser(user.id);
+
+    await this.auditRepo.record({
+      actorType: "USER",
+      actorId: user.id,
+      action: "auth.email_auto_verified_development",
+      resourceType: "user",
+      resourceId: user.id,
+      requestId: meta?.requestId,
+      metadata: {
+        email: user.normalizedEmail || user.email.toLowerCase().trim(),
+        ipAddress: meta?.ipAddress,
+      },
+    });
+
+    return (await this.userRepo.findById(user.id)) || user;
+  }
+
   private sanitizeUser(user: User): SanitizedUser {
     return {
       id: user.id,
@@ -121,23 +162,29 @@ export class AuthService {
       status: "ACTIVE",
     });
 
-    // Create Email Verification Token
-    const rawVerifyToken = this.tokenService.generateCryptoToken(32);
-    const tokenHash = this.tokenService.hashCryptoToken(rawVerifyToken);
-    const expiresAt = new Date(Date.now() + AUTH_CONFIG.EMAIL_VERIFICATION_TOKEN_TTL_SEC * 1000).toISOString();
+    let registeredUser = createdUser;
 
-    await this.verifyTokenRepo.create({
-      userId: createdUser.id,
-      tokenHash,
-      expiresAt,
-    });
+    if (this.shouldAutoVerifyEmail(normalizedEmail)) {
+      registeredUser = await this.autoVerifyDevelopmentUser(createdUser, meta);
+    } else {
+      // Create Email Verification Token
+      const rawVerifyToken = this.tokenService.generateCryptoToken(32);
+      const tokenHash = this.tokenService.hashCryptoToken(rawVerifyToken);
+      const expiresAt = new Date(Date.now() + AUTH_CONFIG.EMAIL_VERIFICATION_TOKEN_TTL_SEC * 1000).toISOString();
 
-    // Send verification email via port
-    await this.emailDelivery.sendEmailVerificationEmail(
-      createdUser.email,
-      rawVerifyToken,
-      createdUser.fullName
-    );
+      await this.verifyTokenRepo.create({
+        userId: createdUser.id,
+        tokenHash,
+        expiresAt,
+      });
+
+      // Send verification email via port
+      await this.emailDelivery.sendEmailVerificationEmail(
+        createdUser.email,
+        rawVerifyToken,
+        createdUser.fullName
+      );
+    }
 
     // Audit and Outbox persistence
     await this.auditRepo.record({
@@ -162,7 +209,7 @@ export class AuthService {
       },
     });
 
-    return { user: this.sanitizeUser(createdUser) };
+    return { user: this.sanitizeUser(registeredUser) };
   }
 
   // --------------------------------------------------------------------------
@@ -184,7 +231,7 @@ export class AuthService {
       );
     }
 
-    const user = await this.userRepo.findByNormalizedEmail(normalizedEmail);
+    let user = await this.userRepo.findByNormalizedEmail(normalizedEmail);
     if (!user || !user.passwordHash) {
       await this.auditRepo.record({
         actorType: "ANONYMOUS",
@@ -219,6 +266,8 @@ export class AuthService {
       });
       throw new AppError(ERROR_CODES.INVALID_CREDENTIALS, 401, "Invalid email or password.");
     }
+
+    user = await this.autoVerifyDevelopmentUser(user, meta);
 
     // Reset rate limit on success
     this.rateLimiter.reset(rateLimitKey);
@@ -556,6 +605,11 @@ export class AuthService {
     const user = await this.userRepo.findByNormalizedEmail(normalizedEmail);
 
     if (!user || user.emailVerified) {
+      return;
+    }
+
+    if (this.shouldAutoVerifyEmail(normalizedEmail)) {
+      await this.autoVerifyDevelopmentUser(user, meta);
       return;
     }
 

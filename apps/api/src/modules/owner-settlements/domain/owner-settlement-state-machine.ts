@@ -10,10 +10,10 @@ export class OwnerSettlementStateMachine {
   private static readonly ALLOWED_TRANSITIONS: Record<OwnerSettlementStatus, OwnerSettlementStatus[]> = {
     PENDING: ["CALCULATED"],
     CALCULATED: ["APPROVED", "DISPUTED", "CALCULATED"],
-    APPROVED: ["PAYMENT_PENDING", "PAID"],
+    APPROVED: ["PAYMENT_PENDING", "PAID", "DISPUTED"],
     PAYMENT_PENDING: ["PAID", "APPROVED"],
     PAID: [], // Terminal state
-    DISPUTED: ["CALCULATED", "APPROVED"], // Recalculate after adjustment or approve once dispute resolved
+    DISPUTED: ["CALCULATED"], // Resolve/recalculate first; approval is a separate four-eyes command
   };
 
   /**
@@ -29,7 +29,7 @@ export class OwnerSettlementStateMachine {
    * Asserts that a transition is valid, throwing a domain error if not
    */
   static assertTransition(from: OwnerSettlementStatus, to: OwnerSettlementStatus, settlementNumber: string): void {
-    if (from === "DISPUTED" && to !== "CALCULATED" && to !== "APPROVED") {
+    if (from === "DISPUTED" && to !== "CALCULATED") {
       throw new SettlementDisputedBlockedError(settlementNumber, `transition to ${to}`);
     }
 

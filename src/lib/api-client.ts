@@ -324,31 +324,69 @@ class ApiClient {
 
   // 8. On-Road Rentals & Operations Context
   public rentals = {
-    listRentals: () => this.get<any[]>('/rentals'),
+    listRentals: (params?: Record<string, any>) => {
+      const q = new URLSearchParams(params).toString();
+      return this.get<any[]>(`/rentals${q ? `?${q}` : ''}`);
+    },
     getRental: (id: string) => this.get(`/rentals/${id}`),
     getReadiness: (bookingId: string) => this.get(`/rentals/readiness/${bookingId}`),
-    startRental: (bookingId: string) => this.post('/rentals/start', { bookingId }),
-    extendRental: (id: string, dto: any) => this.post(`/rentals/${id}/extend`, dto),
-    completeRental: (id: string, dto: any) => this.post(`/rentals/${id}/complete`, dto),
+    startRental: (dtoOrBookingId: string | {
+      bookingId: string;
+      contractId?: string;
+      handoverId?: string;
+      startOdometer?: number;
+      startFuelLevel?: number;
+      notes?: string;
+      idempotencyKey?: string;
+    }) => this.post('/rentals/start', typeof dtoOrBookingId === 'string' ? { bookingId: dtoOrBookingId } : dtoOrBookingId),
+    getStartSnapshot: (id: string) => this.get(`/rentals/${id}/start-snapshot`),
+
+    requestExtension: (id: string, dto: any) => this.post(`/rentals/${id}/extensions`, dto),
+    // Compatibility alias for legacy callers; this now creates a REQUESTED extension.
+    extendRental: (id: string, dto: any) => this.post(`/rentals/${id}/extensions`, dto),
+    listExtensions: (id: string) => this.get(`/rentals/${id}/extensions`),
+    approveExtension: (id: string, extensionId: string, dto: any = {}) =>
+      this.post(`/rentals/${id}/extensions/${extensionId}/approve`, dto),
+    rejectExtension: (id: string, extensionId: string, dto: any) =>
+      this.post(`/rentals/${id}/extensions/${extensionId}/reject`, dto),
+
+    listIncidents: (id: string) => this.get(`/rentals/${id}/incidents`),
     recordIncident: (id: string, incident: any) => this.post(`/rentals/${id}/incidents`, incident),
+
+    scheduleReturn: (id: string, dto: any) => this.post(`/rentals/${id}/return-schedule`, dto),
+    receiveReturnedVehicle: (id: string, dto: any) => this.post(`/rentals/${id}/receive`, dto),
+    linkReturnInspection: (id: string, dto: any) => this.post(`/rentals/${id}/return-inspection`, dto),
+    getReturnRecord: (id: string) => this.get(`/rentals/${id}/return-record`),
+    calculateFinal: (id: string, dto: any) => this.post(`/rentals/${id}/calculate-final`, dto),
+    getFinalCalculation: (id: string) => this.get(`/rentals/${id}/final-calculation`),
+    processDepositSettlement: (id: string, dto: any) => this.post(`/rentals/${id}/deposit-settlement`, dto),
+    completeRental: (id: string, dto: any = {}) => this.post(`/rentals/${id}/complete`, dto),
   };
 
-  // 9. Vehicle Inspections & Damage Mapping Context
+  // 8. Vehicle Inspections & Damage Mapping Context
   public inspections = {
     listInspections: (params?: Record<string, any>) => {
       const q = new URLSearchParams(params).toString();
       return this.get<any[]>(`/inspections${q ? `?${q}` : ''}`);
     },
+    createInspection: (dto: any) => this.post('/inspections', dto),
+    getInspection: (id: string) => this.get(`/inspections/${id}`),
+    startInspection: (id: string, dto: any = {}) => this.post(`/inspections/${id}/start`, dto),
+    recordResponses: (id: string, dto: any) => this.post(`/inspections/${id}/responses`, dto),
+    recordDamage: (id: string, dto: any) => this.post(`/inspections/${id}/damages`, dto),
+    addEvidence: (id: string, dto: any) => this.post(`/inspections/${id}/evidence`, dto),
+    addSignature: (id: string, dto: any) => this.post(`/inspections/${id}/signatures`, dto),
+    getReadiness: (id: string) => this.get(`/inspections/${id}/readiness`),
+    completeInspection: (id: string, dto: any) => this.post(`/inspections/${id}/complete`, dto),
+    compare: (baselineId: string, returnId: string) => this.post('/inspections/compare', { baselineId, returnId }),
+    getRentalComparison: (rentalId: string) => this.get(`/inspections/rentals/${rentalId}/comparison`),
     listDamageCases: (params?: Record<string, any>) => {
       const q = new URLSearchParams(params).toString();
       return this.get<any[]>(`/inspections/damage-cases/list${q ? `?${q}` : ''}`);
     },
-    createInspection: (dto: any) => this.post('/inspections', dto),
-    getInspection: (id: string) => this.get(`/inspections/${id}`),
-    getReadiness: (id: string) => this.get(`/inspections/${id}/readiness`),
   };
 
-  // 10. Customers & Parties Context
+  // 9. Customers & Parties Context
   public customers = {
     listCustomers: (params?: Record<string, any>) => {
       const q = new URLSearchParams(params).toString();
@@ -429,36 +467,168 @@ class ApiClient {
 
   // 12. Operational Finance & General Ledger Context
   public finance = {
-    getInvoices: () => this.get<any[]>('/finance/invoices'),
-    getExpenses: () => this.get<any[]>('/finance/expenses'),
+    getSummary: () => this.get('/finance/summary'),
+    getInvoices: (params?: Record<string, any>) => {
+      const q = new URLSearchParams(
+        Object.entries(params || {}).filter(([, value]) => value !== undefined && value !== null && value !== '') as [string, string][]
+      ).toString();
+      return this.get<any[]>(`/finance/invoices${q ? `?${q}` : ''}`);
+    },
+    getInvoice: (id: string) => this.get(`/finance/invoices/${id}`),
+    getInvoiceHistory: (id: string) => this.get<any[]>(`/finance/invoices/${id}/history`),
+    createInvoice: (dto: any) => this.post('/finance/invoices', dto),
+    generateRentalInvoice: (dto: any) => this.post('/finance/invoices/generate-from-rental', dto),
+    issueInvoice: (id: string, dto: any = {}) => this.post(`/finance/invoices/${id}/issue`, dto),
+    voidInvoice: (id: string, dto: any) => this.post(`/finance/invoices/${id}/void`, dto),
+
+    getCreditNotes: (params?: Record<string, any>) => {
+      const q = new URLSearchParams(
+        Object.entries(params || {}).filter(([, value]) => value !== undefined && value !== null && value !== '') as [string, string][]
+      ).toString();
+      return this.get<any[]>(`/finance/credit-notes${q ? `?${q}` : ''}`);
+    },
+    createCreditNote: (dto: any) => this.post('/finance/credit-notes', dto),
+    issueCreditNote: (id: string) => this.post(`/finance/credit-notes/${id}/issue`),
+    voidCreditNote: (id: string, reason: string) => this.post(`/finance/credit-notes/${id}/void`, { reason }),
+
+    getExpenses: (params?: Record<string, any>) => {
+      const q = new URLSearchParams(
+        Object.entries(params || {}).filter(([, value]) => value !== undefined && value !== null && value !== '') as [string, string][]
+      ).toString();
+      return this.get<any[]>(`/finance/expenses${q ? `?${q}` : ''}`);
+    },
     createExpense: (dto: any) => this.post('/finance/expenses', dto),
-    recordPayment: (dto: any) => this.post('/finance/payments', dto),
+    submitExpense: (id: string) => this.post(`/finance/expenses/${id}/submit`),
+    approveExpense: (id: string, dto: any = {}) => this.post(`/finance/expenses/${id}/approve`, dto),
+    rejectExpense: (id: string, reason: string) => this.post(`/finance/expenses/${id}/reject`, { reason }),
+    voidExpense: (id: string, reason: string) => this.post(`/finance/expenses/${id}/void`, { reason }),
+
+    getDeposits: (params?: Record<string, any>) => {
+      const q = new URLSearchParams(
+        Object.entries(params || {}).filter(([, value]) => value !== undefined && value !== null && value !== '') as [string, string][]
+      ).toString();
+      return this.get<any[]>(`/finance/deposits${q ? `?${q}` : ''}`);
+    },
+    createDeposit: (dto: any) => this.post('/finance/deposits', dto),
+    applyDeposit: (id: string, dto: any) => this.post(`/finance/deposits/${id}/apply`, dto),
+
+    getRefundObligations: (params?: Record<string, any>) => {
+      const q = new URLSearchParams(
+        Object.entries(params || {}).filter(([, value]) => value !== undefined && value !== null && value !== '') as [string, string][]
+      ).toString();
+      return this.get<any[]>(`/finance/refunds${q ? `?${q}` : ''}`);
+    },
+    createRefundObligation: (dto: any) => this.post('/finance/refunds', dto),
+    approveRefundObligation: (id: string) => this.post(`/finance/refunds/${id}/approve`),
+
+    getCustomerReceivables: (customerId: string) => this.get(`/finance/receivables/customers/${customerId}`),
+    getCorporateReceivables: (corporateAccountId: string) => this.get(`/finance/receivables/corporate/${corporateAccountId}`),
+
     getLedgerAccounts: () => this.get<any[]>('/ledger/accounts'),
-    getLedgerTransactions: () => this.get<any[]>('/ledger/transactions'),
+    getLedgerTransactions: () => this.get<any[]>('/ledger/journals'),
+    getTrialBalance: (asOfDate?: string) => this.get(`/ledger/trial-balance${asOfDate ? `?asOfDate=${encodeURIComponent(asOfDate)}` : ''}`),
   };
 
-  // 13. Vehicle Owner Settlements Context
+  // 12. Vehicle Owner Settlements Context
   public ownerSettlements = {
-    listSettlements: () => this.get<any[]>('/owner-settlements'),
+    listPeriods: (params?: Record<string, any>) => {
+      const q = new URLSearchParams(
+        Object.entries(params || {}).filter(([, value]) => value !== undefined && value !== null && value !== '') as [string, string][]
+      ).toString();
+      return this.get<any[]>(`/owner-settlements/periods${q ? `?${q}` : ''}`);
+    },
+    createPeriod: (dto: any) => this.post('/owner-settlements/periods', dto),
+    closePeriod: (id: string) => this.post(`/owner-settlements/periods/${id}/close`, {}),
+    listBatches: (periodId?: string) =>
+      this.get<any[]>(`/owner-settlements/batches${periodId ? `?periodId=${encodeURIComponent(periodId)}` : ''}`),
+    generateBatch: (dto: any) => this.post('/owner-settlements/batches', dto),
+
+    listSettlements: (params?: Record<string, any>) => {
+      const q = new URLSearchParams(
+        Object.entries(params || {}).filter(([, value]) => value !== undefined && value !== null && value !== '') as [string, string][]
+      ).toString();
+      return this.get<any[]>(`/owner-settlements${q ? `?${q}` : ''}`);
+    },
+    getSettlement: (id: string) => this.get(`/owner-settlements/${id}`),
     calculateSettlement: (dto: any) => this.post('/owner-settlements/calculate', dto),
-    approveSettlement: (id: string) => this.post(`/owner-settlements/${id}/approve`),
-    paySettlement: (id: string, payoutRef: string) => this.post(`/owner-settlements/${id}/pay`, { payoutRef }),
+    getStatement: (id: string) => this.get(`/owner-settlements/${id}/statement`),
+    approveSettlement: (id: string, dto: any = {}) => this.post(`/owner-settlements/${id}/approve`, dto),
+    disputeSettlement: (id: string, reason: string) => this.post(`/owner-settlements/${id}/dispute`, { reason }),
+    resolveDispute: (id: string, dto: any) => this.post(`/owner-settlements/${id}/resolve-dispute`, dto),
+    addAdjustment: (id: string, dto: any) => this.post(`/owner-settlements/${id}/adjustments`, dto),
+    listPayables: (params?: Record<string, any>) => {
+      const q = new URLSearchParams(
+        Object.entries(params || {}).filter(([, value]) => value !== undefined && value !== null && value !== '') as [string, string][]
+      ).toString();
+      return this.get<any[]>(`/owner-settlements/payables/list${q ? `?${q}` : ''}`);
+    },
+    getProfitability: (params: { startDate: string; endDate: string; vehicleId?: string }) => {
+      const q = new URLSearchParams(
+        Object.entries(params).filter(([, value]) => value !== undefined && value !== null && value !== '') as [string, string][]
+      ).toString();
+      return this.get(`/owner-settlements/reports/profitability?${q}`);
+    },
+
+    // Resource-scoped Vehicle Owner self-service.
+    listMine: () => this.get<any[]>('/owner-settlements/mine'),
+    getMyStatement: (id: string) => this.get(`/owner-settlements/mine/${id}/statement`),
+    disputeMine: (id: string, reason: string) => this.post(`/owner-settlements/mine/${id}/dispute`, { reason }),
   };
 
-  // 14. Payments & M-Pesa Integration Context
+  // 13. Payments & Provider Integration Context
   public payments = {
-    stkPush: (dto: { bookingId: string; phoneNumber: string; amount: number }) =>
+    initiateAttempt: (dto: any) => this.post('/payments/attempts', dto),
+    stkPush: (dto: { invoiceId: string; phoneNumber: string; amount: number; customerId?: string }) =>
       this.post('/payments/attempts', {
         purpose: 'CUSTOMER_INVOICE',
         amount: String(dto.amount),
-        targetId: dto.bookingId,
+        targetId: dto.invoiceId,
+        customerId: dto.customerId,
         customerPhone: dto.phoneNumber,
         provider: 'MPESA_DARAJA',
       }),
-    getAttempts: (bookingId?: string) => this.get('/payments/attempts', bookingId ? { bookingId } : undefined),
+    listAttempts: (params?: Record<string, any>) => {
+      const q = new URLSearchParams(
+        Object.entries(params || {}).filter(([, value]) => value !== undefined && value !== null && value !== '') as [string, string][]
+      ).toString();
+      return this.get<any[]>(`/payments/attempts${q ? `?${q}` : ''}`);
+    },
+    getAttempt: (id: string) => this.get(`/payments/attempts/${id}`),
+    verifyAttempt: (id: string) => this.post(`/payments/attempts/${id}/verify`, {}),
+
+    recordManual: (dto: any) => this.post('/payments/manual', dto),
+    listPayments: (params?: Record<string, any>) => {
+      const q = new URLSearchParams(
+        Object.entries(params || {}).filter(([, value]) => value !== undefined && value !== null && value !== '') as [string, string][]
+      ).toString();
+      return this.get<any[]>(`/payments${q ? `?${q}` : ''}`);
+    },
+    getPayment: (id: string) => this.get(`/payments/${id}`),
+    allocate: (paymentId: string, dto: any) => this.post(`/payments/${paymentId}/allocate`, dto),
+    getAllocations: (paymentId: string) => this.get<any[]>(`/payments/${paymentId}/allocations`),
+
+    listRefunds: (params?: Record<string, any>) => {
+      const q = new URLSearchParams(
+        Object.entries(params || {}).filter(([, value]) => value !== undefined && value !== null && value !== '') as [string, string][]
+      ).toString();
+      return this.get<any[]>(`/payments/refunds${q ? `?${q}` : ''}`);
+    },
+    requestRefund: (dto: any) => this.post('/payments/refunds', dto),
+    approveAndExecuteRefund: (id: string) => this.post(`/payments/refunds/${id}/approve-and-execute`),
+
+    runReconciliation: () => this.post<any[]>('/payments/reconciliation/scan', {}),
+    listReconciliationIssues: (resolved?: boolean) =>
+      this.get<any[]>(`/payments/reconciliation/issues${resolved === undefined ? '' : `?resolved=${resolved}`}`),
+    resolveReconciliationIssue: (id: string) => this.post(`/payments/reconciliation/issues/${id}/resolve`),
+    executeOwnerPayout: (dto: {
+      settlementPayableId: string;
+      provider?: string;
+      idempotencyKey?: string;
+      notes?: string;
+    }) => this.post('/payments/payouts/owner-settlement', dto),
   };
 
-  // 15. Fleet Maintenance & Servicing Context
+  // 14. Fleet Maintenance & Servicing Context
   public maintenance = {
     listWorkOrders: (params?: Record<string, any>) => {
       const q = new URLSearchParams(params).toString();

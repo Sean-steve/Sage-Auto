@@ -33,6 +33,7 @@ import {
   IWebhookRepository,
   IOperationalInvoiceRepository,
   IDepositPositionRepository,
+  IBookingRepository,
   IOwnerSettlementRepository,
   IAuditRepository,
   IOutboxRepository,
@@ -76,7 +77,8 @@ export class PaymentService {
     private readonly depositPositionRepo?: IDepositPositionRepository,
     private readonly settlementRepo?: IOwnerSettlementRepository,
     private readonly auditRepo?: IAuditRepository,
-    private readonly outboxRepo?: IOutboxRepository
+    private readonly outboxRepo?: IOutboxRepository,
+    private readonly bookingRepo?: IBookingRepository
   ) {}
 
   // --------------------------------------------------------------------------
@@ -573,28 +575,34 @@ export class PaymentService {
     });
 
     if (dto.targetId) {
-      if (dto.purpose === "CUSTOMER_INVOICE") {
-        await this.allocatePayment(
-          tenantId,
-          {
-            paymentId: payment.id,
-            sourceType: "CUSTOMER_INVOICE",
-            sourceId: dto.targetId,
-            amount: payment.amount,
-          },
-          actor
-        );
-      } else if (dto.purpose === "RENTAL_DEPOSIT") {
-        await this.allocatePayment(
-          tenantId,
-          {
-            paymentId: payment.id,
-            sourceType: "RENTAL_DEPOSIT",
-            sourceId: dto.targetId,
-            amount: payment.amount,
-          },
-          actor
-        );
+      try {
+        if (dto.purpose === "CUSTOMER_INVOICE") {
+          await this.allocatePayment(
+            tenantId,
+            {
+              paymentId: payment.id,
+              sourceType: "CUSTOMER_INVOICE",
+              sourceId: dto.targetId,
+              amount: payment.amount,
+            },
+            actor
+          );
+        } else if (dto.purpose === "RENTAL_DEPOSIT") {
+          await this.allocatePayment(
+            tenantId,
+            {
+              paymentId: payment.id,
+              sourceType: "RENTAL_DEPOSIT",
+              sourceId: dto.targetId,
+              amount: payment.amount,
+            },
+            actor
+          );
+        }
+      } catch (allocationError) {
+        // Money was genuinely recorded. Never roll the Payment fact back because
+        // an obligation binding failed; reconciliation can safely resolve it.
+        console.error("Manual payment recorded but auto-allocation failed:", allocationError);
       }
     }
 
@@ -639,6 +647,13 @@ export class PaymentService {
 
       if (invoice.currency !== payment.currency) {
         throw new PaymentCurrencyMismatchError(invoice.currency, payment.currency);
+      }
+
+      const outstanding = parseFloat(invoice.amountOutstanding);
+      if (parseFloat(allocationAmount) > outstanding + 0.0001) {
+        throw new Error(
+          `Allocation ${allocationAmount} ${payment.currency} exceeds invoice outstanding balance ${invoice.amountOutstanding}.`
+        );
       }
 
       const newPaid = parseFloat(invoice.amountPaid) + parseFloat(allocationAmount);
@@ -722,24 +737,68 @@ export class PaymentService {
       }
 
       let deposit = await this.depositPositionRepo.findById(dto.sourceId, tenantId);
-      if (!deposit) {
-        // If sourceId was a rentalId, search by rentalId
-        deposit = await this.depositPositionRepo.findByRentalId(dto.sourceId, tenantId);
+      if (!deposit) deposit = await this.depositPositionRepo.findByRentalId(dto.sourceId, tenantId);
+      if (!deposit) deposit = await this.depositPositionRepo.findByBookingId(dto.sourceId, tenantId);
+
+      let booking: any = null;
+      if (!deposit && this.bookingRepo) {
+        booking = await this.bookingRepo.findById(dto.sourceId, tenantId);
+        if (booking && Number(booking.depositRequired || 0) > 0) {
+          deposit = await this.depositPositionRepo.create({
+            tenantId,
+            bookingId: booking.id,
+            customerId: booking.customerId,
+            currency: (booking.currency || payment.currency).toUpperCase(),
+            requiredAmount: to4Dec(booking.depositRequired),
+            receivedAmount: "0.0000",
+            heldAmount: "0.0000",
+            appliedAmount: "0.0000",
+            refundDueAmount: "0.0000",
+            refundedAmount: "0.0000",
+            forfeitedAmount: "0.0000",
+            status: "REQUIRED",
+            notes: `Security deposit position for booking ${booking.bookingNumber}`,
+          });
+        }
       }
 
-      if (deposit) {
-        const newReceived = parseFloat(deposit.receivedAmount) + parseFloat(allocationAmount);
-        const newHeld = parseFloat(deposit.heldAmount) + parseFloat(allocationAmount);
+      if (!deposit) {
+        throw new DepositPositionNotFoundError(dto.sourceId);
+      }
+      if (deposit.currency !== payment.currency) {
+        throw new PaymentCurrencyMismatchError(deposit.currency, payment.currency);
+      }
 
-        await this.depositPositionRepo.update(
-          deposit.id,
+      if (!booking && deposit.bookingId && this.bookingRepo) {
+        booking = await this.bookingRepo.findById(deposit.bookingId, tenantId);
+      }
+
+      const newReceived = parseFloat(deposit.receivedAmount) + parseFloat(allocationAmount);
+      const newHeld = parseFloat(deposit.heldAmount) + parseFloat(allocationAmount);
+      const required = parseFloat(deposit.requiredAmount);
+      if (newReceived > required + 0.0001) {
+        throw new Error(
+          `Deposit allocation would exceed required amount ${deposit.requiredAmount} ${deposit.currency}.`
+        );
+      }
+      const funded = newReceived + 0.0001 >= required;
+      deposit = await this.depositPositionRepo.update(
+        deposit.id,
+        tenantId,
+        {
+          receivedAmount: to4Dec(newReceived),
+          heldAmount: to4Dec(newHeld),
+          status: funded ? "HELD" : "REQUIRED",
+        },
+        deposit.version
+      );
+
+      if (booking && this.bookingRepo) {
+        await this.bookingRepo.update(
+          booking.id,
           tenantId,
-          {
-            receivedAmount: to4Dec(newReceived),
-            heldAmount: to4Dec(newHeld),
-            status: "HELD",
-          },
-          deposit.version
+          { depositStatus: funded ? "HELD" : "REQUESTED" },
+          booking.version
         );
       }
 
@@ -747,7 +806,7 @@ export class PaymentService {
         tenantId,
         paymentId: payment.id,
         sourceType: "RENTAL_DEPOSIT",
-        sourceId: deposit ? deposit.id : dto.sourceId,
+        sourceId: deposit.id,
         amount: allocationAmount,
         currency: payment.currency,
         notes: dto.notes,
@@ -761,6 +820,12 @@ export class PaymentService {
           allocatedAmount: newAllocated,
           unallocatedAmount: newUnallocated,
           status: newStatus,
+          sourceContext: {
+            ...(payment.sourceContext || {}),
+            customerId: deposit.customerId,
+            bookingId: deposit.bookingId,
+            rentalId: deposit.rentalId,
+          },
         },
         payment.version
       );
@@ -768,7 +833,7 @@ export class PaymentService {
       postingContract = PaymentPostingContractFactory.createDepositPaymentPostingContract(
         payment,
         allocation,
-        deposit?.rentalId || dto.sourceId
+        deposit.rentalId || deposit.bookingId || dto.sourceId
       );
 
       await this.outboxRepo?.publish({
@@ -846,6 +911,7 @@ export class PaymentService {
       status: "PENDING",
       reason: dto.reason,
       requestedAt: new Date().toISOString(),
+      requestedBy: actor.userId,
       postedToLedger: false,
     });
 
@@ -871,6 +937,13 @@ export class PaymentService {
     const refund = await this.refundRepo.findById(refundId, tenantId);
     if (!refund) {
       throw new RefundNotFoundError(refundId);
+    }
+
+    if (refund.requestedBy && refund.requestedBy === actor.userId) {
+      const err: any = new Error("Refund approval requires a different authorized user from the requester.");
+      err.code = "SEPARATION_OF_DUTIES";
+      err.statusCode = 409;
+      throw err;
     }
 
     const payment = await this.paymentRepo.findById(refund.originalPaymentId, tenantId);
@@ -986,6 +1059,22 @@ export class PaymentService {
       throw new SettlementAlreadyPaidError(payable.payableNumber);
     }
 
+    const settlement = await this.settlementRepo.findById(payable.settlementId, tenantId);
+    if (!settlement) {
+      throw new Error(`Settlement ${payable.settlementId} backing payable ${payable.payableNumber} was not found.`);
+    }
+    if (!["APPROVED", "PAYMENT_PENDING"].includes(settlement.status)) {
+      throw new Error(
+        `Settlement ${settlement.settlementNumber} must be APPROVED before provider payout; current status is ${settlement.status}.`
+      );
+    }
+    if (settlement.approvedBy && settlement.approvedBy === actor.userId) {
+      const err: any = new Error("Owner payout execution requires a different authorized user from the settlement approver.");
+      err.code = "SEPARATION_OF_DUTIES";
+      err.statusCode = 409;
+      throw err;
+    }
+
     if (this.isProductionLike() && (!dto.provider || dto.provider === "FAKE_PROVIDER")) {
       throw new Error(
         "Production and staging require an explicit payment provider; FAKE_PROVIDER is forbidden."
@@ -993,7 +1082,20 @@ export class PaymentService {
     }
 
     const providerName = dto.provider || "FAKE_PROVIDER";
+    if (this.isProductionLike() && providerName === "STRIPE_CARD") {
+      throw new Error(
+        "Stripe owner payout is not production-certified in this deployment. Configure a real outbound transfer adapter or use M-Pesa B2C."
+      );
+    }
     const provider = this.providerRegistry.get(providerName);
+
+    await this.settlementRepo.updatePayableStatus(payable.id, tenantId, "PROCESSING");
+    if (settlement.status !== "PAYMENT_PENDING") {
+      await this.settlementRepo.update(settlement.id, tenantId, {
+        status: "PAYMENT_PENDING",
+        paymentPendingAt: new Date().toISOString(),
+      });
+    }
 
     const payoutResult = await provider.executePayout({
       tenantId,
@@ -1009,6 +1111,7 @@ export class PaymentService {
 
     if (!payoutResult.success) {
       await this.settlementRepo.updatePayableStatus(payable.id, tenantId, "FAILED");
+      await this.settlementRepo.update(settlement.id, tenantId, { status: "APPROVED" });
       throw new Error(`Owner settlement payout failed: ${payoutResult.failureReason}`);
     }
 
@@ -1045,6 +1148,30 @@ export class PaymentService {
       now
     );
 
+    await this.settlementRepo.update(settlement.id, tenantId, {
+      status: "PAID",
+      paidAt: payoutResult.disbursedAt || now,
+      payoutReference: payoutResult.providerTransactionId || payment.paymentNumber,
+      payoutMethod: payable.payoutMethod,
+    });
+
+    await this.auditRepo?.create({
+      tenantId,
+      actorUserId: actor.userId,
+      actorType: "USER",
+      action: "OWNER_SETTLEMENT_PAYOUT_EXECUTED",
+      resourceType: "OWNER_SETTLEMENT",
+      resourceId: settlement.id,
+      description: `Executed provider payout for ${settlement.settlementNumber} (${payment.amount} ${payment.currency})`,
+      payload: {
+        settlementId: settlement.id,
+        payableId: payable.id,
+        paymentId: payment.id,
+        provider: payment.provider,
+        providerTransactionId: payment.providerTransactionId,
+      },
+    });
+
     const postingContract = PaymentPostingContractFactory.createOwnerPayoutPostingContract(
       payment,
       payable.payableNumber,
@@ -1059,6 +1186,7 @@ export class PaymentService {
       payload: {
         paymentId: payment.id,
         payableId: payable.id,
+        settlementId: settlement.id,
         amount: payment.amount,
         postingContract,
       },

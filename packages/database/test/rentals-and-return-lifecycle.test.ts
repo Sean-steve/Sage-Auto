@@ -13,6 +13,8 @@ import {
   VehicleAllocationRepository,
   InspectionRepository,
   DamageRepository,
+  DepositPositionRepository,
+  OperationalInvoiceRepository,
   AuditRepository,
   OutboxRepository,
   IdempotencyRepository,
@@ -40,6 +42,8 @@ async function runTests() {
   VehicleAllocationRepository.clear();
   InspectionRepository.clear();
   DamageRepository.clear();
+  DepositPositionRepository.clear();
+  OperationalInvoiceRepository.clear();
 
   const rentalRepo = new RentalRepository();
   const bookingRepo = new BookingRepository();
@@ -49,6 +53,8 @@ async function runTests() {
   const allocationRepo = new VehicleAllocationRepository();
   const inspectionRepo = new InspectionRepository();
   const damageRepo = new DamageRepository();
+  const depositPositionRepo = new DepositPositionRepository();
+  const operationalInvoiceRepo = new OperationalInvoiceRepository();
   const auditRepo = new AuditRepository();
   const outboxRepo = new OutboxRepository();
   const idempotencyRepo = new IdempotencyRepository();
@@ -80,8 +86,9 @@ async function runTests() {
   console.log("\n[TEST 1] Testing Rental State Machine Transitions...");
   assert.equal(RentalStateMachine.canTransition("SCHEDULED_HANDOVER", "ACTIVE_ON_ROAD"), true);
   assert.equal(RentalStateMachine.canTransition("ACTIVE_ON_ROAD", "RETURN_SCHEDULED"), true);
-  assert.equal(RentalStateMachine.canTransition("ACTIVE_ON_ROAD", "VEHICLE_RECEIVED"), true);
-  assert.equal(RentalStateMachine.canTransition("ACTIVE_ON_ROAD", "FINAL_CALCULATION"), true);
+  assert.equal(RentalStateMachine.canTransition("ACTIVE_ON_ROAD", "VEHICLE_RECEIVED"), false);
+  assert.equal(RentalStateMachine.canTransition("ACTIVE_ON_ROAD", "FINAL_CALCULATION"), false);
+  assert.equal(RentalStateMachine.canTransition("RETURN_SCHEDULED", "VEHICLE_RECEIVED"), true);
   assert.equal(RentalStateMachine.canTransition("VEHICLE_RECEIVED", "DAMAGE_ASSESSMENT"), true);
   assert.equal(RentalStateMachine.canTransition("FINAL_CALCULATION", "DEPOSIT_PROCESSING"), true);
   assert.equal(RentalStateMachine.canTransition("DEPOSIT_PROCESSING", "COMPLETED"), true);
@@ -197,6 +204,31 @@ async function runTests() {
   console.log("✓ Base Rental created and start snapshot saved.");
 
   // --------------------------------------------------------------------------
+  // TEST 2A: Rental Incident Persistence & Audit Path
+  // --------------------------------------------------------------------------
+  console.log("\n[TEST 2A] Recording an on-road rental incident...");
+  const incident = await service.recordIncident(
+    tenantId,
+    rental.id,
+    {
+      type: "MECHANICAL_BREAKDOWN",
+      description: "Warning light reported while vehicle remained safely parked.",
+      location: "Nairobi",
+      estimatedCost: 2500,
+      reportedAt: "2026-09-03T11:15:00Z",
+    },
+    actor
+  );
+  assert.equal(incident.rentalId, rental.id);
+  assert.equal(incident.resolved, false);
+  const incidentList = await service.getRentalIncidents(tenantId, rental.id);
+  assert.equal(incidentList.length, 1);
+  assert.equal(incidentList[0].type, "MECHANICAL_BREAKDOWN");
+  const rentalWithIncident = await rentalRepo.findById(rental.id, tenantId);
+  assert.equal(rentalWithIncident?.incidents.length, 1);
+  console.log("✓ Incident persisted to the authoritative rental aggregate.");
+
+  // --------------------------------------------------------------------------
   // TEST 3: Rental Extension Request & Pricing Calculation
   // --------------------------------------------------------------------------
   console.log("\n[TEST 3] Testing Rental Extension Request & Pricing...");
@@ -239,16 +271,44 @@ async function runTests() {
   // TEST 5: Return Scheduling & Vehicle Receipt Validation
   // --------------------------------------------------------------------------
   console.log("\n[TEST 5] Testing Return Scheduling & Vehicle Receipt...");
+
+  await assert.rejects(
+    async () => {
+      await service.receiveReturnedVehicle(
+        tenantId,
+        rental.id,
+        { returnOdometer: 46000, returnFuelLevel: 80 },
+        actor
+      );
+    },
+    (err: any) => err instanceof RentalInvalidStateTransitionError
+  );
+  console.log("✓ Direct vehicle receipt before return scheduling rejected.");
+
   const scheduledRental = await service.scheduleReturn(
     tenantId,
     rental.id,
     {
       scheduledReturnAt: "2026-09-07T10:00:00Z",
       scheduledReturnLocationId: "branch-nairobi-hq",
+      idempotencyKey: "return-schedule-rnt-16001",
     },
     actor
   );
   assert.equal(scheduledRental.state, "RETURN_SCHEDULED");
+  const scheduledReplay = await service.scheduleReturn(
+    tenantId,
+    rental.id,
+    {
+      scheduledReturnAt: "2026-09-07T10:00:00Z",
+      scheduledReturnLocationId: "branch-nairobi-hq",
+      idempotencyKey: "return-schedule-rnt-16001",
+    },
+    actor
+  );
+  assert.equal(scheduledReplay.id, scheduledRental.id);
+  assert.equal(scheduledReplay.state, "RETURN_SCHEDULED");
+  console.log("✓ Return scheduling is idempotent under retry.");
 
   // Test odometer regression validation
   await assert.rejects(
@@ -297,6 +357,7 @@ async function runTests() {
       returnFuelLevel: 60,
       receivedAt: "2026-09-07T12:00:00Z",
       conditionNotes: "Vehicle returned with light dust and minor scratches on rear bumper.",
+      idempotencyKey: "return-receipt-rnt-16001",
     },
     actor
   );
@@ -304,15 +365,82 @@ async function runTests() {
   assert.equal(receivedRental.state, "VEHICLE_RECEIVED");
   assert.equal(receivedRental.returnOdometer, 46600);
   assert.equal(receivedRental.returnFuelLevel, 60);
-  console.log("✓ Vehicle successfully received at branch. State:", receivedRental.state);
+  const receivedReplay = await service.receiveReturnedVehicle(
+    tenantId,
+    rental.id,
+    {
+      returnOdometer: 46600,
+      returnFuelLevel: 60,
+      receivedAt: "2026-09-07T12:00:00Z",
+      conditionNotes: "Vehicle returned with light dust and minor scratches on rear bumper.",
+      idempotencyKey: "return-receipt-rnt-16001",
+    },
+    actor
+  );
+  assert.equal(receivedReplay.id, receivedRental.id);
+  assert.equal(receivedReplay.state, "VEHICLE_RECEIVED");
+  const mergedReturnRecord = await rentalRepo.getReturnRecord(rental.id, tenantId);
+  assert.equal(mergedReturnRecord?.scheduledReturnAt, "2026-09-07T10:00:00Z");
+  assert.equal(mergedReturnRecord?.actualReturnAt, "2026-09-07T12:00:00Z");
+  assert.equal(mergedReturnRecord?.returnOdometer, 46600);
+  console.log("✓ Vehicle successfully received and scheduled return facts were preserved.");
 
   // --------------------------------------------------------------------------
   // TEST 6: Link Damage Cases to Rental
   // --------------------------------------------------------------------------
   console.log("\n[TEST 6] Linking Observed Damage Cases...");
+
+  const draftInspection = await inspectionRepo.create(tenantId, {
+    inspectionType: "RETURN",
+    vehicleId: vehicle.id,
+    rentalId: rental.id,
+    bookingId: booking.id,
+    odometer: 46600,
+    fuelLevel: 60,
+    performedByMembershipId: "mbr-draft-return",
+    actorUserId: actor.userId,
+    actorType: actor.actorType,
+  } as any);
+  await assert.rejects(
+    async () => {
+      await service.linkReturnInspection(
+        tenantId,
+        rental.id,
+        { inspectionId: draftInspection.id },
+        actor
+      );
+    },
+    /must be completed and sealed/i
+  );
+  console.log("✓ Unsealed return inspection cannot advance the rental.");
+
+  const returnInspection = await inspectionRepo.create(tenantId, {
+    inspectionType: "RETURN",
+    vehicleId: vehicle.id,
+    rentalId: rental.id,
+    bookingId: booking.id,
+    odometer: 46600,
+    fuelLevel: 60,
+    overallCondition: "FAIR",
+    performedByMembershipId: "mbr-sprint16-return",
+    actorUserId: actor.userId,
+    actorType: actor.actorType,
+  } as any);
+  await inspectionRepo.addAcknowledgement(returnInspection.id, tenantId, {
+    signerType: "INSPECTOR",
+    signerId: actor.userId,
+    signerName: actor.name || "Fleet Ops Manager",
+    signatureMethod: "MANUAL_UPLOAD",
+    signatureReference: "test-inspector-signature",
+  } as any);
+  await inspectionRepo.update(returnInspection.id, tenantId, {
+    status: "COMPLETED",
+    completedAt: "2026-09-07T12:20:00Z",
+  } as any);
+
   const damageCase = await damageRepo.create(tenantId, {
     vehicleId: vehicle.id,
-    inspectionId: "insp-return-16001",
+    inspectionId: returnInspection.id,
     rentalId: rental.id,
     damageType: "SCRATCH",
     severity: "MINOR",
@@ -322,11 +450,23 @@ async function runTests() {
     estimatedRepairCost: 7500,
   });
 
+  await damageRepo.create(tenantId, {
+    vehicleId: vehicle.id,
+    inspectionId: returnInspection.id,
+    rentalId: rental.id,
+    damageType: "MECHANICAL",
+    severity: "MINOR",
+    bodyZone: "UNDERBODY",
+    description: "Operator-attributable workshop item that must not be charged to the customer",
+    responsibleParty: "OPERATOR",
+    estimatedRepairCost: 9000,
+  });
+
   const inspectionLinkedRental = await service.linkReturnInspection(
     tenantId,
     rental.id,
     {
-      inspectionId: "insp-return-16001",
+      inspectionId: returnInspection.id,
       damageCaseIds: [damageCase.id],
     },
     actor
@@ -338,6 +478,26 @@ async function runTests() {
   // TEST 7: Authoritative Final Calculation Engine & Deposit Reconciliation
   // --------------------------------------------------------------------------
   console.log("\n[TEST 7] Executing Authoritative Final Rental Calculation Engine...");
+
+  // Deposit requirement is not money. Seed the actually received/held deposit
+  // liability that would have been funded by an authoritative Payment allocation.
+  await depositPositionRepo.create({
+    tenantId,
+    rentalId: rental.id,
+    bookingId: rental.bookingId,
+    customerId: rental.customerId,
+    currency: "KES",
+    requiredAmount: "30000.0000",
+    receivedAmount: "30000.0000",
+    heldAmount: "30000.0000",
+    appliedAmount: "0.0000",
+    refundDueAmount: "0.0000",
+    refundedAmount: "0.0000",
+    forfeitedAmount: "0.0000",
+    status: "HELD",
+    notes: "Verified deposit funding fixture",
+  });
+
   const { calculation, rental: calculatedRental } = await service.calculateFinalRental(
     tenantId,
     rental.id,
@@ -385,6 +545,7 @@ async function runTests() {
   assert.equal(calculation.billableLateHours, 3);
   assert.equal(calculation.lateReturnFee, 1500);
   assert.equal(calculation.totalDamageCharge, 7500);
+  console.log("✓ Operator-attributable damage was excluded from customer final charges.");
   assert.equal(calculation.depositHeldAmount, 30000);
   // Post rental incidental charges = 14000 (excess km) + 4070 (fuel) + 500 (refuel fee) + 1500 (late) + 7500 (damage) + 3000 (500 refuel + 2500 cleaning) = 30070
   // Deposit held = 30000. Incidental total = 30070.
@@ -395,16 +556,57 @@ async function runTests() {
   assert.equal(calculatedRental.state, "FINAL_CALCULATION");
   console.log("✓ Final Calculation Engine produced mathematically exact results.");
 
+  await assert.rejects(
+    async () => {
+      await service.completeRental(
+        tenantId,
+        rental.id,
+        { releaseVehicleToStatus: "AVAILABLE" },
+        actor
+      );
+    },
+    /sealed final calculation and completed deposit settlement/i
+  );
+  console.log("✓ Rental cannot complete before final settlement is sealed.");
+
   // --------------------------------------------------------------------------
   // TEST 8: Process Deposit Settlement
   // --------------------------------------------------------------------------
   console.log("\n[TEST 8] Processing Deposit Settlement & Payment...");
+
+  const settlementInvoice = await operationalInvoiceRepo.create({
+    tenantId,
+    customerId: rental.customerId,
+    rentalId: rental.id,
+    bookingId: rental.bookingId,
+    currency: "KES",
+    status: "PAID",
+    issueDate: "2026-09-07",
+    dueDate: "2026-09-07",
+    subtotal: String(calculation.grossFinalTotal),
+    discountTotal: "0.0000",
+    taxTotal: "0.0000",
+    total: String(calculation.grossFinalTotal),
+    amountPaid: String(calculation.grossFinalTotal),
+    amountCredited: "0.0000",
+    amountOutstanding: "0.0000",
+    billingSnapshot: {
+      customerName: "Sprint 16 Customer",
+      customerEmail: "",
+      customerPhone: "",
+    },
+    lineItems: [],
+    issuedAt: "2026-09-07T12:30:00Z",
+    paidAt: "2026-09-07T12:35:00Z",
+  } as any);
+
   const settledCalc = await service.processDepositSettlement(
     tenantId,
     rental.id,
     {
-      settlementStatus: "SETTLED",
+      settlementStatus: "CHARGED",
       additionalChargedAmount: 70,
+      invoiceId: settlementInvoice.id,
       paymentMethod: "MPESA",
       transactionReference: "QKD883921Z",
       notes: "Customer settled 70 KES remaining incidental balance via M-Pesa.",
@@ -412,9 +614,32 @@ async function runTests() {
     actor
   );
 
-  assert.equal(settledCalc.depositSettlementStatus, "SETTLED");
+  assert.equal(settledCalc.depositSettlementStatus, "CHARGED");
   assert.equal(settledCalc.isImmutable, true);
-  console.log("✓ Deposit settlement sealed as immutable and recorded.");
+
+  await assert.rejects(
+    async () => {
+      await service.completeRental(
+        tenantId,
+        rental.id,
+        {} as any,
+        actor
+      );
+    },
+    /explicit vehicle disposition/i
+  );
+  console.log("✓ Completion cannot silently release a vehicle without an explicit disposition.");
+
+  const sealedReplay = await service.calculateFinalRental(
+    tenantId,
+    rental.id,
+    { fuelPricePerLiter: 999, damageChargesOverride: 0 },
+    actor
+  );
+  assert.equal(sealedReplay.calculation.id, settledCalc.id);
+  assert.equal(sealedReplay.calculation.fuelPricePerUnit, settledCalc.fuelPricePerUnit);
+  assert.equal(sealedReplay.calculation.totalDamageCharge, settledCalc.totalDamageCharge);
+  console.log("✓ Deposit settlement sealed as immutable; recalculation cannot rewrite it.");
 
   // --------------------------------------------------------------------------
   // TEST 9: Complete Rental, Booking, Contract & Release Fleet
@@ -426,12 +651,27 @@ async function runTests() {
     {
       releaseVehicleToStatus: "AVAILABLE",
       notes: "Rental fully completed, customer signed off, vehicle released.",
+      idempotencyKey: "return-complete-rnt-16001",
     },
     actor
   );
 
   assert.equal(completedRental.state, "COMPLETED");
   assert.ok(completedRental.completedAt);
+
+  const completedReplay = await service.completeRental(
+    tenantId,
+    rental.id,
+    {
+      releaseVehicleToStatus: "AVAILABLE",
+      notes: "Rental fully completed, customer signed off, vehicle released.",
+      idempotencyKey: "return-complete-rnt-16001",
+    },
+    actor
+  );
+  assert.equal(completedReplay.id, completedRental.id);
+  assert.equal(completedReplay.state, "COMPLETED");
+  console.log("✓ Final completion is idempotent under retry.");
 
   const finalBooking = await bookingRepo.findById(booking.id, tenantId);
   assert.equal(finalBooking?.status, "COMPLETED");
@@ -447,7 +687,13 @@ async function runTests() {
   const finalAllocation = await allocationRepo.findById(allocation.id, tenantId);
   assert.equal(finalAllocation?.status, "RELEASED");
 
-  console.log("✓ Rental, Booking, Contract completed and Vehicle allocation released.");
+  const finalReturnRecord = await rentalRepo.getReturnRecord(rental.id, tenantId);
+  assert.equal(finalReturnRecord?.status, "COMPLETED");
+  assert.equal(finalReturnRecord?.scheduledReturnAt, "2026-09-07T10:00:00Z");
+  assert.equal(finalReturnRecord?.actualReturnAt, "2026-09-07T12:00:00Z");
+  assert.equal(finalReturnRecord?.returnInspectionId, returnInspection.id);
+
+  console.log("✓ Rental, Booking, Contract completed; ReturnRecord history preserved and Vehicle allocation released.");
 
   // --------------------------------------------------------------------------
   // TEST 10: Terminal State Invariants
@@ -466,8 +712,25 @@ async function runTests() {
   );
   console.log("✓ Post-completion modifications strictly rejected.");
 
+  await assert.rejects(
+    async () => {
+      await service.recordIncident(
+        tenantId,
+        rental.id,
+        {
+          type: "OTHER",
+          description: "Should not be accepted after completion.",
+          location: "Nairobi",
+        },
+        actor
+      );
+    },
+    (err: any) => err instanceof RentalAlreadyCompletedError
+  );
+  console.log("✓ Post-completion incident mutation rejected.");
+
   console.log("\n================================================================");
-  console.log("ALL SPRINT 16 TESTS PASSED SUCCESSFULLY! (10/10 TEST SUITES GREEN)");
+  console.log("ALL RENTAL + RETURN LIFECYCLE TESTS PASSED SUCCESSFULLY!");
   console.log("================================================================\n");
 }
 

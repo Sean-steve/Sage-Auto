@@ -3433,10 +3433,11 @@ export interface RentalStartReadiness {
 
 export interface CreateRentalFromBookingDto {
   bookingId: string;
-  contractId: string;
-  handoverId: string;
-  startOdometer: number;
-  startFuelLevel: number;
+  /** Optional explicit links. The server resolves the current booking contract/handover when omitted. */
+  contractId?: string;
+  handoverId?: string;
+  startOdometer?: number;
+  startFuelLevel?: number;
   notes?: string;
   idempotencyKey?: string;
 }
@@ -4063,6 +4064,18 @@ export interface RequestRentalExtensionDto {
   idempotencyKey?: string;
 }
 
+export interface RecordRentalIncidentDto {
+  type: RentalIncident["type"];
+  description: string;
+  location: string;
+  occurredAt?: string;
+  reportedAt?: string;
+  policeReportNumber?: string;
+  estimatedCost?: number;
+  evidenceIds?: string[];
+  notes?: string;
+}
+
 export interface ApproveRentalExtensionDto {
   approvedDailyRate?: number;
   approvedAdditionalCost?: number;
@@ -4125,6 +4138,12 @@ export interface ProcessDepositSettlementDto {
   settlementStatus: DepositSettlementStatus;
   refundAmount?: number;
   additionalChargedAmount?: number;
+  /**
+   * Finance evidence. CHARGED requires a fully settled invoice for this Rental.
+   * REFUNDED requires a completed provider Refund tied to this Rental/deposit.
+   */
+  invoiceId?: string;
+  refundId?: string;
   paymentMethod?: "MPESA" | "CARD" | "BANK_TRANSFER" | "CASH" | "SECURITY_DEPOSIT_HOLD";
   transactionReference?: string;
   notes?: string;
@@ -4132,7 +4151,11 @@ export interface ProcessDepositSettlementDto {
 
 export interface CompleteRentalDto {
   notes?: string;
-  releaseVehicleToStatus?: "AVAILABLE" | "MAINTENANCE" | "INSPECTION" | "GROUNDED";
+  /**
+   * Explicit post-return fleet disposition. Completion must never silently
+   * make a vehicle bookable when inspection/damage outcomes require a hold.
+   */
+  releaseVehicleToStatus: "AVAILABLE" | "MAINTENANCE" | "INSPECTION" | "GROUNDED";
   idempotencyKey?: string;
 }
 

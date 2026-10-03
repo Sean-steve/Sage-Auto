@@ -123,6 +123,10 @@ export interface OwnerSettlementRentalLine {
   rentalStartDate: string;
   rentalEndDate: string;
   eligibleDays: number;
+  /** Authoritative Finance source supporting this settlement line. */
+  invoiceId?: string;
+  invoiceNumber?: string;
+  financeSourceSettled?: boolean;
   baseRentalRevenue: string; // NUMERIC(19,4)
   excessMileageRevenue: string; // NUMERIC(19,4)
   totalRentalRevenue: string; // NUMERIC(19,4)
@@ -217,8 +221,11 @@ export interface OwnerSettlement {
   operatorNetRevenue?: string;
   carriedForwardBalance?: string;
 
-  // Frozen historical snapshot of terms
+  // Frozen historical terms used by the calculation. termsSnapshot remains
+  // the compatibility/primary view; termsSnapshots preserves every distinct
+  // ownership agreement represented by source lines.
   termsSnapshot?: OwnerSettlementTermsSnapshot;
+  termsSnapshots?: OwnerSettlementTermsSnapshot[];
 
   // Lifecycle & Audit
   calculatedAt: string;
@@ -284,6 +291,7 @@ export interface OwnerSettlementStatementReadModel {
     payoutMpesaNumber?: string;
   };
   commercialTerms: OwnerSettlementTermsSnapshot;
+  commercialTermsHistory?: OwnerSettlementTermsSnapshot[];
   currency: string;
   financialSummary: {
     totalEligibleRentalRevenue: string;

@@ -18,6 +18,7 @@ import {
 import { OwnerSettlementsService } from "./application/owner-settlements.service";
 import { createOwnerSettlementsController } from "./presentation/owner-settlements.controller";
 import { LedgerService } from "../ledger/application/ledger.service";
+import type { FinanceService } from "../finance/application/finance.service";
 
 export class OwnerSettlementsModule {
   public readonly settlementService: OwnerSettlementsService;
@@ -26,6 +27,7 @@ export class OwnerSettlementsModule {
   constructor(
     permissionGuard?: (perm: string) => (req: Request, res: Response, next: NextFunction) => void,
     ledgerService?: LedgerService,
+    financeService?: Pick<FinanceService, "getSettledRentalRevenueComponents">,
     overrides?: {
       settlementRepo?: OwnerSettlementRepository;
       periodRepo?: OwnerSettlementPeriodRepository;
@@ -58,7 +60,8 @@ export class OwnerSettlementsModule {
       rentalRepo,
       expenseRepo,
       ledgerService,
-      auditRepo
+      auditRepo,
+      financeService
     );
 
     this.router = createOwnerSettlementsController(this.settlementService, permissionGuard);

@@ -9,7 +9,10 @@ import { TENANT_PERMISSIONS } from "@carhire/constants";
 
 export function createFinanceController(
   financeService: FinanceService,
-  permissionGuard?: (perm: string) => (req: Request, res: Response, next: NextFunction) => void
+  permissionGuard?: (perm: string) => (req: Request, res: Response, next: NextFunction) => void,
+  paymentService?: {
+    recordGovernedManualPayment(tenantId: string, dto: any, actor: any): Promise<any>;
+  }
 ): Router {
   const router = Router();
   const guard = (perm: string) =>
@@ -49,6 +52,54 @@ export function createFinanceController(
   // --------------------------------------------------------------------------
   // INVOICES
   // --------------------------------------------------------------------------
+
+  router.get(
+    "/invoices",
+    guard(TENANT_PERMISSIONS.INVOICE_READ),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const tenantId = getTenantId(req);
+        const invoices = await financeService.listInvoices(tenantId, {
+          customerId: req.query.customerId as string,
+          corporateAccountId: req.query.corporateAccountId as string,
+          rentalId: req.query.rentalId as string,
+          status: req.query.status as any,
+          overdueOnly: req.query.overdueOnly === "true" ? true : undefined,
+        });
+        res.status(200).json({ success: true, data: invoices });
+      } catch (err) {
+        next(err);
+      }
+    }
+  );
+
+  router.get(
+    "/invoices/:id",
+    guard(TENANT_PERMISSIONS.INVOICE_READ),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const tenantId = getTenantId(req);
+        const invoice = await financeService.getInvoice(tenantId, req.params.id);
+        res.status(200).json({ success: true, data: invoice });
+      } catch (err) {
+        next(err);
+      }
+    }
+  );
+
+  router.get(
+    "/invoices/:id/history",
+    guard(TENANT_PERMISSIONS.INVOICE_READ),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const tenantId = getTenantId(req);
+        const history = await financeService.getInvoiceStatusHistory(tenantId, req.params.id);
+        res.status(200).json({ success: true, data: history });
+      } catch (err) {
+        next(err);
+      }
+    }
+  );
 
   // Create manual invoice draft
   router.post(
@@ -114,20 +165,46 @@ export function createFinanceController(
     }
   );
 
-  // Record manual offline payment on invoice
+  // Legacy compatibility route. Payment truth remains owned by the Payments context.
   router.post(
     "/invoices/:id/payments",
     guard(TENANT_PERMISSIONS.PAYMENT_RECORD),
     async (req: Request, res: Response, next: NextFunction) => {
       try {
+        if (!paymentService) {
+          const err: any = new Error("Canonical Payment service is unavailable.");
+          err.statusCode = 503;
+          throw err;
+        }
         const tenantId = getTenantId(req);
         const actor = getActor(req);
-        const invoice = await financeService.recordManualPayment(
+        const invoice = await financeService.getInvoice(tenantId, req.params.id);
+        const amount = String(req.body.amount ?? "");
+        const transactionReference =
+          req.body.transactionReference || req.body.providerTransactionId || req.body.reference;
+        if (!transactionReference) {
+          const err: any = new Error("Transaction reference is required for manual payment recording.");
+          err.statusCode = 400;
+          throw err;
+        }
+
+        const payment = await paymentService.recordGovernedManualPayment(
           tenantId,
-          { ...req.body, invoiceId: req.params.id },
+          {
+            purpose: "CUSTOMER_INVOICE",
+            amount,
+            currency: invoice.currency,
+            targetId: invoice.id,
+            customerId: invoice.customerId,
+            payerReference: req.body.payerReference || invoice.billingSnapshot.customerName,
+            providerTransactionId: transactionReference,
+            paidAt: req.body.paidAt,
+            notes: req.body.notes || `Legacy finance payment route for ${invoice.invoiceNumber}`,
+          },
           actor
         );
-        res.status(200).json({ success: true, data: invoice });
+        const updatedInvoice = await financeService.getInvoice(tenantId, invoice.id);
+        res.status(200).json({ success: true, data: updatedInvoice, payment });
       } catch (err) {
         next(err);
       }
@@ -137,6 +214,24 @@ export function createFinanceController(
   // --------------------------------------------------------------------------
   // CREDIT NOTES
   // --------------------------------------------------------------------------
+
+  router.get(
+    "/credit-notes",
+    guard(TENANT_PERMISSIONS.CREDIT_NOTE_READ),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const tenantId = getTenantId(req);
+        const notes = await financeService.listCreditNotes(tenantId, {
+          invoiceId: req.query.invoiceId as string,
+          customerId: req.query.customerId as string,
+          status: req.query.status as any,
+        });
+        res.status(200).json({ success: true, data: notes });
+      } catch (err) {
+        next(err);
+      }
+    }
+  );
 
   // Create credit note draft
   router.post(
@@ -194,6 +289,27 @@ export function createFinanceController(
   // --------------------------------------------------------------------------
   // OPERATIONAL EXPENSES
   // --------------------------------------------------------------------------
+
+  router.get(
+    "/expenses",
+    guard(TENANT_PERMISSIONS.EXPENSE_READ),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const tenantId = getTenantId(req);
+        const expenses = await financeService.listExpenses(tenantId, {
+          vehicleId: req.query.vehicleId as string,
+          rentalId: req.query.rentalId as string,
+          category: req.query.category as any,
+          status: req.query.status as any,
+          fromDate: req.query.fromDate as string,
+          toDate: req.query.toDate as string,
+        });
+        res.status(200).json({ success: true, data: expenses });
+      } catch (err) {
+        next(err);
+      }
+    }
+  );
 
   // Create operating expense draft
   router.post(
@@ -299,6 +415,44 @@ export function createFinanceController(
   // --------------------------------------------------------------------------
   // DEPOSITS & REFUNDS
   // --------------------------------------------------------------------------
+
+  router.get(
+    "/deposits",
+    guard(TENANT_PERMISSIONS.DEPOSIT_READ),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const tenantId = getTenantId(req);
+        const deposits = await financeService.listDepositPositions(tenantId, {
+          customerId: req.query.customerId as string,
+          rentalId: req.query.rentalId as string,
+          status: req.query.status as any,
+        });
+        res.status(200).json({ success: true, data: deposits });
+      } catch (err) {
+        next(err);
+      }
+    }
+  );
+
+  router.get(
+    "/refunds",
+    guard(TENANT_PERMISSIONS.REFUND_READ),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const tenantId = getTenantId(req);
+        const refunds = await financeService.listRefundObligations(tenantId, {
+          customerId: req.query.customerId as string,
+          rentalId: req.query.rentalId as string,
+          invoiceId: req.query.invoiceId as string,
+          depositPositionId: req.query.depositPositionId as string,
+          status: req.query.status as any,
+        });
+        res.status(200).json({ success: true, data: refunds });
+      } catch (err) {
+        next(err);
+      }
+    }
+  );
 
   // Record deposit position
   router.post(

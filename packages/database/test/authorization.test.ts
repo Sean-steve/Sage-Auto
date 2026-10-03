@@ -192,6 +192,86 @@ async function runTestSuite() {
     assert(agent !== null, "BOOKING_AGENT must exist");
     assert(agent!.permissions.includes(TENANT_PERMISSIONS.BOOKING_CREATE), "Agent can create booking");
     assert(!agent!.permissions.includes(TENANT_PERMISSIONS.VEHICLE_DELETE), "Agent CANNOT delete vehicle");
+
+    const manager = await roleRepo.findByCode("MANAGER");
+    const fleetManager = await roleRepo.findByCode("FLEET_MANAGER");
+    const bookingManager = await roleRepo.findByCode("BOOKING_MANAGER");
+    const financeManager = await roleRepo.findByCode("FINANCE_MANAGER");
+    const accountant = await roleRepo.findByCode("ACCOUNTANT");
+    const vehicleOwner = await roleRepo.findByCode("VEHICLE_OWNER");
+    const driver = await roleRepo.findByCode("DRIVER");
+    const customerService = await roleRepo.findByCode("CUSTOMER_SERVICE");
+
+    assert(manager!.permissions.includes(TENANT_PERMISSIONS.RENTAL_RETURN_SCHEDULE), "Manager can schedule a rental return");
+    assert(manager!.permissions.includes(TENANT_PERMISSIONS.RENTAL_RETURN_RECEIVE), "Manager can receive a returned vehicle");
+    assert(manager!.permissions.includes(TENANT_PERMISSIONS.RENTAL_RETURN_INSPECTION_LINK), "Manager can advance sealed return inspection");
+    assert(manager!.permissions.includes(TENANT_PERMISSIONS.RENTAL_FINAL_CALCULATE), "Manager can generate final calculation");
+    assert(manager!.permissions.includes(TENANT_PERMISSIONS.RENTAL_FINAL_COMPLETE), "Manager can close settled rental");
+    assert(!manager!.permissions.includes(TENANT_PERMISSIONS.RENTAL_FINAL_SETTLE), "Manager cannot seal financial settlement by default");
+
+    assert(fleetManager!.permissions.includes(TENANT_PERMISSIONS.RENTAL_RETURN_RECEIVE), "Fleet Manager can receive vehicle");
+    assert(fleetManager!.permissions.includes(TENANT_PERMISSIONS.RENTAL_RETURN_INSPECTION_LINK), "Fleet Manager can own return inspection progression");
+    assert(!fleetManager!.permissions.includes(TENANT_PERMISSIONS.RENTAL_FINAL_SETTLE), "Fleet Manager cannot settle customer balances");
+
+    assert(bookingManager!.permissions.includes(TENANT_PERMISSIONS.RENTAL_RETURN_SCHEDULE), "Booking Manager can schedule return");
+    assert(bookingManager!.permissions.includes(TENANT_PERMISSIONS.RENTAL_RETURN_RECEIVE), "Booking Manager can receive return");
+    assert(agent!.permissions.includes(TENANT_PERMISSIONS.RENTAL_RETURN_RECEIVE), "Booking Agent can perform front-desk vehicle receipt");
+    assert(!agent!.permissions.includes(TENANT_PERMISSIONS.RENTAL_FINAL_CALCULATE), "Booking Agent cannot calculate final charges");
+
+    assert(financeManager!.permissions.includes(TENANT_PERMISSIONS.RENTAL_FINAL_CALCULATE), "Finance Manager can calculate final charges");
+    assert(financeManager!.permissions.includes(TENANT_PERMISSIONS.RENTAL_FINAL_SETTLE), "Finance Manager can seal final settlement");
+    assert(financeManager!.permissions.includes(TENANT_PERMISSIONS.REFUND_APPROVE), "Finance Manager can approve refund obligations");
+    assert(financeManager!.permissions.includes(TENANT_PERMISSIONS.REFUND_EXECUTE), "Finance Manager can execute approved refunds");
+    assert(!financeManager!.permissions.includes(TENANT_PERMISSIONS.RENTAL_RETURN_RECEIVE), "Finance Manager does not receive vehicles");
+
+    assert(accountant!.permissions.includes(TENANT_PERMISSIONS.RENTAL_FINAL_CALCULATE), "Accountant can prepare final calculation");
+    assert(!accountant!.permissions.includes(TENANT_PERMISSIONS.RENTAL_FINAL_SETTLE), "Accountant cannot seal settlement by default");
+    assert(!accountant!.permissions.includes(TENANT_PERMISSIONS.REFUND_APPROVE), "Accountant cannot approve refunds by default");
+    assert(!accountant!.permissions.includes(TENANT_PERMISSIONS.REFUND_EXECUTE), "Accountant cannot execute refunds by default");
+
+    assert(financeManager!.permissions.includes(TENANT_PERMISSIONS.SETTLEMENT_CALCULATE), "Finance Manager can calculate owner settlements");
+    assert(financeManager!.permissions.includes(TENANT_PERMISSIONS.SETTLEMENT_APPROVE), "Finance Manager can independently approve owner settlements");
+    assert(financeManager!.permissions.includes(TENANT_PERMISSIONS.SETTLEMENT_ADJUST), "Finance Manager can record governed settlement adjustments");
+    assert(financeManager!.permissions.includes(TENANT_PERMISSIONS.SETTLEMENT_PAY), "Finance Manager can execute approved payout obligations");
+    assert(financeManager!.permissions.includes(TENANT_PERMISSIONS.SETTLEMENT_PERIOD_MANAGE), "Finance Manager can manage settlement periods");
+
+    assert(accountant!.permissions.includes(TENANT_PERMISSIONS.SETTLEMENT_CALCULATE), "Accountant can prepare settlement calculation");
+    assert(!accountant!.permissions.includes(TENANT_PERMISSIONS.SETTLEMENT_APPROVE), "Accountant cannot approve owner settlement by default");
+    assert(!accountant!.permissions.includes(TENANT_PERMISSIONS.SETTLEMENT_ADJUST), "Accountant cannot adjust owner settlement by default");
+    assert(!accountant!.permissions.includes(TENANT_PERMISSIONS.SETTLEMENT_PAY), "Accountant cannot execute owner payout by default");
+
+    assert(vehicleOwner!.permissions.includes(TENANT_PERMISSIONS.SETTLEMENT_SELF_READ), "Vehicle Owner can read own settlements through scoped self-service");
+    assert(vehicleOwner!.permissions.includes(TENANT_PERMISSIONS.SETTLEMENT_SELF_DISPUTE), "Vehicle Owner can dispute own settlement");
+    assert(!vehicleOwner!.permissions.includes(TENANT_PERMISSIONS.SETTLEMENT_READ), "Vehicle Owner cannot read tenant-wide settlements");
+    assert(!vehicleOwner!.permissions.includes(TENANT_PERMISSIONS.SETTLEMENT_PAY), "Vehicle Owner cannot execute own payout");
+
+    assert(!driver!.permissions.includes(TENANT_PERMISSIONS.RENTAL_READ), "Driver cannot read the tenant-wide Rental collection");
+    assert(driver!.permissions.includes(TENANT_PERMISSIONS.RENTAL_INCIDENT_REPORT), "Driver can report incidents for assigned trips through scoped self-service context");
+
+    assert(!customerService!.permissions.includes(TENANT_PERMISSIONS.RENTAL_FINAL_SETTLE), "Customer Service remains read/support only for settlement");
+
+    assert(financeManager!.permissions.includes(TENANT_PERMISSIONS.FINANCE_READ), "Finance Manager can read finance command center");
+    assert(financeManager!.permissions.includes(TENANT_PERMISSIONS.PAYMENT_VERIFY), "Finance Manager can verify provider payments");
+    assert(financeManager!.permissions.includes(TENANT_PERMISSIONS.PAYMENT_ALLOCATE), "Finance Manager can allocate exception/unallocated payments");
+    assert(financeManager!.permissions.includes(TENANT_PERMISSIONS.PAYMENT_RECONCILIATION_RESOLVE), "Finance Manager can resolve reconciliation issues");
+    assert(financeManager!.permissions.includes(TENANT_PERMISSIONS.REFUND_APPROVE), "Finance Manager can approve refunds");
+    assert(financeManager!.permissions.includes(TENANT_PERMISSIONS.DEPOSIT_APPLY), "Finance Manager can apply held deposits");
+
+    assert(accountant!.permissions.includes(TENANT_PERMISSIONS.PAYMENT_ALLOCATE), "Accountant can allocate verified payments");
+    assert(accountant!.permissions.includes(TENANT_PERMISSIONS.PAYMENT_RECONCILIATION_RUN), "Accountant can run reconciliation");
+    assert(!accountant!.permissions.includes(TENANT_PERMISSIONS.PAYMENT_VERIFY), "Accountant cannot force provider verification by default");
+    assert(!accountant!.permissions.includes(TENANT_PERMISSIONS.PAYMENT_RECONCILIATION_RESOLVE), "Accountant cannot resolve reconciliation exceptions by default");
+    assert(!accountant!.permissions.includes(TENANT_PERMISSIONS.REFUND_APPROVE), "Accountant cannot approve refunds by default");
+
+    assert(agent!.permissions.includes(TENANT_PERMISSIONS.PAYMENT_INITIATE), "Booking Agent can initiate customer collection");
+    assert(agent!.permissions.includes(TENANT_PERMISSIONS.DEPOSIT_RECORD), "Booking Agent can record required deposit position");
+    assert(!agent!.permissions.includes(TENANT_PERMISSIONS.PAYMENT_VERIFY), "Booking Agent cannot perform provider verification");
+    assert(!agent!.permissions.includes(TENANT_PERMISSIONS.PAYMENT_ALLOCATE), "Booking Agent cannot resolve payment allocation exceptions");
+    assert(!agent!.permissions.includes(TENANT_PERMISSIONS.REFUND_APPROVE), "Booking Agent cannot approve refunds");
+
+    assert(manager!.permissions.includes(TENANT_PERMISSIONS.FINANCE_READ), "General Manager can view finance operating position");
+    assert(!manager!.permissions.includes(TENANT_PERMISSIONS.PAYMENT_RECONCILIATION_RESOLVE), "General Manager cannot resolve Finance reconciliation exceptions by default");
+    assert(!manager!.permissions.includes(TENANT_PERMISSIONS.REFUND_APPROVE), "General Manager cannot approve refunds by default");
   });
 
   // ==========================================================================

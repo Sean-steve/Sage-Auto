@@ -196,6 +196,7 @@ export interface Refund {
   status: RefundStatus;
   reason: string;
   requestedAt: string;
+  requestedBy?: string;
   approvedAt?: string;
   approvedBy?: string;
   providerRefundReference?: string;

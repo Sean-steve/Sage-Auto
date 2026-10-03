@@ -39,6 +39,9 @@ export class FinanceModule {
       auditRepo?: AuditRepository;
       outboxRepo?: OutboxRepository;
       ledgerService?: { postFromSourceContract(tenantId: string, contract: any, actor: any): Promise<any> };
+      paymentService?: {
+        recordGovernedManualPayment(tenantId: string, dto: any, actor: any): Promise<any>;
+      };
     }
   ) {
     const invoiceRepo = overrides?.invoiceRepo || new OperationalInvoiceRepository();
@@ -69,6 +72,6 @@ export class FinanceModule {
       ledgerService
     );
 
-    this.router = createFinanceController(this.financeService, permissionGuard);
+    this.router = createFinanceController(this.financeService, permissionGuard, overrides?.paymentService);
   }
 }

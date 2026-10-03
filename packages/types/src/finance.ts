@@ -213,6 +213,7 @@ export interface OperationalExpense {
 // ----------------------------------------------------------------------------
 
 export type DepositPositionStatus =
+  | "REQUIRED"
   | "HELD"
   | "APPLIED"
   | "PARTIALLY_REFUNDED"
@@ -223,7 +224,7 @@ export type DepositPositionStatus =
 export interface DepositPosition {
   id: string;
   tenantId: string;
-  rentalId: string;
+  rentalId?: string;
   bookingId?: string;
   customerId: string;
   currency: string;
@@ -496,12 +497,16 @@ export interface IngestMaintenanceExpenseDto {
 }
 
 export interface CreateDepositPositionDto {
-  rentalId: string;
+  rentalId?: string;
   bookingId?: string;
   customerId: string;
   currency?: string;
   requiredAmount: string | number;
-  receivedAmount: string | number;
+  /**
+   * Deprecated as an input authority. Deposit receipt must be represented by a
+   * verified Payment allocated to this position, not by creating the liability.
+   */
+  receivedAmount?: string | number;
   notes?: string;
 }
 

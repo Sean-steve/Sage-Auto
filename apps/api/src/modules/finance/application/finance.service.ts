@@ -120,6 +120,41 @@ export class FinanceService {
   }
 
   // --------------------------------------------------------------------------
+  // 0. AUTHORITATIVE FINANCE READ MODELS
+  // --------------------------------------------------------------------------
+
+  async listInvoices(tenantId: string, filter: Record<string, any> = {}): Promise<OperationalInvoice[]> {
+    return this.invoiceRepo.listByTenant(tenantId, filter as any);
+  }
+
+  async getInvoice(tenantId: string, invoiceId: string): Promise<OperationalInvoice> {
+    const invoice = await this.invoiceRepo.findById(invoiceId, tenantId);
+    if (!invoice) throw new OperationalInvoiceNotFoundError(invoiceId);
+    return invoice;
+  }
+
+  async getInvoiceStatusHistory(tenantId: string, invoiceId: string): Promise<any[]> {
+    await this.getInvoice(tenantId, invoiceId);
+    return this.invoiceRepo.getStatusHistory(invoiceId, tenantId);
+  }
+
+  async listCreditNotes(tenantId: string, filter: Record<string, any> = {}): Promise<CreditNote[]> {
+    return this.creditNoteRepo.listByTenant(tenantId, filter as any);
+  }
+
+  async listExpenses(tenantId: string, filter: Record<string, any> = {}): Promise<OperationalExpense[]> {
+    return this.expenseRepo.listByTenant(tenantId, filter as any);
+  }
+
+  async listDepositPositions(tenantId: string, filter: Record<string, any> = {}): Promise<DepositPosition[]> {
+    return this.depositPositionRepo.listByTenant(tenantId, filter as any);
+  }
+
+  async listRefundObligations(tenantId: string, filter: Record<string, any> = {}): Promise<RefundObligation[]> {
+    return this.refundObligationRepo.listByTenant(tenantId, filter as any);
+  }
+
+  // --------------------------------------------------------------------------
   // 1. INVOICE OPERATIONS
   // --------------------------------------------------------------------------
 
@@ -244,6 +279,17 @@ export class FinanceService {
     if (!rental) {
       throw new RentalNotFoundError(dto.rentalId);
     }
+    const invoiceEligibleStates = new Set([
+      "FINAL_SETTLEMENT_PENDING",
+      "DEPOSIT_PROCESSING",
+      "COMPLETED",
+      "RETURN_COMPLETED",
+    ]);
+    if (!invoiceEligibleStates.has(rental.state)) {
+      throw new Error(
+        `Rental ${rental.rentalNumber} must have an authoritative final calculation before invoicing (current state: ${rental.state}).`
+      );
+    }
 
     // 3. Fetch customer & corporate account if any
     const customer = await this.customerRepo.findById(rental.customerId, tenantId);
@@ -265,6 +311,9 @@ export class FinanceService {
     // 4. Fetch final calculation and start snapshot
     const finalCalc = await this.rentalRepo.getFinalCalculation(dto.rentalId, tenantId);
     const startSnapshot = await this.rentalRepo.getStartSnapshot(dto.rentalId, tenantId);
+    if (rental.state === "FINAL_SETTLEMENT_PENDING" && !finalCalc) {
+      throw new Error("Final settlement pending Rental is missing its authoritative final calculation.");
+    }
 
     const currency = (startSnapshot?.pricingSnapshot?.currency || "KES").toUpperCase();
     const now = new Date().toISOString();
@@ -342,26 +391,9 @@ export class FinanceService {
     const taxTotalNum = lines.reduce((s, l) => s + num(l.taxAmount), 0);
     const grossTotalNum = subtotalNum + taxTotalNum;
 
-    // 5. Check deposit position on rental and handle reconciliation
-    let depositPosition = await this.depositPositionRepo.findByRentalId(rental.id, tenantId);
-    if (!depositPosition && startSnapshot?.depositRequirement && startSnapshot.depositRequirement > 0) {
-      depositPosition = await this.depositPositionRepo.create({
-        tenantId,
-        rentalId: rental.id,
-        bookingId: rental.bookingId,
-        customerId: rental.customerId,
-        currency,
-        requiredAmount: to4Dec(startSnapshot.depositRequirement),
-        receivedAmount: to4Dec(startSnapshot.depositRequirement),
-        heldAmount: to4Dec(startSnapshot.depositRequirement),
-        appliedAmount: "0.0000",
-        refundDueAmount: "0.0000",
-        refundedAmount: "0.0000",
-        forfeitedAmount: "0.0000",
-        status: "HELD",
-        notes: `Pre-authorized deposit for rental ${rental.rentalNumber}`,
-      });
-    }
+    // 5. Reconcile only an authoritative deposit position.
+    // A deposit requirement from the Rental start snapshot is NOT evidence that money was received.
+    const depositPosition = await this.depositPositionRepo.findByRentalId(rental.id, tenantId);
 
     let appliedDepositNum = 0;
     const shouldApplyDeposit = dto.applyDepositDeduction !== false;
@@ -1254,7 +1286,14 @@ export class FinanceService {
     }
 
     const reqAmt = num(dto.requiredAmount);
-    const recAmt = num(dto.receivedAmount);
+    if (reqAmt < 0) {
+      throw new Error("Deposit requirement cannot be negative");
+    }
+    if (num(dto.receivedAmount) > 0) {
+      throw new Error(
+        "Deposit receipt cannot be created from a Finance liability command. Record/verify a Payment and allocate it to the deposit position."
+      );
+    }
     const currency = (dto.currency || "KES").toUpperCase();
 
     const deposit = await this.depositPositionRepo.create({
@@ -1264,17 +1303,15 @@ export class FinanceService {
       customerId: dto.customerId,
       currency,
       requiredAmount: to4Dec(reqAmt),
-      receivedAmount: to4Dec(recAmt),
-      heldAmount: to4Dec(recAmt),
+      receivedAmount: "0.0000",
+      heldAmount: "0.0000",
       appliedAmount: "0.0000",
       refundDueAmount: "0.0000",
       refundedAmount: "0.0000",
       forfeitedAmount: "0.0000",
-      status: "HELD",
+      status: "REQUIRED",
       notes: dto.notes,
     });
-
-    const postingContract = FinancialPostingContractFactory.createDepositReceivedPostingContract(deposit);
 
     await this.auditRepo?.create({
       tenantId,
@@ -1283,20 +1320,19 @@ export class FinanceService {
       action: "DEPOSIT_POSITION_CREATED",
       resourceType: "DEPOSIT_POSITION",
       resourceId: deposit.id,
-      description: `Deposit position created for rental ${dto.rentalId} (${deposit.heldAmount} held)`,
-      payload: { depositId: deposit.id, heldAmount: deposit.heldAmount },
+      description: `Deposit requirement recorded for rental ${dto.rentalId} (${deposit.requiredAmount} required)`,
+      payload: { depositId: deposit.id, requiredAmount: deposit.requiredAmount },
     });
 
     await this.outboxRepo?.publish({
       tenantId,
-      eventType: "finance.deposit.received",
+      eventType: "finance.deposit.position_created",
       aggregateType: "DEPOSIT_POSITION",
       aggregateId: deposit.id,
       payload: {
         depositId: deposit.id,
         rentalId: deposit.rentalId,
-        heldAmount: deposit.heldAmount,
-        postingContract,
+        requiredAmount: deposit.requiredAmount,
       },
     });
 

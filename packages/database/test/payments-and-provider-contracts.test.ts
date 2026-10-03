@@ -354,81 +354,82 @@ async function runPaymentSuite() {
   console.log("  ✓ Full allocation completed; payment ALLOCATED and invoice PAID");
 
   // --------------------------------------------------------------------------
-  // TEST 7: Refund Lifecycle, Cap & Execution
+  // TEST 7: Refund Lifecycle, Cap, Four-Eyes & Provider Boundary
   // --------------------------------------------------------------------------
   console.log("\nTEST 7: Refund Request & Execution (Cap Enforced)");
 
-  // Manual/offline payments have no external gateway to reverse automatically.
   const manualRefundReq = await paymentService.requestRefund(
     tenantId,
-    {
-      paymentId: manualPayment.id,
-      amount: "5000.0000",
-      reason: "Manual bank payment refund requires offline confirmation",
-    },
+    { paymentId: manualPayment.id, amount: "5000.0000", reason: "Manual bank payment refund requires offline confirmation" },
     actor
   );
+  const refundApprover = { userId: "usr-finance-approver", actorType: "USER" as const, name: "Finance Approver" };
   await assert.rejects(
-    () => paymentService.approveAndExecuteRefund(tenantId, manualRefundReq.id, actor),
+    () => paymentService.approveAndExecuteRefund(tenantId, manualRefundReq.id, refundApprover),
     (err: any) => err?.code === "MANUAL_REFUND_REQUIRES_OFFLINE_CONFIRMATION"
   );
+  console.log("  ✓ Manual/offline refund cannot be auto-disbursed through a provider adapter");
 
-  // Exercise successful provider refund against the verified FAKE_PROVIDER payment.
   const refundReq = await paymentService.requestRefund(
     tenantId,
-    {
-      paymentId: verifiedPayment.id,
-      amount: "5000.0000",
-      reason: "Customer cancelled extra days in advance",
-    },
+    { paymentId: verifiedPayment.id, amount: "5000.0000", reason: "Customer cancelled extra days in advance" },
     actor
   );
-
   assert.strictEqual(refundReq.status, "PENDING");
   assert.strictEqual(refundReq.amount, "5000.0000");
+  assert.strictEqual(refundReq.requestedBy, actor.userId);
 
-  // Over-refund attempt: trying to request 25000 on the 15000 provider payment
-  try {
-    await paymentService.requestRefund(
+  await assert.rejects(
+    () => paymentService.requestRefund(
       tenantId,
-      {
-        paymentId: verifiedPayment.id,
-        amount: "25000.0000",
-        reason: "Excess refund test",
-      },
+      { paymentId: verifiedPayment.id, amount: "25000.0000", reason: "Excess refund test" },
       actor
-    );
-    assert.fail("Should have thrown RefundExceedsPaymentError");
-  } catch (err: any) {
-    assert.strictEqual(err.name, "RefundExceedsPaymentError");
-  }
+    ),
+    (err: any) => err?.name === "RefundExceedsPaymentError"
+  );
   console.log("  ✓ Refund exceeding payment balance strictly rejected");
 
-  // Approve and execute refund
-  const executedRefund = await paymentService.approveAndExecuteRefund(
-    tenantId,
-    refundReq.id,
-    actor
+  await assert.rejects(
+    () => paymentService.approveAndExecuteRefund(tenantId, refundReq.id, actor),
+    (err: any) => err?.code === "SEPARATION_OF_DUTIES"
   );
+  console.log("  ✓ Refund requester cannot self-approve");
 
+  const executedRefund = await paymentService.approveAndExecuteRefund(tenantId, refundReq.id, refundApprover);
   assert.strictEqual(executedRefund.status, "COMPLETED");
   assert.ok(executedRefund.providerRefundReference, "Provider refund ref assigned");
-
   const updatedProviderPmt = await paymentRepo.findById(verifiedPayment.id, tenantId);
   assert.strictEqual(updatedProviderPmt?.refundedAmount, "5000.0000");
   assert.strictEqual(updatedProviderPmt?.status, "PARTIALLY_REFUNDED");
-  console.log("  ✓ Refund approved and executed; payment updated to PARTIALLY_REFUNDED");
+  console.log("  ✓ Provider refund approved by a second user and payment updated");
 
-  // --------------------------------------------------------------------------
   // TEST 8: Vehicle Owner Settlement Payout Execution (Sprint 21 Integration)
   // --------------------------------------------------------------------------
   console.log("\nTEST 8: Owner Settlement Payout Execution");
 
-  // Create an approved settlement payable in settlementRepo
+  // Create the approved settlement backing the payable. Payments must not
+  // disburse an orphan payable or bypass settlement approval.
+  const approvedSettlement = await settlementRepo.create({
+    tenantId,
+    settlementNumber: "SET-2026-PAYOUT-001",
+    ownerId: "owner_james_kariuki",
+    ownerName: "James Kariuki",
+    periodStart: "2026-08-01",
+    periodEnd: "2026-08-31",
+    currency: "KES",
+    status: "APPROVED",
+    calculatedAt: "2026-09-01T08:00:00Z",
+    calculatedBy: "user_finance_calculator",
+    approvedAt: "2026-09-01T09:00:00Z",
+    approvedBy: "user_finance_approver",
+    totalDeductions: "2250.0000",
+    netPayoutAmount: "42750.0000",
+  });
+
   const payable = await settlementRepo.createPayable({
     tenantId,
     payableNumber: "PAY-2026-0001",
-    settlementId: "settlement_001",
+    settlementId: approvedSettlement.id,
     ownerId: "owner_james_kariuki",
     recipientName: "James Kariuki",
     destinationMpesaNumber: "+254722334455",
@@ -441,6 +442,21 @@ async function runPaymentSuite() {
     createdBy: actor.userId,
     retryCount: 0,
   });
+
+  await assert.rejects(
+    () =>
+      paymentService.executeOwnerPayout(
+        tenantId,
+        {
+          settlementPayableId: payable.id,
+          provider: "FAKE_PROVIDER",
+          notes: "Self-approval payout must be rejected",
+        },
+        { userId: "user_finance_approver", tenantId, role: "FINANCE_ADMIN" }
+      ),
+    (err: any) => err?.code === "SEPARATION_OF_DUTIES"
+  );
+  console.log("  ✓ Settlement approver cannot execute the same payout");
 
   const payoutResult = await paymentService.executeOwnerPayout(
     tenantId,
@@ -457,6 +473,10 @@ async function runPaymentSuite() {
   assert.strictEqual(payoutResult.payment.amount, "42750.0000");
   assert.strictEqual(payoutResult.payment.status, "ALLOCATED");
   assert.strictEqual(payoutResult.payable.status, "PAID");
+  const paidSettlement = await settlementRepo.findById(approvedSettlement.id, tenantId);
+  assert.strictEqual(paidSettlement?.status, "PAID");
+  assert.ok(paidSettlement?.payoutReference, "Provider payout reference must seal the settlement");
+  console.log("  ✓ Provider payout sealed both payable and settlement PAID");
 
   // Payout on already paid payable must fail
   try {

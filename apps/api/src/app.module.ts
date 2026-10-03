@@ -204,19 +204,21 @@ export function createApiApp(): Express {
   // General Ledger & Double-Entry Accounting Module (Sprint 20: DOM-003 §35-40)
   const ledgerModule = new LedgerModule(permissionGuard);
 
+  // Payment Bounded Context & Provider Integrations (Sprint 22: DEV-009, DATA-002)
+  const paymentsModule = new PaymentsModule(permissionGuard);
+
   // Operational Finance, Invoicing, Receivables & Expenses Module (Sprint 19: DOM-003 §28-34)
   const financeModule = new FinanceModule(permissionGuard, {
     ledgerService: ledgerModule.ledgerService,
+    paymentService: paymentsModule.paymentService,
   });
 
   // Vehicle Owner Settlements, Revenue Sharing & Payout Obligations (Sprint 21: DOM-003 §41-45)
   const ownerSettlementsModule = new OwnerSettlementsModule(
     permissionGuard,
-    ledgerModule.ledgerService
+    ledgerModule.ledgerService,
+    financeModule.financeService
   );
-
-  // Payment Bounded Context & Provider Integrations (Sprint 22: DEV-009, DATA-002)
-  const paymentsModule = new PaymentsModule(permissionGuard);
 
   // Secure Files, Document Storage & Object Access Module (Sprint 27: ARCH-001, SEC-001, SEC-002)
   const filesModule = new FilesModule({
