@@ -224,7 +224,7 @@ export type DepositPositionStatus =
 export interface DepositPosition {
   id: string;
   tenantId: string;
-  rentalId: string;
+  rentalId?: string;
   bookingId?: string;
   customerId: string;
   currency: string;
@@ -497,7 +497,7 @@ export interface IngestMaintenanceExpenseDto {
 }
 
 export interface CreateDepositPositionDto {
-  rentalId: string;
+  rentalId?: string;
   bookingId?: string;
   customerId: string;
   currency?: string;
