@@ -358,11 +358,26 @@ async function runPaymentSuite() {
   // --------------------------------------------------------------------------
   console.log("\nTEST 7: Refund Request & Execution (Cap Enforced)");
 
-  // Request refund on manualPayment (20000 total)
-  const refundReq = await paymentService.requestRefund(
+  // Manual/offline payments have no external gateway to reverse automatically.
+  const manualRefundReq = await paymentService.requestRefund(
     tenantId,
     {
       paymentId: manualPayment.id,
+      amount: "5000.0000",
+      reason: "Manual bank payment refund requires offline confirmation",
+    },
+    actor
+  );
+  await assert.rejects(
+    () => paymentService.approveAndExecuteRefund(tenantId, manualRefundReq.id, actor),
+    (err: any) => err?.code === "MANUAL_REFUND_REQUIRES_OFFLINE_CONFIRMATION"
+  );
+
+  // Exercise successful provider refund against the verified FAKE_PROVIDER payment.
+  const refundReq = await paymentService.requestRefund(
+    tenantId,
+    {
+      paymentId: verifiedPayment.id,
       amount: "5000.0000",
       reason: "Customer cancelled extra days in advance",
     },
@@ -372,12 +387,12 @@ async function runPaymentSuite() {
   assert.strictEqual(refundReq.status, "PENDING");
   assert.strictEqual(refundReq.amount, "5000.0000");
 
-  // Over-refund attempt: trying to request 25000 on 20000
+  // Over-refund attempt: trying to request 25000 on the 15000 provider payment
   try {
     await paymentService.requestRefund(
       tenantId,
       {
-        paymentId: manualPayment.id,
+        paymentId: verifiedPayment.id,
         amount: "25000.0000",
         reason: "Excess refund test",
       },
@@ -399,9 +414,9 @@ async function runPaymentSuite() {
   assert.strictEqual(executedRefund.status, "COMPLETED");
   assert.ok(executedRefund.providerRefundReference, "Provider refund ref assigned");
 
-  const updatedManualPmt = await paymentRepo.findById(manualPayment.id, tenantId);
-  assert.strictEqual(updatedManualPmt?.refundedAmount, "5000.0000");
-  assert.strictEqual(updatedManualPmt?.status, "PARTIALLY_REFUNDED");
+  const updatedProviderPmt = await paymentRepo.findById(verifiedPayment.id, tenantId);
+  assert.strictEqual(updatedProviderPmt?.refundedAmount, "5000.0000");
+  assert.strictEqual(updatedProviderPmt?.status, "PARTIALLY_REFUNDED");
   console.log("  ✓ Refund approved and executed; payment updated to PARTIALLY_REFUNDED");
 
   // --------------------------------------------------------------------------
