@@ -265,6 +265,20 @@ async function runTests() {
   // TEST 5: Return Scheduling & Vehicle Receipt Validation
   // --------------------------------------------------------------------------
   console.log("\n[TEST 5] Testing Return Scheduling & Vehicle Receipt...");
+
+  await assert.rejects(
+    async () => {
+      await service.receiveReturnedVehicle(
+        tenantId,
+        rental.id,
+        { returnOdometer: 46000, returnFuelLevel: 80 },
+        actor
+      );
+    },
+    (err: any) => err instanceof RentalInvalidStateTransitionError
+  );
+  console.log("✓ Direct vehicle receipt before return scheduling rejected.");
+
   const scheduledRental = await service.scheduleReturn(
     tenantId,
     rental.id,
@@ -340,6 +354,31 @@ async function runTests() {
   // TEST 6: Link Damage Cases to Rental
   // --------------------------------------------------------------------------
   console.log("\n[TEST 6] Linking Observed Damage Cases...");
+
+  const draftInspection = await inspectionRepo.create(tenantId, {
+    inspectionType: "RETURN",
+    vehicleId: vehicle.id,
+    rentalId: rental.id,
+    bookingId: booking.id,
+    odometer: 46600,
+    fuelLevel: 60,
+    performedByMembershipId: "mbr-draft-return",
+    actorUserId: actor.userId,
+    actorType: actor.actorType,
+  } as any);
+  await assert.rejects(
+    async () => {
+      await service.linkReturnInspection(
+        tenantId,
+        rental.id,
+        { inspectionId: draftInspection.id },
+        actor
+      );
+    },
+    /must be completed and sealed/i
+  );
+  console.log("✓ Unsealed return inspection cannot advance the rental.");
+
   const returnInspection = await inspectionRepo.create(tenantId, {
     inspectionType: "RETURN",
     vehicleId: vehicle.id,
@@ -449,6 +488,19 @@ async function runTests() {
   assert.equal(calculatedRental.state, "FINAL_CALCULATION");
   console.log("✓ Final Calculation Engine produced mathematically exact results.");
 
+  await assert.rejects(
+    async () => {
+      await service.completeRental(
+        tenantId,
+        rental.id,
+        { releaseVehicleToStatus: "AVAILABLE" },
+        actor
+      );
+    },
+    /sealed final calculation and completed deposit settlement/i
+  );
+  console.log("✓ Rental cannot complete before final settlement is sealed.");
+
   // --------------------------------------------------------------------------
   // TEST 8: Process Deposit Settlement
   // --------------------------------------------------------------------------
@@ -468,7 +520,17 @@ async function runTests() {
 
   assert.equal(settledCalc.depositSettlementStatus, "CHARGED");
   assert.equal(settledCalc.isImmutable, true);
-  console.log("✓ Deposit settlement sealed as immutable and recorded.");
+
+  const sealedReplay = await service.calculateFinalRental(
+    tenantId,
+    rental.id,
+    { fuelPricePerLiter: 999, damageChargesOverride: 0 },
+    actor
+  );
+  assert.equal(sealedReplay.calculation.id, settledCalc.id);
+  assert.equal(sealedReplay.calculation.fuelPricePerUnit, settledCalc.fuelPricePerUnit);
+  assert.equal(sealedReplay.calculation.totalDamageCharge, settledCalc.totalDamageCharge);
+  console.log("✓ Deposit settlement sealed as immutable; recalculation cannot rewrite it.");
 
   // --------------------------------------------------------------------------
   // TEST 9: Complete Rental, Booking, Contract & Release Fleet
@@ -501,7 +563,13 @@ async function runTests() {
   const finalAllocation = await allocationRepo.findById(allocation.id, tenantId);
   assert.equal(finalAllocation?.status, "RELEASED");
 
-  console.log("✓ Rental, Booking, Contract completed and Vehicle allocation released.");
+  const finalReturnRecord = await rentalRepo.getReturnRecord(rental.id, tenantId);
+  assert.equal(finalReturnRecord?.status, "COMPLETED");
+  assert.equal(finalReturnRecord?.scheduledReturnAt, "2026-09-07T10:00:00Z");
+  assert.equal(finalReturnRecord?.actualReturnAt, "2026-09-07T12:00:00Z");
+  assert.equal(finalReturnRecord?.returnInspectionId, returnInspection.id);
+
+  console.log("✓ Rental, Booking, Contract completed; ReturnRecord history preserved and Vehicle allocation released.");
 
   // --------------------------------------------------------------------------
   // TEST 10: Terminal State Invariants
@@ -538,7 +606,7 @@ async function runTests() {
   console.log("✓ Post-completion incident mutation rejected.");
 
   console.log("\n================================================================");
-  console.log("ALL SPRINT 16 TESTS PASSED SUCCESSFULLY! (10/10 TEST SUITES GREEN)");
+  console.log("ALL RENTAL + RETURN LIFECYCLE TESTS PASSED SUCCESSFULLY!");
   console.log("================================================================\n");
 }
 
