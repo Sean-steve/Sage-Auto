@@ -8,7 +8,6 @@ import { PricingExperienceView } from './PricingExperienceView';
 import { AvailabilityExperienceView } from './AvailabilityExperienceView';
 import { BookingExperienceView } from './BookingExperienceView';
 import { ContractHandoverExperienceView } from './ContractHandoverExperienceView';
-import { ContractHandoverExperienceView } from './ContractHandoverExperienceView';
 
 const screens: Record<string, React.LazyExoticComponent<React.ComponentType>> = {
   overview:lazy(()=>import('./DashboardView').then(m=>({default:m.DashboardView}))),
