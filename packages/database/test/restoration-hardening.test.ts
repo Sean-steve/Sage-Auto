@@ -9,7 +9,7 @@ for (const [role, sections] of Object.entries(ROLE_SECTIONS)) {
 }
 
 for (const [screen, connection] of Object.entries(RESTORATION_SCREEN_CONNECTIONS)) {
-  if (screen === 'fleet' || screen === 'customers') {
+  if (screen === 'fleet' || screen === 'customers' || screen === 'pricing') {
     assert.equal(connection.status, 'PARTIAL', `${screen} must be explicitly marked as a reconstructed experience`);
     assert.equal(connection.mutationsEnabled, true, `${screen} core mutations may be enabled only after server-backed reconstruction`);
   } else {
