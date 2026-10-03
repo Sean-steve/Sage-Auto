@@ -113,6 +113,25 @@ async function runSprint33TestSuite() {
   const customerService = new CustomersService(customerRepo, docRepo, auditRepo, outboxRepo);
   const corporateService = new CorporateAccountsService(corporateRepo, auditRepo, outboxRepo);
   const pricingService = new PricingService(rateRepo as any);
+  const crmDefaultRatePlan = await pricingService.createRatePlan(tenantId, {
+    code: "CRM_DEFAULT_USD",
+    name: "CRM Default USD",
+    currency: "USD",
+    priority: 10,
+    isDefault: true,
+    effectiveFrom: "2026-01-01T00:00:00.000Z",
+    taxInclusive: false,
+  });
+  await pricingService.setRates(tenantId, crmDefaultRatePlan.id, [{
+    dailyRate: 150,
+    weeklyDailyRate: 150,
+    monthlyDailyRate: 150,
+    weekendDailyRate: 150,
+    mileageAllowanceModel: "UNLIMITED",
+    depositAmount: 300,
+    depositModel: "FIXED",
+  }]);
+  await pricingService.activateRatePlan(tenantId, crmDefaultRatePlan.id);
   const availabilityService = new AvailabilityService();
   const bookingService = new BookingService(
     bookingRepo,
