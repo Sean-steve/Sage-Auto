@@ -8,6 +8,7 @@ import { PricingExperienceView } from './PricingExperienceView';
 import { AvailabilityExperienceView } from './AvailabilityExperienceView';
 import { BookingExperienceView } from './BookingExperienceView';
 import { ContractHandoverExperienceView } from './ContractHandoverExperienceView';
+import { ContractHandoverExperienceView } from './ContractHandoverExperienceView';
 
 const screens: Record<string, React.LazyExoticComponent<React.ComponentType>> = {
   overview:lazy(()=>import('./DashboardView').then(m=>({default:m.DashboardView}))),
@@ -34,6 +35,7 @@ function Screen({section,portal}:{section:string;portal:AccessPortal}) {
   if(section==='pricing') return <PricingExperienceView portal={portal}/>;
   if(section==='availability') return <AvailabilityExperienceView portal={portal}/>;
   if(section==='bookings') return <BookingExperienceView portal={portal}/>;
+  if(section==='handover') return <ContractHandoverExperienceView portal={portal}/>;
   if(section==='handover') return <ContractHandoverExperienceView portal={portal}/>;
   if(workspaceLoading)return <p role="status" className="p-8">Loading saved workspace records…</p>;
   return <>{workspaceError&&<p role="alert" className="m-6 rounded border border-red-200 bg-red-50 p-4 text-red-900">{workspaceError}</p>}
