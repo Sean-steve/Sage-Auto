@@ -112,19 +112,42 @@ export class HandoverService {
     if (!booking) {
       throw new BookingNotFoundError(dto.bookingId);
     }
-
-    const vehicleId = booking.assignedVehicleId || booking.requestedVehicleId || booking.vehicleId;
-    if (!vehicleId) {
-      throw new Error(`Booking ${booking.bookingNumber} has no assigned vehicle for handover.`);
+    if (booking.status !== "CONFIRMED") {
+      throw new Error(`Handover scheduling requires a CONFIRMED booking. Booking ${booking.bookingNumber} is currently ${booking.status}.`);
     }
 
-    // Find latest contract for this booking, or verify existence
+    const vehicleId = booking.assignedVehicleId;
+    if (!vehicleId) {
+      throw new Error(`Booking ${booking.bookingNumber} has no confirmed assigned Vehicle for handover.`);
+    }
+
+    const existingHandovers = await this.handoverRepo.findByBookingId(booking.id, tenantId);
+    const currentHandover = existingHandovers
+      .filter((item) => item.status !== "HANDOVER_COMPLETED")
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+    if (currentHandover) {
+      throw new Error(`Booking ${booking.bookingNumber} already has active Handover ${currentHandover.handoverNumber}.`);
+    }
+
+    // Handover must be anchored to the current non-terminal Contract.
     const contracts = await this.contractRepo.findByBookingId(booking.id, tenantId);
-    let contractId = contracts.length > 0 ? contracts[0].id : "";
+    const contract = contracts
+      .filter((item) => !["ACTIVE", "COMPLETED", "ARCHIVED"].includes(item.status))
+      .sort((a, b) => b.contractVersion - a.contractVersion || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+    if (!contract) {
+      throw new ContractNotFoundError(`booking:${booking.id}`);
+    }
+    if (contract.vehicleId !== vehicleId) {
+      throw new Error(`Contract ${contract.contractNumber} Vehicle does not match Booking assigned Vehicle.`);
+    }
+    const contractId = contract.id;
 
     const vehicle = await this.vehicleRepo.findById(vehicleId, tenantId);
-    const initialOdometer = vehicle?.odometer || 0;
-    const initialFuel = vehicle?.fuelLevel || 100;
+    if (!vehicle) {
+      throw new RecordNotFoundError("Vehicle", vehicleId);
+    }
+    const initialOdometer = vehicle.odometer ?? 0;
+    const initialFuel = vehicle.fuelLevel ?? 100;
 
     const handoverNumber = await this.handoverRepo.generateNextHandoverNumber(tenantId);
     const scheduledAt = dto.scheduledAt || booking.pickupAt || new Date().toISOString();
@@ -311,16 +334,39 @@ export class HandoverService {
       throw new Error("Vehicle inspection failed. Vehicle is not roadworthy for handover.");
     }
 
-    const inspectionCompletedAt = new Date().toISOString();
+    const inspection = await this.inspectionRepo.findById(dto.inspectionId, tenantId);
+    if (!inspection) {
+      throw new RecordNotFoundError("Inspection", dto.inspectionId);
+    }
+    if (inspection.status !== "COMPLETED") {
+      throw new Error(`Pre-rental Inspection ${inspection.inspectionNumber} must be COMPLETED before Handover can advance.`);
+    }
+    if (inspection.inspectionType !== "PRE_RENTAL") {
+      throw new Error(`Inspection ${inspection.inspectionNumber} is ${inspection.inspectionType}; Handover requires PRE_RENTAL.`);
+    }
+    if (inspection.vehicleId !== handover.vehicleId) {
+      throw new Error(`Inspection ${inspection.inspectionNumber} belongs to a different Vehicle.`);
+    }
+    if (inspection.bookingId && inspection.bookingId !== handover.bookingId) {
+      throw new Error(`Inspection ${inspection.inspectionNumber} belongs to a different Booking.`);
+    }
+    if (inspection.handoverId && inspection.handoverId !== handover.id) {
+      throw new Error(`Inspection ${inspection.inspectionNumber} belongs to a different Handover.`);
+    }
+    if (inspection.odometer < 0 || inspection.fuelLevel < 0 || inspection.fuelLevel > 100) {
+      throw new Error(`Inspection ${inspection.inspectionNumber} contains invalid odometer/fuel readings.`);
+    }
+
+    const inspectionCompletedAt = inspection.completedAt || new Date().toISOString();
     const updated = await this.handoverRepo.update(
       handoverId,
       tenantId,
       {
         status: "PRE_RENTAL_INSPECTION",
-        inspectionId: dto.inspectionId,
+        inspectionId: inspection.id,
         inspectionCompletedAt,
-        checkoutOdometer: dto.odometer,
-        checkoutFuelLevel: dto.fuelLevel,
+        checkoutOdometer: inspection.odometer,
+        checkoutFuelLevel: inspection.fuelLevel,
         notes: dto.notes ? `${handover.notes ? handover.notes + " | " : ""}${dto.notes}` : handover.notes,
       },
       dto.expectedVersion
@@ -334,7 +380,7 @@ export class HandoverService {
       actorType: actor?.actorType || "USER",
       actorId: actor?.userId,
       actorName: actor?.name || "Inspector",
-      reason: `Pre-rental inspection completed (Odometer: ${dto.odometer} km, Fuel: ${dto.fuelLevel}%)`,
+      reason: `Pre-rental inspection completed (Odometer: ${inspection.odometer} km, Fuel: ${inspection.fuelLevel}%)`,
       occurredAt: inspectionCompletedAt,
     });
 
@@ -358,6 +404,25 @@ export class HandoverService {
     HandoverStateMachine.validateTransition(handover.status, "SIGNATURE");
     if (!dto.contractSigned) {
       throw new Error("Contract signature is required before proceeding to key handover.");
+    }
+    if (!handover.contractId) {
+      throw new ContractNotFoundError(`handover:${handover.id}`);
+    }
+    const contract = await this.contractRepo.findById(handover.contractId, tenantId);
+    if (!contract) {
+      throw new ContractNotFoundError(handover.contractId);
+    }
+    if (contract.bookingId !== handover.bookingId || contract.vehicleId !== handover.vehicleId) {
+      throw new Error(`Contract ${contract.contractNumber} does not match this Handover Booking/Vehicle.`);
+    }
+    if (contract.status !== "SIGNED") {
+      throw new Error(`Contract ${contract.contractNumber} must be SIGNED before the signature Handover checkpoint (currently ${contract.status}).`);
+    }
+    const hasCurrentVersionSignature = (contract.signatures || []).some(
+      (signature) => signature.contractVersion === contract.contractVersion
+    );
+    if (!hasCurrentVersionSignature) {
+      throw new Error(`Contract ${contract.contractNumber} current version ${contract.contractVersion} has no recorded signature.`);
     }
 
     const signatureCompletedAt = new Date().toISOString();
@@ -402,6 +467,15 @@ export class HandoverService {
     }
 
     HandoverStateMachine.validateTransition(handover.status, "KEY_HANDOVER");
+    if (!Number.isFinite(dto.checkoutOdometer) || dto.checkoutOdometer < handover.checkoutOdometer) {
+      throw new Error(`Key-handover odometer cannot be lower than the verified inspection reading (${handover.checkoutOdometer} km).`);
+    }
+    if (!Number.isFinite(dto.checkoutFuelLevel) || dto.checkoutFuelLevel < 0 || dto.checkoutFuelLevel > 100) {
+      throw new Error("Key-handover fuel level must be between 0 and 100.");
+    }
+    if (!dto.handedOverTo?.trim()) {
+      throw new Error("Key handover requires the recipient name.");
+    }
 
     const keyHandedOverAt = new Date().toISOString();
     const updated = await this.handoverRepo.update(
