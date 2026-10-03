@@ -192,6 +192,37 @@ async function runTestSuite() {
     assert(agent !== null, "BOOKING_AGENT must exist");
     assert(agent!.permissions.includes(TENANT_PERMISSIONS.BOOKING_CREATE), "Agent can create booking");
     assert(!agent!.permissions.includes(TENANT_PERMISSIONS.VEHICLE_DELETE), "Agent CANNOT delete vehicle");
+
+    const manager = await roleRepo.findByCode("MANAGER");
+    const fleetManager = await roleRepo.findByCode("FLEET_MANAGER");
+    const bookingManager = await roleRepo.findByCode("BOOKING_MANAGER");
+    const financeManager = await roleRepo.findByCode("FINANCE_MANAGER");
+    const accountant = await roleRepo.findByCode("ACCOUNTANT");
+    const customerService = await roleRepo.findByCode("CUSTOMER_SERVICE");
+
+    assert(manager!.permissions.includes(TENANT_PERMISSIONS.RENTAL_RETURN_SCHEDULE), "Manager can schedule a rental return");
+    assert(manager!.permissions.includes(TENANT_PERMISSIONS.RENTAL_RETURN_RECEIVE), "Manager can receive a returned vehicle");
+    assert(manager!.permissions.includes(TENANT_PERMISSIONS.RENTAL_RETURN_INSPECTION_LINK), "Manager can advance sealed return inspection");
+    assert(manager!.permissions.includes(TENANT_PERMISSIONS.RENTAL_FINAL_CALCULATE), "Manager can generate final calculation");
+    assert(manager!.permissions.includes(TENANT_PERMISSIONS.RENTAL_FINAL_COMPLETE), "Manager can close settled rental");
+    assert(!manager!.permissions.includes(TENANT_PERMISSIONS.RENTAL_FINAL_SETTLE), "Manager cannot seal financial settlement by default");
+
+    assert(fleetManager!.permissions.includes(TENANT_PERMISSIONS.RENTAL_RETURN_RECEIVE), "Fleet Manager can receive vehicle");
+    assert(fleetManager!.permissions.includes(TENANT_PERMISSIONS.RENTAL_RETURN_INSPECTION_LINK), "Fleet Manager can own return inspection progression");
+    assert(!fleetManager!.permissions.includes(TENANT_PERMISSIONS.RENTAL_FINAL_SETTLE), "Fleet Manager cannot settle customer balances");
+
+    assert(bookingManager!.permissions.includes(TENANT_PERMISSIONS.RENTAL_RETURN_SCHEDULE), "Booking Manager can schedule return");
+    assert(bookingManager!.permissions.includes(TENANT_PERMISSIONS.RENTAL_RETURN_RECEIVE), "Booking Manager can receive return");
+    assert(agent!.permissions.includes(TENANT_PERMISSIONS.RENTAL_RETURN_RECEIVE), "Booking Agent can perform front-desk vehicle receipt");
+    assert(!agent!.permissions.includes(TENANT_PERMISSIONS.RENTAL_FINAL_CALCULATE), "Booking Agent cannot calculate final charges");
+
+    assert(financeManager!.permissions.includes(TENANT_PERMISSIONS.RENTAL_FINAL_CALCULATE), "Finance Manager can calculate final charges");
+    assert(financeManager!.permissions.includes(TENANT_PERMISSIONS.RENTAL_FINAL_SETTLE), "Finance Manager can seal final settlement");
+    assert(!financeManager!.permissions.includes(TENANT_PERMISSIONS.RENTAL_RETURN_RECEIVE), "Finance Manager does not receive vehicles");
+
+    assert(accountant!.permissions.includes(TENANT_PERMISSIONS.RENTAL_FINAL_CALCULATE), "Accountant can prepare final calculation");
+    assert(!accountant!.permissions.includes(TENANT_PERMISSIONS.RENTAL_FINAL_SETTLE), "Accountant cannot seal settlement by default");
+    assert(!customerService!.permissions.includes(TENANT_PERMISSIONS.RENTAL_FINAL_SETTLE), "Customer Service remains read/support only for settlement");
   });
 
   // ==========================================================================
