@@ -1027,9 +1027,9 @@ export interface VehicleDigitalTwin {
   statusHistory: VehicleStatusHistory[];
   stats: {
     totalRentals: number;
-    totalRevenue: number;
+    totalRevenue: number | null;
     totalDaysOnRent: number;
-    utilizationRatePercent: number;
+    utilizationRatePercent: number | null;
   };
 }
 
