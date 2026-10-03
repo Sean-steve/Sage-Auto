@@ -251,6 +251,20 @@ export function createPricingController(
     }
   );
 
+  router.delete(
+    "/seasonal-rules/:id",
+    permissionGuard(TENANT_PERMISSIONS.PRICING_RATE_PLAN_MANAGE),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const tenantId = getTenantId(req);
+        await pricingService.deleteSeasonalRule(tenantId, req.params.id, getActor(req));
+        res.json({ success: true });
+      } catch (err) {
+        next(err);
+      }
+    }
+  );
+
   router.post(
     "/rate-plans/:id/duration-tiers",
     permissionGuard(TENANT_PERMISSIONS.PRICING_RATE_PLAN_MANAGE),
@@ -273,6 +287,20 @@ export function createPricingController(
         const tenantId = getTenantId(req);
         const tiers = await pricingService.listDurationTiers(tenantId, req.params.id);
         res.json({ success: true, data: tiers });
+      } catch (err) {
+        next(err);
+      }
+    }
+  );
+
+  router.delete(
+    "/duration-tiers/:id",
+    permissionGuard(TENANT_PERMISSIONS.PRICING_RATE_PLAN_MANAGE),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const tenantId = getTenantId(req);
+        await pricingService.deleteDurationTier(tenantId, req.params.id, getActor(req));
+        res.json({ success: true });
       } catch (err) {
         next(err);
       }
@@ -311,6 +339,20 @@ export function createPricingController(
     }
   );
 
+  router.delete(
+    "/fees/:id",
+    permissionGuard(TENANT_PERMISSIONS.PRICING_RATE_PLAN_MANAGE),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const tenantId = getTenantId(req);
+        await pricingService.deleteFeeRule(tenantId, req.params.id, getActor(req));
+        res.json({ success: true });
+      } catch (err) {
+        next(err);
+      }
+    }
+  );
+
   // --------------------------------------------------------------------------
   // Promo Codes
   // --------------------------------------------------------------------------
@@ -337,6 +379,25 @@ export function createPricingController(
         const tenantId = getTenantId(req);
         const promo = await pricingService.createPromoCode(tenantId, req.body, getActor(req));
         res.status(201).json({ success: true, data: promo });
+      } catch (err) {
+        next(err);
+      }
+    }
+  );
+
+  router.patch(
+    "/promo-codes/:id/status",
+    permissionGuard(TENANT_PERMISSIONS.PRICING_PROMO_MANAGE),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const tenantId = getTenantId(req);
+        const promo = await pricingService.updatePromoStatus(
+          tenantId,
+          req.params.id,
+          req.body.status,
+          getActor(req)
+        );
+        res.json({ success: true, data: promo });
       } catch (err) {
         next(err);
       }
