@@ -7,6 +7,7 @@ import { CustomersDriversExperienceView } from './CustomersDriversExperienceView
 import { PricingExperienceView } from './PricingExperienceView';
 import { AvailabilityExperienceView } from './AvailabilityExperienceView';
 import { BookingExperienceView } from './BookingExperienceView';
+import { ContractHandoverExperienceView } from './ContractHandoverExperienceView';
 
 const screens: Record<string, React.LazyExoticComponent<React.ComponentType>> = {
   overview:lazy(()=>import('./DashboardView').then(m=>({default:m.DashboardView}))),
@@ -33,9 +34,10 @@ function Screen({section,portal}:{section:string;portal:AccessPortal}) {
   if(section==='pricing') return <PricingExperienceView portal={portal}/>;
   if(section==='availability') return <AvailabilityExperienceView portal={portal}/>;
   if(section==='bookings') return <BookingExperienceView portal={portal}/>;
+  if(section==='handover') return <ContractHandoverExperienceView portal={portal}/>;
   if(workspaceLoading)return <p role="status" className="p-8">Loading saved workspace records…</p>;
   return <>{workspaceError&&<p role="alert" className="m-6 rounded border border-red-200 bg-red-50 p-4 text-red-900">{workspaceError}</p>}
-    {!['fleet','customers','pricing','availability','bookings'].includes(section)&&<div id="restoration-actions-note" className="m-6 rounded border border-amber-200 bg-amber-50 p-4 text-amber-950"><strong>Original screen — {connection.status.replaceAll('_',' ').toLowerCase()}</strong><p>{connection.note}</p><p><small>Read source: {connection.readSource}. Mutations: {connection.mutationsEnabled?'verified and enabled':'disabled until the mutation acceptance gate passes'}.</small></p></div>}
+    {!['fleet','customers','pricing','availability','bookings','handover'].includes(section)&&<div id="restoration-actions-note" className="m-6 rounded border border-amber-200 bg-amber-50 p-4 text-amber-950"><strong>Original screen — {connection.status.replaceAll('_',' ').toLowerCase()}</strong><p>{connection.note}</p><p><small>Read source: {connection.readSource}. Mutations: {connection.mutationsEnabled?'verified and enabled':'disabled until the mutation acceptance gate passes'}.</small></p></div>}
     {View?<fieldset disabled={!connection.mutationsEnabled} aria-describedby="restoration-actions-note" className="min-w-0 border-0 p-0"><Suspense fallback={<p role="status" className="p-8">Opening your screen…</p>}><View/></Suspense></fieldset>:<p className="p-8">This role's workflow is not connected yet.</p>}
   </>;
 }
