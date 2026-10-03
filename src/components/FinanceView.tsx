@@ -729,7 +729,7 @@ export const FinanceView: React.FC = () => {
                       <div><span className={`rounded px-2 py-0.5 text-[10px] font-bold ${statusClass(refund.status)}`}>{label(refund.status)}</span><p className="mt-2 text-xs">{refund.reason}</p></div>
                       <strong className="text-xs">{formatMoney(refund.amount, refund.currency)}</strong>
                     </div>
-                    {refund.status === "PENDING" && hasPermission("refund.approve") && (
+                    {refund.status === "PENDING" && hasPermission("refund.execute") && (
                       <button disabled={submitting} onClick={() => void handleApproveObligation(refund)} className="mt-3 rounded-lg bg-slate-900 px-3 py-2 text-[11px] font-bold text-white dark:bg-white dark:text-slate-900">Approve liability</button>
                     )}
                   </div>
@@ -745,7 +745,7 @@ export const FinanceView: React.FC = () => {
                       <div><span className="font-mono text-xs font-bold">{refund.refundNumber}</span><p className="mt-1 text-[11px] text-slate-400">{refund.reason}</p></div>
                       <div className="text-right"><span className={`rounded px-2 py-0.5 text-[10px] font-bold ${statusClass(refund.status)}`}>{label(refund.status)}</span><p className="mt-1 text-xs font-bold">{formatMoney(refund.amount, refund.currency)}</p></div>
                     </div>
-                    {refund.status === "PENDING" && hasPermission("refund.approve") && (
+                    {refund.status === "PENDING" && hasPermission("refund.execute") && (
                       <button disabled={submitting} onClick={() => void handleApproveRefund(refund)} className="mt-3 rounded-lg bg-rose-700 px-3 py-2 text-[11px] font-bold text-white">Approve & execute</button>
                     )}
                   </div>
