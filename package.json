@@ -13,6 +13,7 @@
     "typecheck": "tsc --noEmit",
     "test": "tsx packages/database/test/persistence.test.ts && tsx packages/database/test/auth.test.ts && tsx packages/database/test/tenancy.test.ts && tsx packages/database/test/authorization.test.ts && tsx packages/database/test/subscription-state-machine.test.ts && tsx packages/database/test/saas-billing.test.ts && tsx packages/database/test/entitlement-engine.test.ts && tsx packages/database/test/fleet-and-vehicle-owners.test.ts && tsx packages/database/test/party-and-customers.test.ts && tsx packages/database/test/pricing-and-rates.test.ts && tsx packages/database/test/availability-engine.test.ts && tsx packages/database/test/bookings-and-reservations.test.ts",
     "test:auth": "tsx packages/database/test/auth.test.ts",
+    "test:email": "tsx packages/database/test/email-delivery.test.ts",
     "test:authz": "tsx packages/database/test/authorization.test.ts",
     "test:persistence": "tsx packages/database/test/persistence.test.ts",
     "test:tenancy": "tsx packages/database/test/tenancy.test.ts",
