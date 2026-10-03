@@ -68,10 +68,13 @@ export function ContractHandoverExperienceView({portal}:Props){
   const [scheduleOpen,setScheduleOpen]=useState(false);
   const [contractAction,setContractAction]=useState<ContractAction|null>(null);
   const [handoverAction,setHandoverAction]=useState<HandoverAction|null>(null);
-  const seq=useRef(0);
+  const supportingSeq=useRef(0);
+  const contractsSeq=useRef(0);
+  const handoversSeq=useRef(0);
+  const detailSeq=useRef(0);
 
   async function loadSupporting(){
-    const request=++seq.current;
+    const request=++supportingSeq.current;
     const tasks:Promise<any>[]=[
       can("booking.read")?apiClient.bookings.listBookings({limit:100,sortBy:"createdAt",sortOrder:"desc"}):Promise.resolve({data:[]}),
       can("customer.read")?apiClient.customers.listCustomers({limit:100}):Promise.resolve({data:[]}),
@@ -80,7 +83,7 @@ export function ContractHandoverExperienceView({portal}:Props){
       can("inspection.read")?apiClient.inspections.listInspections({inspectionType:"PRE_RENTAL",status:"COMPLETED",limit:100}):Promise.resolve({data:[]}),
     ];
     const r=await Promise.all(tasks);
-    if(request!==seq.current)return;
+    if(request!==supportingSeq.current)return;
     setBookings(r[0].error?[]:r[0].data||[]);
     setCustomers(r[1].error?[]:r[1].data||[]);
     setDrivers(r[2].error?[]:r[2].data||[]);
@@ -89,57 +92,57 @@ export function ContractHandoverExperienceView({portal}:Props){
   }
 
   async function loadContracts(){
-    const request=++seq.current;setLoading(true);setError("");
-    if(!can("contract.read")){if(request===seq.current){setContracts([]);setLoading(false);}return;}
+    const request=++contractsSeq.current;if(tab==="contracts")setLoading(true);setError("");
+    if(!can("contract.read")){if(request===contractsSeq.current){setContracts([]);if(tab==="contracts")setLoading(false);}return;}
     try{
       const params:any={limit:100};
       if(contractStatus!=="ALL")params.status=contractStatus;
       if(search)params.search=search;
       const res=await apiClient.contracts.listContracts(params);
-      if(request!==seq.current)return;
+      if(request!==contractsSeq.current)return;
       if(res.error)throw new Error(res.error.message);
       setContracts(res.data||[]);
-    }catch(e:any){if(request===seq.current)setError(e.message||"Unable to load Contracts.");}
-    finally{if(request===seq.current)setLoading(false);}
+    }catch(e:any){if(request===contractsSeq.current)setError(e.message||"Unable to load Contracts.");}
+    finally{if(request===contractsSeq.current&&tab==="contracts")setLoading(false);}
   }
 
   async function loadHandovers(){
-    const request=++seq.current;setLoading(true);setError("");
-    if(!can("rental.read")){if(request===seq.current){setHandovers([]);setLoading(false);}return;}
+    const request=++handoversSeq.current;if(tab==="handovers")setLoading(true);setError("");
+    if(!can("rental.read")){if(request===handoversSeq.current){setHandovers([]);if(tab==="handovers")setLoading(false);}return;}
     try{
       const params:any={limit:100};
       if(handoverStatus!=="ALL")params.status=handoverStatus;
       if(search)params.search=search;
       const res=await apiClient.handovers.listHandovers(params);
-      if(request!==seq.current)return;
+      if(request!==handoversSeq.current)return;
       if(res.error)throw new Error(res.error.message);
       setHandovers(res.data||[]);
-    }catch(e:any){if(request===seq.current)setError(e.message||"Unable to load Handovers.");}
-    finally{if(request===seq.current)setLoading(false);}
+    }catch(e:any){if(request===handoversSeq.current)setError(e.message||"Unable to load Handovers.");}
+    finally{if(request===handoversSeq.current&&tab==="handovers")setLoading(false);}
   }
 
   async function loadContractDetail(id:string){
     if(!id){setContractDetail(null);return;}
-    const request=++seq.current;setError("");
-    try{const data:any=await unwrap(apiClient.contracts.getContract(id));if(request!==seq.current)return;setContractDetail(data);}
-    catch(e:any){if(request===seq.current)setError(e.message||"Unable to load Contract.");}
+    const request=++detailSeq.current;setError("");
+    try{const data:any=await unwrap(apiClient.contracts.getContract(id));if(request!==detailSeq.current)return;setContractDetail(data);}
+    catch(e:any){if(request===detailSeq.current)setError(e.message||"Unable to load Contract.");}
   }
 
   async function loadHandoverDetail(id:string){
     if(!id){setHandoverDetail(null);setRentalReadiness(null);return;}
-    const request=++seq.current;setError("");setRentalReadiness(null);
+    const request=++detailSeq.current;setError("");setRentalReadiness(null);
     try{
       const data:any=await unwrap(apiClient.handovers.getHandover(id));
-      if(request!==seq.current)return;
+      if(request!==detailSeq.current)return;
       setHandoverDetail(data);
       if(can("rental.read")){
         const rr=await apiClient.rentals.getReadiness(data.bookingId);
-        if(request===seq.current&&!rr.error)setRentalReadiness(rr.data);
+        if(request===detailSeq.current&&!rr.error)setRentalReadiness(rr.data);
       }
-    }catch(e:any){if(request===seq.current)setError(e.message||"Unable to load Handover.");}
+    }catch(e:any){if(request===detailSeq.current)setError(e.message||"Unable to load Handover.");}
   }
 
-  useEffect(()=>{void loadSupporting();void loadContracts();void loadHandovers();return()=>{seq.current++;};},[portal.id]);
+  useEffect(()=>{void loadSupporting();void loadContracts();void loadHandovers();return()=>{supportingSeq.current++;contractsSeq.current++;handoversSeq.current++;detailSeq.current++;};},[portal.id]);
   useEffect(()=>{if(tab==="contracts")void loadContracts();else void loadHandovers();},[tab,contractStatus,handoverStatus,search]);
   useEffect(()=>{setSelectedContractId("");setSelectedHandoverId("");setContractDetail(null);setHandoverDetail(null);setRentalReadiness(null);setGenerateOpen(false);setScheduleOpen(false);setContractAction(null);setHandoverAction(null);},[portal.id]);
 
