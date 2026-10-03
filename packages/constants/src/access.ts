@@ -31,7 +31,7 @@ export const ROLE_SECTIONS: Record<string,string[]> = {
   MANAGER:['overview','bookings','availability','fleet','customers','rentals','returns','inspections','maintenance','compliance','finance','pricing'],
   FLEET_MANAGER:['fleet','maintenance','compliance','inspections','owners'],
   BOOKING_MANAGER:['bookings','availability','availability','customers','rentals','returns','pricing','leads'], BOOKING_AGENT:['bookings','availability','customers','rentals','returns'],
-  FINANCE_MANAGER:['finance','settlements'], ACCOUNTANT:['finance','settlements'], SALES_AGENT:['leads','bookings','customers'],
+  FINANCE_MANAGER:['returns','finance','settlements'], ACCOUNTANT:['returns','finance','settlements'], SALES_AGENT:['leads','bookings','customers'],
   DRIVER_MANAGER:['drivers','rentals','returns','compliance'], DRIVER:['myTrips','myInspections'],
   CUSTOMER_SERVICE:['customers','bookings','rentals','returns','finance'], VEHICLE_OWNER:['myVehicles','mySettlements'],
   RENTER:['myBookings','profile'],
