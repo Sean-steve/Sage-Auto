@@ -64,8 +64,10 @@ export class PublicWebsiteService {
       throw new WebsiteNotFoundError(cleanHost);
     }
 
-    // Invariant 1: Unconfigured or draft sites cannot be viewed publicly
-    if (website.status !== "PUBLISHED" || website.isMaintenanceMode) {
+    // Invariant 1: Unconfigured or draft sites cannot be viewed publicly.
+    // Maintenance mode is still a routable published state so the public edge
+    // can resolve the tenant and render the maintenance message safely.
+    if (website.status !== "PUBLISHED") {
       throw new WebsiteUnpublishedError(cleanHost);
     }
 
