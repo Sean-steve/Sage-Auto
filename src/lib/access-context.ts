@@ -29,7 +29,7 @@ export const RESTORATION_SCREEN_CONNECTIONS: Record<string, RestorationScreenCon
   finance:{status:'UNCONNECTED',readSource:'Not loaded by restoration provider',mutationsEnabled:false,note:'Layout preserved only; no local financial totals are authoritative.'},
   settlements:{status:'UNCONNECTED',readSource:'Not loaded by restoration provider',mutationsEnabled:false,note:'Layout preserved only.'},
   pricing:{status:'PARTIAL',readSource:'Pricing REST API: rate plans, matrices, assignments, rules, fees, promos and server quote calculation',mutationsEnabled:true,note:'Pricing uses a reconstructed server-backed experience. The legacy local quote calculator is no longer reachable; Availability/Booking handoff remains separate.'},
-  availability:{status:'UNCONNECTED',readSource:'Not loaded by restoration provider',mutationsEnabled:false,note:'Layout preserved only.'},
+  availability:{status:'PARTIAL',readSource:'Availability REST API: checks, search, allocation/hold/block registries, vehicle calendar and substitution',mutationsEnabled:true,note:'Availability uses a reconstructed server-backed dispatch experience. Empty timeline space is never treated as proof of availability; Booking handoff remains separate.'},
   website:{status:'UNCONNECTED',readSource:'Not loaded by restoration provider',mutationsEnabled:false,note:'Layout preserved only.'},
   settings:{status:'UNCONNECTED',readSource:'Not loaded by restoration provider',mutationsEnabled:false,note:'Layout preserved only.'},
 };
