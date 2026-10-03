@@ -287,13 +287,46 @@ class ApiClient {
 
   // 9. Customers & Parties Context
   public customers = {
-    listCustomers: () => this.get<any[]>('/customers'),
+    listCustomers: (params?: Record<string, any>) => {
+      const q = new URLSearchParams(params).toString();
+      return this.get<any[]>(`/customers${q ? `?${q}` : ''}`);
+    },
     getCustomer: (id: string) => this.get(`/customers/${id}`),
     createCustomer: (dto: any) => this.post('/customers', dto),
     updateCustomer: (id: string, dto: any) => this.put(`/customers/${id}`, dto),
     verifyCustomer: (id: string, dto: any) => this.patch(`/customers/${id}/verify`, dto),
     changeStatus: (id: string, dto: any) => this.patch(`/customers/${id}/status`, dto),
-    blockCustomer: (id: string, reason: string) => this.patch(`/customers/${id}/status`, { status: "BLOCKED", reason }),
+    blockCustomer: (id: string, reason: string, expectedVersion?: number) =>
+      this.patch(`/customers/${id}/status`, { status: "BLOCKED", reason, expectedVersion }),
+  };
+
+  public drivers = {
+    listDrivers: (params?: Record<string, any>) => {
+      const q = new URLSearchParams(params).toString();
+      return this.get<any[]>(`/drivers${q ? `?${q}` : ''}`);
+    },
+    getDriver: (id: string) => this.get(`/drivers/${id}`),
+    createDriver: (dto: any) => this.post('/drivers', dto),
+    updateDriver: (id: string, dto: any) => this.put(`/drivers/${id}`, dto),
+    changeStatus: (id: string, dto: any) => this.patch(`/drivers/${id}/status`, dto),
+    verifyDriver: (id: string, dto: any) => this.patch(`/drivers/${id}/verify`, dto),
+    listCustomerRelationships: (customerId: string) =>
+      this.get<any[]>(`/drivers/relationships/customer/${customerId}`),
+    linkCustomer: (dto: any) => this.post('/drivers/relationships', dto),
+    unlinkCustomer: (relationshipId: string) => this.delete(`/drivers/relationships/${relationshipId}`),
+  };
+
+  public corporateAccounts = {
+    listAccounts: (params?: Record<string, any>) => {
+      const q = new URLSearchParams(params).toString();
+      return this.get<any[]>(`/corporate-accounts${q ? `?${q}` : ''}`);
+    },
+    getAccount: (id: string) => this.get(`/corporate-accounts/${id}`),
+    createAccount: (dto: any) => this.post('/corporate-accounts', dto),
+    updateAccount: (id: string, dto: any) => this.put(`/corporate-accounts/${id}`, dto),
+    authorizeDriver: (id: string, dto: any) => this.post(`/corporate-accounts/${id}/authorized-drivers`, dto),
+    revokeAuthorizedDriver: (id: string, authorizationId: string) =>
+      this.delete(`/corporate-accounts/${id}/authorized-drivers/${authorizationId}`),
   };
 
   // 10. Pricing & Rate Engine Context
@@ -371,6 +404,7 @@ class ApiClient {
       return this.get<any[]>(`/compliance/records${q ? `?${q}` : ''}`);
     },
     getVehicleReadiness: (vehicleId: string) => this.get<any>(`/compliance/readiness/vehicle/${vehicleId}`),
+    getDriverReadiness: (driverId: string) => this.get<any>(`/compliance/readiness/driver/${driverId}`),
     listDocuments: () => this.get<any[]>('/compliance/documents'),
     addDocument: (dto: any) => this.post('/compliance/documents', dto),
     overrideHold: (id: string, reason: string) => this.post(`/compliance/documents/${id}/override-hold`, { reason }),
