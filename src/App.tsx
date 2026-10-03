@@ -27,6 +27,7 @@ import { FleetView } from "./components/FleetView";
 import { VehicleOwnersView } from "./components/VehicleOwnersView";
 import { BookingsView } from "./components/BookingsView";
 import { RentalsView } from "./components/RentalsView";
+import { ReturnFinalCalculationView } from "./components/ReturnFinalCalculationView";
 import { InspectionsView } from "./components/InspectionsView";
 import { MaintenanceView } from "./components/MaintenanceView";
 import { ComplianceView } from "./components/ComplianceView";
@@ -138,6 +139,8 @@ const AppContent: React.FC = () => {
         return <BookingsView />;
       case "rentals":
         return <RentalsView />;
+      case "returns":
+        return <ReturnFinalCalculationView />;
       case "inspections":
         return <InspectionsView />;
       case "maintenance":
