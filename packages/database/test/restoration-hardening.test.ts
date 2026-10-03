@@ -9,7 +9,7 @@ for (const [role, sections] of Object.entries(ROLE_SECTIONS)) {
 }
 
 for (const [screen, connection] of Object.entries(RESTORATION_SCREEN_CONNECTIONS)) {
-  if (screen === 'fleet' || screen === 'customers' || screen === 'pricing' || screen === 'availability' || screen === 'bookings') {
+  if (screen === 'fleet' || screen === 'customers' || screen === 'pricing' || screen === 'availability' || screen === 'bookings' || screen === 'handover') {
     assert.equal(connection.status, 'PARTIAL', `${screen} must be explicitly marked as a reconstructed experience`);
     assert.equal(connection.mutationsEnabled, true, `${screen} core mutations may be enabled only after server-backed reconstruction`);
   } else {
@@ -19,7 +19,7 @@ for (const [screen, connection] of Object.entries(RESTORATION_SCREEN_CONNECTIONS
   assert.ok(connection.note.length > 0);
 }
 
-for (const screen of ['overview','fleet','bookings','customers','rentals','inspections','maintenance','compliance','owners','finance','settlements','pricing','availability','website','settings']) {
+for (const screen of ['overview','fleet','bookings','handover','customers','rentals','inspections','maintenance','compliance','owners','finance','settlements','pricing','availability','website','settings']) {
   assert.ok(RESTORATION_SCREEN_CONNECTIONS[screen], `missing restoration ledger entry for ${screen}`);
 }
 
