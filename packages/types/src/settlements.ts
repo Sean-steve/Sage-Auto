@@ -123,6 +123,10 @@ export interface OwnerSettlementRentalLine {
   rentalStartDate: string;
   rentalEndDate: string;
   eligibleDays: number;
+  /** Authoritative Finance source supporting this settlement line. */
+  invoiceId?: string;
+  invoiceNumber?: string;
+  financeSourceSettled?: boolean;
   baseRentalRevenue: string; // NUMERIC(19,4)
   excessMileageRevenue: string; // NUMERIC(19,4)
   totalRentalRevenue: string; // NUMERIC(19,4)
