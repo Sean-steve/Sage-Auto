@@ -78,10 +78,10 @@ export class PaymentsModule {
       webhookRepo,
       invoiceRepo,
       depositPositionRepo,
-      bookingRepo,
       settlementRepo,
       auditRepo,
-      outboxRepo
+      outboxRepo,
+      bookingRepo
     );
 
     this.controller = new PaymentsController(this.paymentService);
