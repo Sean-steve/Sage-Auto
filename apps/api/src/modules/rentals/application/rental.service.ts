@@ -51,6 +51,12 @@ import {
   InspectionRepository,
   IDamageRepository,
   DamageRepository,
+  IDepositPositionRepository,
+  DepositPositionRepository,
+  IOperationalInvoiceRepository,
+  OperationalInvoiceRepository,
+  IRefundRepository,
+  RefundRepository,
   RentalNotFoundError,
   BookingNotFoundError,
   ContractNotFoundError,
@@ -102,6 +108,9 @@ export class RentalService {
   private readonly inspectionRepo: IInspectionRepository;
   private readonly damageRepo: IDamageRepository;
   private readonly complianceReadinessService?: any;
+  private readonly depositPositionRepo: IDepositPositionRepository;
+  private readonly operationalInvoiceRepo: IOperationalInvoiceRepository;
+  private readonly refundRepo: IRefundRepository;
 
   constructor(
     rentalRepo?: IRentalRepository,
@@ -115,7 +124,10 @@ export class RentalService {
     idempotencyRepo?: IIdempotencyRepository,
     inspectionRepo?: IInspectionRepository,
     damageRepo?: IDamageRepository,
-    complianceReadinessService?: any
+    complianceReadinessService?: any,
+    depositPositionRepo?: IDepositPositionRepository,
+    operationalInvoiceRepo?: IOperationalInvoiceRepository,
+    refundRepo?: IRefundRepository
   ) {
     this.rentalRepo = rentalRepo || new RentalRepository();
     this.bookingRepo = bookingRepo || new BookingRepository();
@@ -129,6 +141,9 @@ export class RentalService {
     this.inspectionRepo = inspectionRepo || new InspectionRepository();
     this.damageRepo = damageRepo || new DamageRepository();
     this.complianceReadinessService = complianceReadinessService;
+    this.depositPositionRepo = depositPositionRepo || new DepositPositionRepository();
+    this.operationalInvoiceRepo = operationalInvoiceRepo || new OperationalInvoiceRepository();
+    this.refundRepo = refundRepo || new RefundRepository();
   }
 
   /**
@@ -1428,7 +1443,10 @@ export class RentalService {
     const netFinalTotal = Math.round((grossFinalTotal - totalTaxAmount) * 100) / 100;
 
     // 6. Deposit Reconciliation Math
-    const depositHeldAmount = startSnapshot?.depositRequirement ?? 0;
+    // Requirement is contractual; heldAmount is financial truth and can only
+    // increase through Payment allocation to the DepositPosition.
+    const depositPosition = await this.depositPositionRepo.findByRentalId(rentalId, tenantId);
+    const depositHeldAmount = depositPosition ? Number(depositPosition.heldAmount || 0) : 0;
     const postRentalIncidentalCharges = Math.round(
       (excessKmCharge +
         fuelDeficitCharge +
@@ -1618,11 +1636,43 @@ export class RentalService {
       }
     }
 
-    if (
-      (dto.settlementStatus === "REFUNDED" || dto.settlementStatus === "CHARGED") &&
-      !dto.transactionReference?.trim()
-    ) {
-      throw new Error("A transaction reference is required to seal a refund or additional charge.");
+    if (dto.settlementStatus === "CHARGED") {
+      if (!dto.invoiceId) {
+        throw new Error("A fully settled Finance invoice is required to prove the additional customer balance was charged.");
+      }
+      const invoice = await this.operationalInvoiceRepo.findById(dto.invoiceId, tenantId);
+      if (!invoice || invoice.rentalId !== rentalId) {
+        throw new Error("Settlement invoice does not belong to this Rental.");
+      }
+      if (invoice.status !== "PAID" || Number(invoice.amountOutstanding || 0) > 0.0001) {
+        throw new Error("Settlement invoice must be fully PAID before the Rental can be marked CHARGED.");
+      }
+    }
+
+    if (dto.settlementStatus === "REFUNDED") {
+      if (!dto.refundId) {
+        throw new Error("A completed provider Refund is required to prove the refundable deposit was disbursed.");
+      }
+      const refund = await this.refundRepo.findById(dto.refundId, tenantId);
+      if (!refund || refund.status !== "COMPLETED") {
+        throw new Error("Settlement refund must be COMPLETED before the Rental can be marked REFUNDED.");
+      }
+      const deposit = await this.depositPositionRepo.findByRentalId(rentalId, tenantId);
+      const validSourceIds = new Set([rentalId, deposit?.id].filter(Boolean) as string[]);
+      if (
+        refund.sourceObligationType !== "RENTAL_DEPOSIT" ||
+        !refund.sourceObligationId ||
+        !validSourceIds.has(refund.sourceObligationId)
+      ) {
+        throw new Error("Completed Refund is not tied to this Rental deposit obligation.");
+      }
+      if (Math.abs(Number(refund.amount) - calc.depositRefundDue) > 0.01) {
+        throw new Error("Completed Refund amount must match the authoritative deposit refund due.");
+      }
+    }
+
+    if (dto.settlementStatus === "WAIVED" && !dto.notes?.trim()) {
+      throw new Error("A documented reason is required when a final Rental balance is waived.");
     }
 
     const now = new Date().toISOString();
@@ -1675,6 +1725,8 @@ export class RentalService {
         settlementStatus: dto.settlementStatus,
         paymentMethod: dto.paymentMethod,
         transactionReference: dto.transactionReference,
+        invoiceId: dto.invoiceId,
+        refundId: dto.refundId,
       },
     });
 
@@ -1687,6 +1739,8 @@ export class RentalService {
         rentalId,
         settlementStatus: dto.settlementStatus,
         transactionReference: dto.transactionReference,
+        invoiceId: dto.invoiceId,
+        refundId: dto.refundId,
       },
     });
 
