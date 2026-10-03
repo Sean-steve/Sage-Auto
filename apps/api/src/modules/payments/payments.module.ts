@@ -106,7 +106,7 @@ export class PaymentsModule {
 
     // 3. Refunds — specific routes must be registered before /:id
     this.router.post("/refunds", guard(TENANT_PERMISSIONS.REFUND_CREATE), this.controller.requestRefund);
-    this.router.post("/refunds/:id/approve-and-execute", guard(TENANT_PERMISSIONS.REFUND_APPROVE), this.controller.approveAndExecuteRefund);
+    this.router.post("/refunds/:id/approve-and-execute", guard(TENANT_PERMISSIONS.REFUND_EXECUTE), this.controller.approveAndExecuteRefund);
     this.router.get("/refunds", guard(TENANT_PERMISSIONS.REFUND_READ), this.controller.listRefunds);
 
     // 4. Reconciliation — specific routes must be registered before /:id
