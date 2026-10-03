@@ -294,6 +294,7 @@ export class OwnerSettlementsService {
         operatorNetRevenue: calculation.operatorNetRevenue,
         carriedForwardBalance: calculation.carriedForwardBalance,
         termsSnapshot: calculation.termsSnapshot,
+        termsSnapshots: calculation.termsSnapshots,
         rentalLines: calculation.rentalLines,
         expenseLines: calculation.expenseLines,
         adjustmentLines: calculation.adjustmentLines,
@@ -838,14 +839,13 @@ export class OwnerSettlementsService {
         payoutAccountNumber: owner?.payoutAccountNumber,
         payoutMpesaNumber: owner?.payoutMpesaNumber,
       },
-      commercialTerms: settlement.termsSnapshot || {
-        ownershipId: "terms",
-        ownershipType: "THIRD_PARTY_OWNED",
-        revenueSharePercent: 75,
-        allowableExpenseDeductions: true,
-        termsVersion: 1,
-        agreementStartDate: settlement.periodStart,
-      },
+      commercialTerms: (() => {
+        if (!settlement.termsSnapshot) {
+          throw new Error(`Settlement ${settlement.settlementNumber} is missing its historical ownership terms snapshot.`);
+        }
+        return settlement.termsSnapshot;
+      })(),
+      commercialTermsHistory: settlement.termsSnapshots || (settlement.termsSnapshot ? [settlement.termsSnapshot] : []),
       currency: settlement.currency,
       financialSummary: {
         totalEligibleRentalRevenue: settlement.totalEligibleRentalRevenue || "0.0000",
