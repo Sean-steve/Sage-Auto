@@ -1132,7 +1132,7 @@ export class BookingService {
       throw new BookingNotFoundError(bookingId);
     }
 
-    if (booking.status === "COMPLETED" || booking.status === "CANCELLED" || booking.status === "REJECTED" || booking.status === "EXPIRED") {
+    if (BookingStateMachine.isTerminal(booking.status)) {
       throw new BookingImmutableError(bookingId, booking.status);
     }
 
