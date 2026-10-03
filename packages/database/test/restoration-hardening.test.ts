@@ -9,7 +9,12 @@ for (const [role, sections] of Object.entries(ROLE_SECTIONS)) {
 }
 
 for (const [screen, connection] of Object.entries(RESTORATION_SCREEN_CONNECTIONS)) {
-  assert.equal(connection.mutationsEnabled, false, `${screen} must stay read-only until its mutation gate is explicitly accepted`);
+  if (screen === 'fleet') {
+    assert.equal(connection.status, 'PARTIAL', 'Fleet must be explicitly marked as the first reconstructed experience');
+    assert.equal(connection.mutationsEnabled, true, 'Fleet core mutations may be enabled only after their server-backed reconstruction');
+  } else {
+    assert.equal(connection.mutationsEnabled, false, `${screen} must stay read-only until its mutation gate is explicitly accepted`);
+  }
   assert.ok(connection.readSource.length > 0);
   assert.ok(connection.note.length > 0);
 }
