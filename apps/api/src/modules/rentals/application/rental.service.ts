@@ -180,6 +180,9 @@ export class RentalService {
       if (!inspectionCompleted) {
         blockers.push("Pre-rental inspection not completed in handover workflow");
       }
+      if (handover.status !== "HANDOVER_COMPLETED") {
+        blockers.push(`Handover is not completed (status: ${handover.status})`);
+      }
     }
 
     // Check 5: Vehicle operational status
@@ -288,17 +291,30 @@ export class RentalService {
       throw new RentalAlreadyStartedError(existingRental.id);
     }
 
-    // 3. Fetch contract, handover & vehicle
-    const [contract, handover] = await Promise.all([
-      this.contractRepo.findById(dto.contractId, tenantId),
-      this.handoverRepo.findById(dto.handoverId, tenantId),
+    // 3. Resolve the authoritative booking-linked contract and handover.
+    // The browser may provide IDs, but the server does not require stale UI state to start a rental.
+    const [bookingContracts, bookingHandovers] = await Promise.all([
+      this.contractRepo.findByBookingId(booking.id, tenantId),
+      this.handoverRepo.findByBookingId(booking.id, tenantId),
     ]);
+    const contract = dto.contractId
+      ? await this.contractRepo.findById(dto.contractId, tenantId)
+      : bookingContracts.find((item: any) => item.status === "SIGNED" || item.status === "ACTIVE") || bookingContracts[0];
+    const handover = dto.handoverId
+      ? await this.handoverRepo.findById(dto.handoverId, tenantId)
+      : bookingHandovers.find((item: any) => item.status === "HANDOVER_COMPLETED") || bookingHandovers[0];
 
     if (!contract) {
-      throw new ContractNotFoundError(dto.contractId);
+      throw new ContractNotFoundError(dto.contractId || booking.id);
     }
     if (!handover) {
-      throw new HandoverNotFoundError(dto.handoverId);
+      throw new HandoverNotFoundError(dto.handoverId || booking.id);
+    }
+    if ((contract as any).bookingId && (contract as any).bookingId !== booking.id) {
+      throw new Error("Contract does not belong to the booking being dispatched.");
+    }
+    if ((handover as any).bookingId && (handover as any).bookingId !== booking.id) {
+      throw new Error("Handover does not belong to the booking being dispatched.");
     }
 
     const vehicleId = booking.assignedVehicleId || handover.vehicleId;
@@ -314,8 +330,8 @@ export class RentalService {
     }
 
     const now = new Date().toISOString();
-    const startOdometer = dto.startOdometer || handover.checkoutOdometer || vehicle.odometer || 0;
-    const startFuel = dto.startFuelLevel || handover.checkoutFuelLevel || vehicle.fuelLevel || 100;
+    const startOdometer = dto.startOdometer ?? handover.checkoutOdometer ?? vehicle.odometer ?? 0;
+    const startFuel = dto.startFuelLevel ?? handover.checkoutFuelLevel ?? vehicle.fuelLevel ?? 100;
     const scheduledReturn = booking.returnAt || new Date(Date.now() + 86400000).toISOString();
 
     const rentalNumber = await this.rentalRepo.generateNextRentalNumber(tenantId);
