@@ -1052,6 +1052,9 @@ export class RentalService {
     if (inspection.status !== "COMPLETED") {
       throw new Error("Return inspection must be completed and sealed before it can advance the rental.");
     }
+    if (!inspection.acknowledgements || inspection.acknowledgements.length === 0) {
+      throw new Error("Return inspection requires at least one captured acknowledgement/signature before it can advance the rental.");
+    }
     if (inspection.vehicleId !== rental.vehicleId) {
       throw new Error("Return inspection vehicle does not match the rental vehicle.");
     }
