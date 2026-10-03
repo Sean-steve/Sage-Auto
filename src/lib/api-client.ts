@@ -256,9 +256,35 @@ class ApiClient {
 
   // 6. Availability & Allocation Context
   public availability = {
-    checkAvailability: (params: { vehicleId: string; startDate: string; endDate: string }) =>
-      this.get('/availability/check', params),
-    getTimeline: (params: { startDate: string; endDate: string }) => this.get('/availability/timeline', params),
+    checkAvailability: (dto: any) => this.post('/availability/check', dto),
+    searchAvailableVehicles: (dto: any) => this.post('/availability/search', dto),
+    listAllocations: (params?: Record<string, any>) => {
+      const q = new URLSearchParams(params).toString();
+      return this.get<any[]>(`/availability/allocations${q ? `?${q}` : ''}`);
+    },
+    createAllocation: (dto: any) => this.post('/availability/allocations', dto),
+    releaseAllocation: (id: string, reason: string) =>
+      this.post(`/availability/allocations/${id}/release`, { reason }),
+    substituteAllocation: (id: string, newVehicleId: string) =>
+      this.post(`/availability/allocations/${id}/substitute`, { newVehicleId }),
+    listHolds: (params?: Record<string, any>) => {
+      const q = new URLSearchParams(params).toString();
+      return this.get<any[]>(`/availability/holds${q ? `?${q}` : ''}`);
+    },
+    createHold: (dto: any) => this.post('/availability/holds', dto),
+    confirmHold: (dto: any) => this.post('/availability/holds/confirm', dto),
+    releaseHold: (idOrToken: string) => this.post(`/availability/holds/${idOrToken}/release`),
+    listBlocks: (params?: Record<string, any>) => {
+      const q = new URLSearchParams(params).toString();
+      return this.get<any[]>(`/availability/blocks${q ? `?${q}` : ''}`);
+    },
+    createBlock: (dto: any) => this.post('/availability/blocks', dto),
+    releaseBlock: (id: string, reason: string) =>
+      this.post(`/availability/blocks/${id}/release`, { reason }),
+    getVehicleCalendar: (vehicleId: string, start: string, end: string) => {
+      const q = new URLSearchParams({ start, end }).toString();
+      return this.get(`/availability/calendar/${vehicleId}?${q}`);
+    },
   };
 
   // 7. On-Road Rentals & Operations Context
