@@ -25,6 +25,8 @@ import type {
   CalculateFinalRentalDto,
   ProcessDepositSettlementDto,
   CompleteRentalDto,
+  RecordRentalIncidentDto,
+  RentalIncident,
 } from "@carhire/types";
 import {
   IRentalRepository,
@@ -798,6 +800,66 @@ export class RentalService {
 
   async getRentalExtensions(tenantId: string, rentalId: string): Promise<RentalExtension[]> {
     return this.rentalRepo.getExtensions(rentalId, tenantId);
+  }
+
+  async recordIncident(
+    tenantId: string,
+    rentalId: string,
+    dto: RecordRentalIncidentDto,
+    actor: RentalActor
+  ): Promise<RentalIncident> {
+    const rental = await this.rentalRepo.findById(rentalId, tenantId);
+    if (!rental) {
+      throw new RentalNotFoundError(rentalId);
+    }
+    if (RentalStateMachine.TERMINAL_STATES.has(rental.state)) {
+      throw new RentalAlreadyCompletedError(rentalId);
+    }
+
+    const incident = await this.rentalRepo.recordIncident(rentalId, tenantId, {
+      type: dto.type,
+      description: dto.description.trim(),
+      location: dto.location.trim(),
+      reportedAt: dto.reportedAt || new Date().toISOString(),
+      policeReportNumber: dto.policeReportNumber,
+      estimatedCost: dto.estimatedCost ?? 0,
+      resolved: false,
+    });
+
+    await this.auditRepo.record({
+      tenantId,
+      actorUserId: actor.userId,
+      actorType: toAuditActorType(actor.actorType),
+      actorName: actor.name,
+      action: "rental.incident.recorded",
+      resourceType: "RentalIncident",
+      resourceId: incident.id,
+      details: {
+        rentalId,
+        type: incident.type,
+        location: incident.location,
+        estimatedCost: incident.estimatedCost,
+      },
+    });
+
+    await this.outboxRepo.enqueue({
+      tenantId,
+      eventType: "rental.incident_recorded",
+      aggregateType: "Rental",
+      aggregateId: rentalId,
+      payload: {
+        rentalId,
+        incidentId: incident.id,
+        type: incident.type,
+        reportedAt: incident.reportedAt,
+      },
+    });
+
+    return incident;
+  }
+
+  async getRentalIncidents(tenantId: string, rentalId: string): Promise<RentalIncident[]> {
+    return this.rentalRepo.getIncidents(rentalId, tenantId);
   }
 
   // ==========================================================================
