@@ -525,7 +525,7 @@ export const RentalsView: React.FC = () => {
                         Log incident
                       </button>
                     )}
-                    {(selectedRental.state === "ACTIVE_ON_ROAD" || selectedRental.state === "OVERDUE") && hasPermission("rental.update") && (
+                    {(selectedRental.state === "ACTIVE_ON_ROAD" || selectedRental.state === "OVERDUE") && hasPermission("rental.return_schedule") && (
                       <button onClick={() => setActionMode("RETURN")} className="inline-flex items-center gap-2 rounded-xl bg-blue-700 px-3 py-2 text-xs font-bold text-white hover:bg-blue-800">
                         Schedule return <ArrowRight className="h-3.5 w-3.5" />
                       </button>
