@@ -248,6 +248,7 @@ export function createApiApp(): Express {
     entitlementEngine: entitlementsModule.entitlementEngine,
     permissionGuard,
   });
+  websiteModule.websiteService.setPlatformDomainProvisioner(domainsModule.domainService);
 
   // Identity & Authentication Module (Sprint 3: DEV-004, SEC-007)
   const identityModule = new IdentityModule();
