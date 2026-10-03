@@ -150,7 +150,7 @@ export function createRentalController(
   // --------------------------------------------------------------------------
   router.post(
     "/:id/extensions",
-    guard(TENANT_PERMISSIONS.RENTAL_UPDATE || "rental.update"),
+    guard(TENANT_PERMISSIONS.RENTAL_EXTEND || "rental.extend"),
     async (req: Request, res: Response, next: NextFunction) => {
       try {
         const tenantId = getTenantId(req);
@@ -167,7 +167,7 @@ export function createRentalController(
 
   router.post(
     "/:id/extensions/:extensionId/approve",
-    guard(TENANT_PERMISSIONS.RENTAL_UPDATE || "rental.update"),
+    guard(TENANT_PERMISSIONS.RENTAL_EXTEND || "rental.extend"),
     async (req: Request, res: Response, next: NextFunction) => {
       try {
         const tenantId = getTenantId(req);
@@ -185,7 +185,7 @@ export function createRentalController(
 
   router.post(
     "/:id/extensions/:extensionId/reject",
-    guard(TENANT_PERMISSIONS.RENTAL_UPDATE || "rental.update"),
+    guard(TENANT_PERMISSIONS.RENTAL_EXTEND || "rental.extend"),
     async (req: Request, res: Response, next: NextFunction) => {
       try {
         const tenantId = getTenantId(req);
@@ -209,6 +209,38 @@ export function createRentalController(
         const tenantId = getTenantId(req);
         const extensions = await rentalService.getRentalExtensions(tenantId, req.params.id);
         res.json({ success: true, data: extensions });
+      } catch (err) {
+        next(err);
+      }
+    }
+  );
+
+  // --------------------------------------------------------------------------
+  // RENTAL INCIDENT OPERATIONS
+  // --------------------------------------------------------------------------
+  router.post(
+    "/:id/incidents",
+    guard(TENANT_PERMISSIONS.RENTAL_INCIDENT_REPORT || "rental.incident_report"),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const tenantId = getTenantId(req);
+        const actor = getActor(req);
+        const incident = await rentalService.recordIncident(tenantId, req.params.id, req.body, actor);
+        res.status(201).json({ success: true, data: incident });
+      } catch (err) {
+        next(err);
+      }
+    }
+  );
+
+  router.get(
+    "/:id/incidents",
+    guard(TENANT_PERMISSIONS.RENTAL_READ || "rental.read"),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const tenantId = getTenantId(req);
+        const incidents = await rentalService.getRentalIncidents(tenantId, req.params.id);
+        res.json({ success: true, data: incidents });
       } catch (err) {
         next(err);
       }
@@ -339,7 +371,7 @@ export function createRentalController(
   // --------------------------------------------------------------------------
   router.post(
     "/:id/complete",
-    guard(TENANT_PERMISSIONS.RENTAL_UPDATE || "rental.update"),
+    guard(TENANT_PERMISSIONS.RENTAL_COMPLETE || "rental.complete"),
     async (req: Request, res: Response, next: NextFunction) => {
       try {
         const tenantId = getTenantId(req);
