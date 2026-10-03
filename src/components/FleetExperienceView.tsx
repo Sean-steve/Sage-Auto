@@ -69,9 +69,10 @@ const inputClass="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5
 const buttonPrimary="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50";
 const buttonSecondary="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50";
 
-async function unwrap<T>(response: ApiResponse<T>): Promise<T> {
-  if (response.error) throw new Error(response.error.message);
-  return response.data as T;
+async function unwrap<T>(response: ApiResponse<T> | Promise<ApiResponse<T>>): Promise<T> {
+  const resolved = await response;
+  if (resolved.error) throw new Error(resolved.error.message);
+  return resolved.data as T;
 }
 
 export function FleetExperienceView({portal}:FleetExperienceProps) {
@@ -359,7 +360,17 @@ function OverviewTab({twin,canUpdate,onEdit}:{twin:any;canUpdate:boolean;onEdit:
 
 function OwnershipTab({twin,owners,canManage,busy,mutate}:{twin:any;owners:any[];canManage:boolean;busy:boolean;mutate:(w:()=>Promise<ApiResponse<any>>)=>Promise<void>}) {
   const current=twin.currentOwnership;
-  async function submit(e:React.FormEvent<HTMLFormElement>){e.preventDefault();const d=new FormData(e.currentTarget);const ownerId=String(d.get("ownerId")||"");if(!ownerId)return;const payload={vehicleId:twin.vehicle.id,ownerId,ownershipType:String(d.get("ownershipType")||"THIRD_PARTY_OWNED"),revenueSharePercent:number(d.get("revenueSharePercent"),75),fixedMonthlyPayout:d.get("fixedMonthlyPayout")?number(d.get("fixedMonthlyPayout")):undefined,allowableExpenseDeductions:d.get("allowableExpenseDeductions")==="on",termsSnapshot:String(d.get("termsSnapshot")||"").trim()||undefined};await mutate(()=>current?apiClient.vehicleOwners.transferOwnership({newOwnerId:ownerId,vehicleId:twin.vehicle.id,...payload}):apiClient.vehicleOwners.assignOwnership(payload));}
+  async function submit(e:React.FormEvent<HTMLFormElement>){e.preventDefault();const d=new FormData(e.currentTarget);const ownerId=String(d.get("ownerId")||"");if(!ownerId)return;const payload={vehicleId:twin.vehicle.id,ownerId,ownershipType:String(d.get("ownershipType")||"THIRD_PARTY_OWNED"),revenueSharePercent:number(d.get("revenueSharePercent"),75),fixedMonthlyPayout:d.get("fixedMonthlyPayout")?number(d.get("fixedMonthlyPayout")):undefined,allowableExpenseDeductions:d.get("allowableExpenseDeductions")==="on",termsSnapshot:String(d.get("termsSnapshot")||"").trim()||undefined};await mutate(()=>current
+    ? apiClient.vehicleOwners.transferOwnership({
+        vehicleId:twin.vehicle.id,
+        newOwnerId:ownerId,
+        ownershipType:payload.ownershipType,
+        revenueSharePercent:payload.revenueSharePercent,
+        fixedMonthlyPayout:payload.fixedMonthlyPayout,
+        allowableExpenseDeductions:payload.allowableExpenseDeductions,
+        termsSnapshot:payload.termsSnapshot,
+      })
+    : apiClient.vehicleOwners.assignOwnership(payload));}
   return <div className="space-y-5"><SectionTitle title="Ownership & commercial agreement" subtitle="Current and historical asset ownership remain separate from the Vehicle identity."/>
     <div className="rounded-2xl border border-slate-200 p-4">{current?<><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="font-bold text-slate-900">{current.owner?.name||current.ownerId}</p><p className="text-sm text-slate-500">{human(current.ownershipType)} · effective {date(current.startDate)}</p></div><Badge value={current.isActive?"ACTIVE":"INACTIVE"}/></div><div className="mt-4 grid gap-3 sm:grid-cols-3"><InfoCard label="Owner revenue share" value={`${number(current.revenueSharePercent)}%`}/><InfoCard label="Fixed payout" value={current.fixedMonthlyPayout!=null?number(current.fixedMonthlyPayout).toLocaleString():"—"}/><InfoCard label="Expense deductions" value={current.allowableExpenseDeductions?"Allowed":"Not allowed"}/></div>{current.termsSnapshot&&<p className="mt-3 rounded-xl bg-slate-50 p-3 text-sm text-slate-600">{current.termsSnapshot}</p>}</>:<p className="text-sm text-slate-500">No external ownership agreement is active. The vehicle is treated as an internal fleet asset until an agreement is assigned.</p>}</div>
     {canManage&&<form onSubmit={submit} className="rounded-2xl border border-slate-200 bg-slate-50 p-4"><h4 className="font-semibold text-slate-900">{current?"Transfer / establish new effective agreement":"Assign ownership agreement"}</h4><div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><Field label="Owner"><select required name="ownerId" className={inputClass}><option value="">Choose owner</option>{owners.map(o=><option key={o.id} value={o.id}>{o.name}</option>)}</select></Field><Field label="Type"><select name="ownershipType" className={inputClass}><option>THIRD_PARTY_OWNED</option><option>LEASED</option><option>MANAGED</option><option>PARTNERSHIP</option></select></Field><Field label="Revenue share %"><input name="revenueSharePercent" type="number" min="0" max="100" step="0.01" defaultValue={current?.revenueSharePercent??75} className={inputClass}/></Field><Field label="Fixed monthly payout"><input name="fixedMonthlyPayout" type="number" min="0" step="0.01" className={inputClass}/></Field></div><div className="mt-3 grid gap-3 sm:grid-cols-[1fr_auto]"><Field label="Terms snapshot"><input name="termsSnapshot" className={inputClass}/></Field><label className="flex items-center gap-2 pt-6 text-sm"><input type="checkbox" name="allowableExpenseDeductions" defaultChecked={current?.allowableExpenseDeductions??true}/> Allow expense deductions</label></div><button disabled={busy} className={`${buttonPrimary} mt-4`}>{busy?<Loader2 className="animate-spin" size={16}/>:<UserRound size={16}/>}Save effective agreement</button></form>}
