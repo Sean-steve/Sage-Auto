@@ -284,7 +284,7 @@ interface AppContextType {
   cancelMaintenanceWorkOrder: (id: string, dto: CancelMaintenanceDto) => boolean;
   createMaintenanceSchedule: (dto: CreateMaintenanceScheduleDto) => MaintenanceSchedule;
   updateMaintenanceSchedule: (id: string, dto: UpdateMaintenanceScheduleDto) => boolean;
-  createServiceProvider: (dto: CreateServiceProviderDto) => ServiceProvider;
+  createServiceProvider: (dto: CreateServiceProviderDto) => Promise<ServiceProvider | null>;
   updateServiceProvider: (id: string, dto: UpdateServiceProviderDto) => boolean;
   evaluateMaintenanceDue: (vehicleId?: string) => MaintenanceDueResult[];
 
@@ -2643,44 +2643,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode; access?:{context
   );
 
   const createServiceProvider = useCallback(
-    (dto: CreateServiceProviderDto): ServiceProvider => {
-      const providerId = `sp-${Date.now().toString(36)}`;
-      const now = new Date().toISOString();
-      const nextNumber=serviceProviders.filter(p=>p.tenantId===activeTenantId).reduce((max,p)=>{
-        const match=String(p.code||"").match(/^GAR-(\d+)$/);
-        return match?Math.max(max,Number(match[1])):max;
-      },0)+1;
-      const vendorCode=dto.code||`GAR-${String(nextNumber).padStart(4,"0")}`;
-
-      const newProvider: ServiceProvider = {
-        id: providerId,
-        tenantId: activeTenantId,
-        name: dto.name,
-        code: vendorCode,
-        contactPerson: dto.contactPerson,
-        phone: dto.phone,
-        email: dto.email,
-        location: dto.location,
-        address: dto.address,
-        status: "ACTIVE",
-        rating: 5.0,
-        servicesProvided: dto.servicesProvided || ["ROUTINE_SERVICE"],
-        paymentMethods: dto.paymentMethods || [],
-        mpesaNumber: dto.mpesaNumber,
-        bankName: dto.bankName,
-        bankAccountName: dto.bankAccountName,
-        bankAccountNumber: dto.bankAccountNumber,
-        notes: dto.notes,
-        createdAt: now,
-        updatedAt: now,
-      };
-
-      setServiceProviders((prev) => [newProvider, ...prev]);
-      emitDomainFact("ServiceProviderRegistered", "ServiceProvider", newProvider.id, { name: newProvider.name }, "maintenance.provider.create");
-      showNotification(`Service provider "${newProvider.name}" registered.`);
-      return newProvider;
+    async (dto: CreateServiceProviderDto): Promise<ServiceProvider | null> => {
+      const response=await apiClient.maintenance.createProvider(dto);
+      if(response.error){showNotification(response.error.message,"error");return null;}
+      const saved=response.data as ServiceProvider;
+      setServiceProviders(prev=>prev.some(item=>item.id===saved.id)?prev:[saved,...prev]);
+      emitDomainFact("ServiceProviderRegistered","ServiceProvider",saved.id,{name:saved.name},"maintenance.provider.create");
+      showNotification(`Service provider "${saved.name}" registered as ${saved.code||"a garage vendor"}.`);
+      return saved;
     },
-    [activeTenantId, emitDomainFact, showNotification]
+    [emitDomainFact, showNotification]
   );
 
   const updateServiceProvider = useCallback(
