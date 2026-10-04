@@ -109,7 +109,7 @@ export function accessController(service:AccessService,identity:IdentityModule):
           const vehicleId=b.assignedVehicleId||b.requestedVehicleId||undefined;
           const vehicle=vehicleId?await vehicleRepo.findById(vehicleId,tenantId):null;
           const rental=await rentalRepo.findByBookingId(b.id,tenantId);
-          const progressStatus=rental?.state||rental?.status||b.status;
+          const progressStatus=rental?.state||(rental as any)?.status||b.status;
           return {
             id:b.id,
             reference:b.bookingNumber,
@@ -122,7 +122,7 @@ export function accessController(service:AccessService,identity:IdentityModule):
             vehicle:vehicle?{id:vehicle.id,registration:vehicle.registrationPlate,name:`${vehicle.make} ${vehicle.model}`,imageUrl:vehicle.imageUrl||null}:null,
             amount:b.grossTotal||b.pricingSnapshot?.grossRentalTotal||0,
             currency:b.currency||b.pricingSnapshot?.currency||'KES',
-            rental:rental?{id:rental.id,reference:rental.rentalNumber,status:rental.state||rental.status,scheduledReturnAt:rental.scheduledReturnAt}:null,
+            rental:rental?{id:rental.id,reference:rental.rentalNumber,status:rental.state||(rental as any).status,scheduledReturnAt:(rental as any).scheduledReturnAt||(rental as any).scheduledReturn}:null,
             history:history.map((h:any)=>({fromStatus:h.fromStatus||null,toStatus:h.toStatus,reason:h.reason||null,occurredAt:h.occurredAt||h.createdAt||null})),
             notifications:history.slice().reverse().slice(0,6).map((h:any)=>({
               title:String(h.toStatus||'Booking update').replaceAll('_',' '),
