@@ -3,7 +3,7 @@
 // Secure HTTP endpoints for upload intent, finalization, access & zero-trust auditing
 // ============================================================================
 
-import { Router, Request, Response, NextFunction } from "express";
+import { Router, Request, Response, NextFunction, raw } from "express";
 import { FileUploadService } from "../../application/services/file-upload.service";
 import { FileAccessService } from "../../application/services/file-access.service";
 import { StorageReconciliationService } from "../../application/services/storage-reconciliation.service";
@@ -65,6 +65,29 @@ export function createFilesController(
         const actor = getActor(req);
         const result = await fileUploadService.requestUploadIntent(tenantId, actor.id, req.body);
         res.status(201).json({ success: true, data: result });
+      } catch (err) {
+        next(err);
+      }
+    }
+  );
+
+  // Development-only browser upload bridge for the in-memory storage driver.
+  router.put(
+    "/upload-session/:sessionId",
+    guard(TENANT_PERMISSIONS.FILE_UPLOAD),
+    raw({ type: "*/*", limit: "16mb" }),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const tenantId = getTenantId(req);
+        const actor = getActor(req);
+        const result = await fileUploadService.uploadSessionBodyForDevelopment(
+          tenantId,
+          actor.id,
+          req.params.sessionId,
+          req.body as Buffer,
+          req.headers["content-type"] || "application/octet-stream"
+        );
+        res.status(200).json({ success: true, data: result });
       } catch (err) {
         next(err);
       }
