@@ -10,6 +10,7 @@ export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> 
 export const Input = React.forwardRef<HTMLInputElement, InputProps>(
   ({ className, label, error, helperText, id, ...props }, ref) => {
     const inputId = id || (label ? label.toLowerCase().replace(/\s+/g, "-") : undefined);
+    const descriptionId = inputId && (error || helperText) ? `${inputId}-description` : undefined;
 
     return (
       <div className="w-full space-y-1.5">
@@ -21,17 +22,19 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
         <input
           id={inputId}
           ref={ref}
+          aria-invalid={Boolean(error) || undefined}
+          aria-describedby={descriptionId}
           className={cn(
-            "w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm text-slate-900 shadow-xs transition-colors placeholder:text-slate-400 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:border-emerald-400 dark:focus:ring-emerald-400/20",
-            error && "border-rose-500 focus:border-rose-500 focus:ring-rose-500/20",
+            "min-h-10 w-full rounded-[10px] border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 shadow-[0_1px_1px_rgba(16,24,40,.02)] outline-none transition-[border-color,box-shadow,background-color] placeholder:text-slate-400 focus:border-emerald-500 focus:ring-3 focus:ring-emerald-500/10 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100",
+            error && "border-rose-500 focus:border-rose-500 focus:ring-rose-500/10",
             className
           )}
           {...props}
         />
         {error ? (
-          <p className="text-xs text-rose-600 dark:text-rose-400 font-medium">{error}</p>
+          <p id={descriptionId} className="text-xs font-medium text-rose-600 dark:text-rose-400">{error}</p>
         ) : helperText ? (
-          <p className="text-xs text-slate-500 dark:text-slate-400">{helperText}</p>
+          <p id={descriptionId} className="text-xs leading-5 text-slate-500 dark:text-slate-400">{helperText}</p>
         ) : null}
       </div>
     );
