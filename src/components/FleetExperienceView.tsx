@@ -229,6 +229,19 @@ function FleetList({vehicles,owners,onOpen}:{vehicles:any[];owners:any[];onOpen:
 
 function RegisterVehicleDialog({portal,owners,categoryOptions,onClose,onCreated}:{portal:AccessPortal;owners:any[];categoryOptions:string[];onClose:()=>void;onCreated:(id:string)=>void|Promise<void>}) {
   const [busy,setBusy]=useState(false);const [error,setError]=useState("");
+  const [imageUrl,setImageUrl]=useState("");
+  const [attachedImage,setAttachedImage]=useState("");
+  const [imageError,setImageError]=useState("");
+  function attachImage(file?:File){
+    setImageError("");
+    if(!file){setAttachedImage("");return;}
+    if(!file.type.startsWith("image/")){setImageError("Choose an image file.");return;}
+    if(file.size>5*1024*1024){setImageError("Primary image attachments must be 5 MB or smaller.");return;}
+    const reader=new FileReader();
+    reader.onload=()=>setAttachedImage(String(reader.result||""));
+    reader.onerror=()=>setImageError("The selected image could not be read.");
+    reader.readAsDataURL(file);
+  }
   async function submit(e:React.FormEvent<HTMLFormElement>){
     e.preventDefault();setBusy(true);setError("");
     const d=new FormData(e.currentTarget);
@@ -248,7 +261,7 @@ function RegisterVehicleDialog({portal,owners,categoryOptions,onClose,onCreated}
       seats:number(d.get("seats"),5),
       fuelType:String(d.get("fuelType")||"PETROL"),
       features:String(d.get("features")||"").split(",").map(s=>s.trim()).filter(Boolean),
-      imageUrl:String(d.get("imageUrl")||"").trim(),
+      imageUrl:attachedImage||imageUrl.trim(),
       currentLocation:String(d.get("currentLocation")||"").trim()||undefined,
       isPublishedToWebsite:d.get("isPublishedToWebsite")==="on",
       insuranceExpiryDate:String(d.get("insuranceExpiryDate")||"")||undefined,
@@ -266,8 +279,8 @@ function RegisterVehicleDialog({portal,owners,categoryOptions,onClose,onCreated}
     <form onSubmit={submit} className="grid gap-5">
       <FormSection title="Vehicle identity"><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"><Field label="Registration plate *"><input required name="registrationPlate" className={inputClass}/></Field><Field label="Make *"><input required name="make" className={inputClass}/></Field><Field label="Model *"><input required name="model" className={inputClass}/></Field><Field label="Year *"><input required name="year" type="number" min="1980" max="2100" defaultValue={new Date().getFullYear()} className={inputClass}/></Field><Field label="VIN / chassis"><input name="vin" className={inputClass}/></Field><Field label="Color"><input name="color" className={inputClass}/></Field></div></FormSection>
       <FormSection title="Operational & commercial"><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"><Field label="Category *"><select name="category" className={inputClass}>{categoryOptions.map(c=><option key={c}>{c}</option>)}</select></Field><Field label="Transmission"><select name="transmission" className={inputClass}><option>AUTOMATIC</option><option>MANUAL</option></select></Field><Field label="Fuel type"><select name="fuelType" className={inputClass}><option>PETROL</option><option>DIESEL</option><option>HYBRID</option><option>ELECTRIC</option></select></Field><Field label="Seats"><input name="seats" type="number" min="1" defaultValue="5" className={inputClass}/></Field><Field label="Current odometer (km)"><input name="odometer" type="number" min="0" defaultValue="0" className={inputClass}/></Field><Field label="Fuel level %"><input name="fuelLevel" type="number" min="0" max="100" defaultValue="100" className={inputClass}/></Field><Field label="Fleet daily-rate reference *"><input required name="dailyRate" type="number" min="0" step="0.01" className={inputClass}/></Field><Field label="Allowed daily km"><input name="allowedDailyKm" type="number" min="0" defaultValue="250" className={inputClass}/></Field><Field label="Excess km rate"><input name="excessKmRate" type="number" min="0" step="0.01" defaultValue="0" className={inputClass}/></Field><Field label="Current location"><input name="currentLocation" className={inputClass}/></Field><Field label="Features (comma separated)"><input name="features" className={inputClass} placeholder="AC, Bluetooth, 4WD"/></Field></div><p className="mt-3 text-xs text-slate-400">Booking prices remain authoritative through the Pricing Engine; this rate is Fleet metadata/reference.</p></FormSection>
-      {permits(portal,"vehicle_owner.read")&&<FormSection title="Ownership"><div className="grid gap-3 sm:grid-cols-3"><Field label="Owner"><select name="ownerId" className={inputClass}><option value="">Internal fleet</option>{owners.map(o=><option key={o.id} value={o.id}>{o.name}</option>)}</select></Field><Field label="Ownership type"><select name="ownershipType" className={inputClass}><option>THIRD_PARTY_OWNED</option><option>LEASED</option><option>MANAGED</option><option>PARTNERSHIP</option></select></Field><Field label="Owner revenue share %"><input name="revenueSharePercent" type="number" min="0" max="100" step="0.01" defaultValue="75" className={inputClass}/></Field></div></FormSection>}
-      <FormSection title="Readiness & media"><div className="grid gap-3 sm:grid-cols-2"><Field label="Insurance expiry"><input name="insuranceExpiryDate" type="date" className={inputClass}/></Field><Field label="Inspection expiry"><input name="inspectionExpiryDate" type="date" className={inputClass}/></Field><Field label="Primary image URL"><input name="imageUrl" type="url" className={inputClass}/></Field><label className="flex items-center gap-2 pt-6 text-sm text-slate-700"><input name="isPublishedToWebsite" type="checkbox" defaultChecked/> Publish to website catalogue</label></div></FormSection>
+      {permits(portal,"vehicle_owner.read")&&<FormSection title="Ownership"><div className="grid gap-3 sm:grid-cols-3"><Field label="Owner (optional)"><select name="ownerId" className={inputClass}><option value="">Internal / assign later</option>{owners.map(o=><option key={o.id} value={o.id}>{o.name}</option>)}</select></Field><Field label="Ownership type"><select name="ownershipType" className={inputClass}><option>THIRD_PARTY_OWNED</option><option>LEASED</option><option>MANAGED</option><option>PARTNERSHIP</option></select></Field><Field label="Owner revenue share %"><input name="revenueSharePercent" type="number" min="0" max="100" step="0.01" defaultValue="75" className={inputClass}/></Field></div><p className="mt-2 text-xs text-slate-500">Assign the owner now when known so the ownership agreement is created with the vehicle. You can assign, transfer or change ownership later from the vehicle Ownership tab.</p></FormSection>}
+      <FormSection title="Readiness & media"><div className="grid gap-3 sm:grid-cols-2"><Field label="Insurance expiry"><input name="insuranceExpiryDate" type="date" className={inputClass}/></Field><Field label="Inspection expiry"><input name="inspectionExpiryDate" type="date" className={inputClass}/></Field><Field label="Primary image URL"><input name="imageUrl" type="url" value={imageUrl} onChange={e=>setImageUrl(e.target.value)} placeholder="https://…/vehicle.jpg" className={inputClass}/></Field><Field label="Or attach primary image"><input type="file" accept="image/*" onChange={e=>attachImage(e.target.files?.[0])} className={inputClass}/></Field><label className="flex items-center gap-2 pt-2 text-sm text-slate-700"><input name="isPublishedToWebsite" type="checkbox" defaultChecked/> Publish to website catalogue</label></div>{imageError&&<p className="mt-2 text-xs font-medium text-rose-700">{imageError}</p>}{(attachedImage||imageUrl)&&<div className="mt-3"><p className="mb-2 text-xs font-semibold text-slate-500">Primary image preview</p><img src={attachedImage||imageUrl} alt="Vehicle preview" onError={()=>setImageError("This URL did not return a displayable image. Use a direct image URL or attach the image file.")} className="h-36 w-52 rounded-xl border border-slate-200 object-cover"/></div>}<p className="mt-2 text-xs text-slate-500">For links, use a direct image URL. Page/share links from Drive, social media or gallery websites usually cannot be rendered as an image.</p></FormSection>
       <div className="flex justify-end gap-2 border-t border-slate-100 pt-4"><button type="button" onClick={onClose} className={buttonSecondary}>Cancel</button><button disabled={busy} className={buttonPrimary}>{busy?<Loader2 className="animate-spin" size={16}/>:<Plus size={16}/>}Register vehicle</button></div>
     </form>
   </Modal>;
@@ -425,8 +438,25 @@ function InspectionTab({inspections,damages,openInspections}:{inspections:any[];
 }
 
 function MediaTab({vehicle,documents,canUpdate,busy,mutate}:{vehicle:any;documents:any[];canUpdate:boolean;busy:boolean;mutate:(w:()=>Promise<ApiResponse<any>>)=>Promise<void>}) {
-  async function save(e:React.FormEvent<HTMLFormElement>){e.preventDefault();const d=new FormData(e.currentTarget);await mutate(()=>apiClient.fleet.updateVehicle(vehicle.id,{imageUrl:String(d.get("imageUrl")||""),expectedVersion:vehicle.version}));}
-  return <div className="space-y-5"><SectionTitle title="Media" subtitle="The current Fleet contract persists one primary image plus document/File references; a client-only gallery is intentionally not invented."/><div className="grid gap-5 lg:grid-cols-[320px_1fr]"><div>{vehicle.imageUrl?<img src={vehicle.imageUrl} alt={`${vehicle.make} ${vehicle.model}`} className="aspect-[4/3] w-full rounded-2xl object-cover"/>:<div className="grid aspect-[4/3] place-items-center rounded-2xl bg-slate-100 text-slate-400"><ImageIcon size={32}/></div>}</div><div>{canUpdate&&<form onSubmit={save}><Field label="Primary image URL"><input name="imageUrl" type="url" defaultValue={vehicle.imageUrl||""} className={inputClass}/></Field><button disabled={busy} className={`${buttonPrimary} mt-3`}><ImageIcon size={16}/>Save primary image</button></form>}<div className="mt-5"><p className="mb-2 text-sm font-semibold">Attached Fleet documents</p><p className="text-sm text-slate-500">{documents.length} attachment record{documents.length===1?"":"s"} linked to this vehicle.</p></div></div></div></div>;
+  const [imageUrl,setImageUrl]=useState(vehicle.imageUrl||"");
+  const [attachedImage,setAttachedImage]=useState("");
+  const [imageError,setImageError]=useState("");
+  const preview=attachedImage||imageUrl||vehicle.imageUrl||"";
+  function attach(file?:File){
+    setImageError("");
+    if(!file){setAttachedImage("");return;}
+    if(!file.type.startsWith("image/")){setImageError("Choose an image file.");return;}
+    if(file.size>5*1024*1024){setImageError("Primary image attachments must be 5 MB or smaller.");return;}
+    const reader=new FileReader();
+    reader.onload=()=>setAttachedImage(String(reader.result||""));
+    reader.onerror=()=>setImageError("The selected image could not be read.");
+    reader.readAsDataURL(file);
+  }
+  async function save(e:React.FormEvent<HTMLFormElement>){
+    e.preventDefault();
+    await mutate(()=>apiClient.fleet.updateVehicle(vehicle.id,{imageUrl:attachedImage||imageUrl.trim(),expectedVersion:vehicle.version}));
+  }
+  return <div className="space-y-5"><SectionTitle title="Media" subtitle="Set the vehicle's primary image by direct URL or local image attachment. Fleet documents remain linked separately."/><div className="grid gap-5 lg:grid-cols-[320px_1fr]"><div>{preview?<img src={preview} onError={()=>setImageError("The image could not be displayed. Use a direct image URL or attach the file.")} alt={`${vehicle.make} ${vehicle.model}`} className="aspect-[4/3] w-full rounded-2xl border border-slate-200 object-cover"/>:<div className="grid aspect-[4/3] place-items-center rounded-2xl bg-slate-100 text-slate-400"><ImageIcon size={32}/></div>}</div><div>{canUpdate&&<form onSubmit={save} className="space-y-3"><Field label="Primary image URL"><input name="imageUrl" type="url" value={imageUrl} onChange={e=>setImageUrl(e.target.value)} placeholder="https://…/vehicle.jpg" className={inputClass}/></Field><Field label="Or attach primary image"><input type="file" accept="image/*" onChange={e=>attach(e.target.files?.[0])} className={inputClass}/></Field>{imageError&&<p className="text-xs font-medium text-rose-700">{imageError}</p>}<p className="text-xs leading-5 text-slate-500">Use a direct image URL, not a webpage/share link. Attachments are stored with the vehicle's primary-image field for local testing; the media asset pipeline remains available for a future multi-image gallery.</p><button disabled={busy||Boolean(imageError)} className={buttonPrimary}><ImageIcon size={16}/>Save primary image</button></form>}<div className="mt-5"><p className="mb-2 text-sm font-semibold">Attached Fleet documents</p><p className="text-sm text-slate-500">{documents.length} attachment record{documents.length===1?"":"s"} linked to this vehicle.</p></div></div></div></div>;
 }
 
 function HistoryTab({twin}:{twin:any}) {
