@@ -1,0 +1,215 @@
+/* Sage Auto UI/UX Design System — Operational Precision */
+.saas-workspace{
+  --sage-canvas:#f6f7f9;
+  --sage-surface:#ffffff;
+  --sage-surface-subtle:#f8fafc;
+  --sage-surface-muted:#f1f5f9;
+  --sage-ink:#101828;
+  --sage-text:#344054;
+  --sage-muted:#667085;
+  --sage-faint:#98a2b3;
+  --sage-line:#e4e7ec;
+  --sage-line-strong:#d0d5dd;
+  --sage-brand:#047857;
+  --sage-brand-strong:#065f46;
+  --sage-brand-soft:#ecfdf3;
+  --sage-info:#175cd3;
+  --sage-warning:#b54708;
+  --sage-danger:#b42318;
+  --sage-radius-sm:8px;
+  --sage-radius-md:10px;
+  --sage-radius-lg:14px;
+  --sage-shadow:0 1px 2px rgba(16,24,40,.04);
+  --sage-shadow-pop:0 12px 32px rgba(16,24,40,.12);
+  --sage-control-h:40px;
+  font-family:Inter,Geist,"SF Pro Text","Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  font-size:14px;
+  line-height:1.5;
+  letter-spacing:-.005em;
+  font-feature-settings:"tnum" 1,"ss01" 1;
+  background:var(--sage-canvas)!important;
+  color:var(--sage-ink);
+}
+.saas-workspace[data-density="compact"]{--sage-control-h:34px;font-size:13px}
+.saas-workspace *{box-sizing:border-box}
+.saas-workspace ::selection{background:#d1fae5;color:#064e3b}
+.saas-workspace :focus-visible{outline:2px solid #10b981;outline-offset:2px}
+.saas-workspace button,.saas-workspace input,.saas-workspace select,.saas-workspace textarea{font:inherit}
+.saas-workspace button{letter-spacing:-.005em}
+.saas-workspace .sage-module{min-height:calc(100dvh - 120px);color:var(--sage-ink)}
+.saas-workspace .sage-module>div[class*="max-w-"]{width:100%}
+.saas-workspace .sage-module :is(h1,h2,h3,h4){color:var(--sage-ink);letter-spacing:-.025em}
+.saas-workspace .sage-module h1{font-weight:650!important}
+.saas-workspace .sage-module :is(h2,h3){font-weight:620!important}
+.saas-workspace .sage-module p{letter-spacing:-.003em}
+.saas-workspace .sage-module .font-black{font-weight:650!important}
+.saas-workspace .sage-module .font-bold{font-weight:600!important}
+.saas-workspace .sage-module .font-semibold{font-weight:550!important}
+.saas-workspace .sage-module .font-mono{font-family:"SFMono-Regular",Consolas,"Liberation Mono",monospace;font-variant-numeric:tabular-nums}
+.saas-workspace .sage-module [class*="text-2xl"],
+.saas-workspace .sage-module [class*="text-3xl"],
+.saas-workspace .sage-module [class*="text-4xl"]{font-variant-numeric:tabular-nums}
+
+/* Calm surfaces: border first, shadow second. */
+.saas-workspace .sage-module [class*="bg-white"][class*="border"]{border-color:var(--sage-line)!important;box-shadow:var(--sage-shadow)!important}
+.saas-workspace .sage-module [class*="shadow-sm"],
+.saas-workspace .sage-module [class*="shadow-md"]{box-shadow:var(--sage-shadow)!important}
+.saas-workspace .sage-module [class*="rounded-[28px]"]{border-radius:var(--sage-radius-lg)!important}
+.saas-workspace .sage-module .rounded-3xl{border-radius:var(--sage-radius-lg)!important}
+.saas-workspace .sage-module .rounded-2xl{border-radius:var(--sage-radius-lg)!important}
+.saas-workspace .sage-module .rounded-xl{border-radius:var(--sage-radius-md)!important}
+.saas-workspace .sage-module .rounded-lg{border-radius:var(--sage-radius-sm)!important}
+
+/* Controls */
+.saas-workspace .sage-module :is(input:not([type="checkbox"]):not([type="radio"]),select,textarea){
+  border-color:var(--sage-line-strong)!important;
+  border-radius:var(--sage-radius-md)!important;
+  background:var(--sage-surface)!important;
+  color:var(--sage-ink)!important;
+  min-height:var(--sage-control-h);
+  box-shadow:0 1px 1px rgba(16,24,40,.02);
+}
+.saas-workspace .sage-module textarea{min-height:96px}
+.saas-workspace .sage-module :is(input,select,textarea)::placeholder{color:var(--sage-faint)}
+.saas-workspace .sage-module :is(input,select,textarea):focus{
+  border-color:#12b76a!important;
+  box-shadow:0 0 0 3px rgba(16,185,129,.12)!important;
+  outline:none!important;
+}
+.saas-workspace .sage-module label{color:var(--sage-text)}
+.saas-workspace .sage-module button{
+  border-radius:var(--sage-radius-md);
+  transition:background-color .14s ease,border-color .14s ease,color .14s ease,box-shadow .14s ease,transform .14s ease;
+}
+.saas-workspace .sage-module button:active:not(:disabled){transform:translateY(1px)}
+.saas-workspace .sage-module button:disabled{cursor:not-allowed}
+
+/* Data tables */
+.saas-workspace .sage-module table{width:100%;font-size:13px;font-variant-numeric:tabular-nums;border-spacing:0}
+.saas-workspace .sage-module thead{background:var(--sage-surface-subtle)}
+.saas-workspace .sage-module th{
+  color:var(--sage-muted)!important;
+  font-size:11px!important;
+  font-weight:600!important;
+  letter-spacing:.035em!important;
+  text-transform:uppercase;
+  white-space:nowrap;
+}
+.saas-workspace .sage-module :is(th,td){padding:11px 14px!important;border-bottom:1px solid var(--sage-line)!important}
+.saas-workspace[data-density="compact"] .sage-module :is(th,td){padding:7px 10px!important}
+.saas-workspace .sage-module tbody tr{transition:background-color .12s ease}
+.saas-workspace .sage-module tbody tr:hover{background:#f8fafc}
+.saas-workspace .sage-module tbody tr:last-child td{border-bottom-color:transparent!important}
+.saas-workspace .sage-module [class*="overflow-x-auto"],
+.saas-workspace .sage-module [class*="overflow-auto"]{scrollbar-width:thin;scrollbar-color:#cbd5e1 transparent}
+
+/* Status pills: compact and semantic. */
+.saas-workspace .sage-module [class*="rounded-full"][class*="uppercase"]{
+  font-size:10px!important;
+  line-height:1.2;
+  letter-spacing:.045em!important;
+  font-weight:650!important;
+}
+.saas-workspace .sage-module [class*="bg-emerald-50"]{background:#ecfdf3!important}
+.saas-workspace .sage-module [class*="text-emerald-700"]{color:#027a48}
+.saas-workspace .sage-module [class*="bg-amber-50"]{background:#fffaeb!important}
+.saas-workspace .sage-module [class*="bg-rose-50"]{background:#fff1f3!important}
+.saas-workspace .sage-module [class*="bg-blue-50"]{background:#eff8ff!important}
+
+/* Tabs and segmented controls */
+.saas-workspace .sage-module [role="tablist"]{background:var(--sage-surface-subtle);border:1px solid var(--sage-line);border-radius:var(--sage-radius-md);padding:3px}
+.saas-workspace .sage-module [role="tab"]{min-height:34px}
+
+/* Drawers, dialogs and popovers */
+.saas-workspace .sage-module [role="dialog"],
+.saas-workspace [role="dialog"]{
+  border-radius:var(--sage-radius-lg)!important;
+  box-shadow:var(--sage-shadow-pop)!important;
+}
+.saas-workspace .sage-module [class*="fixed"][class*="inset-0"][class*="bg-slate-950"]{backdrop-filter:blur(3px)}
+
+/* Empty/loading/error patterns */
+.saas-workspace .sage-module [role="alert"]{border-radius:var(--sage-radius-md)!important}
+.saas-workspace .sage-module [role="status"]{font-variant-numeric:tabular-nums}
+.saas-workspace .sage-skeleton{
+  position:relative;overflow:hidden;background:#eef2f6;border-radius:8px;color:transparent!important;
+}
+.saas-workspace .sage-skeleton:after{
+  content:"";position:absolute;inset:0;transform:translateX(-100%);
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.72),transparent);
+  animation:sage-shimmer 1.35s infinite;
+}
+@keyframes sage-shimmer{100%{transform:translateX(100%)}}
+
+/* Data visualization contracts */
+.saas-workspace .sage-chart{
+  --chart-grid:#e4e7ec;--chart-axis:#667085;--chart-primary:#047857;--chart-secondary:#175cd3;
+  border:1px solid var(--sage-line);border-radius:var(--sage-radius-lg);background:var(--sage-surface);padding:18px;
+}
+.saas-workspace .sage-chart svg text{font-family:inherit!important;fill:var(--chart-axis);font-size:11px}
+.saas-workspace .sage-chart .grid{stroke:var(--chart-grid);stroke-dasharray:3 3}
+.saas-workspace .sage-map{
+  overflow:hidden;border:1px solid var(--sage-line);border-radius:var(--sage-radius-lg);background:#e9eef1;
+  min-height:360px;position:relative;
+}
+.saas-workspace .sage-map:after{
+  content:"";position:absolute;inset:0;pointer-events:none;box-shadow:inset 0 0 0 1px rgba(16,24,40,.03);
+}
+
+/* Workspace shell */
+.saas-workspace .sage-topbar{height:64px;min-height:64px;border-color:var(--sage-line)!important}
+.saas-workspace .sage-page-context{border-color:var(--sage-line)!important;padding-top:14px!important;padding-bottom:14px!important}
+.saas-workspace .sage-sidebar{background:#101828!important}
+.saas-workspace .sage-sidebar .sage-nav-item{min-height:38px;border-radius:9px!important}
+.saas-workspace .sage-sidebar .sage-nav-item[aria-current="page"]{
+  background:#ffffff!important;color:#101828!important;box-shadow:0 1px 2px rgba(0,0,0,.08)!important
+}
+.saas-workspace .sage-sidebar .sage-nav-item[aria-current="page"] svg{color:var(--sage-brand)}
+.saas-workspace .sage-sidebar .sage-nav-item:not([aria-current="page"]):hover{background:rgba(255,255,255,.07)!important}
+.saas-workspace .sage-command-kbd{
+  display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:22px;padding:0 6px;
+  border:1px solid var(--sage-line);border-bottom-color:#c7ccd4;border-radius:6px;background:#fff;
+  color:var(--sage-muted);font-size:10px;font-weight:650;box-shadow:0 1px 0 #d0d5dd;
+}
+
+/* Compact mode */
+.saas-workspace[data-density="compact"] .sage-module [class*="p-8"]{padding:20px!important}
+.saas-workspace[data-density="compact"] .sage-module [class*="p-6"]{padding:16px!important}
+.saas-workspace[data-density="compact"] .sage-module [class*="p-5"]{padding:14px!important}
+.saas-workspace[data-density="compact"] .sage-module [class*="gap-6"]{gap:16px!important}
+.saas-workspace[data-density="compact"] .sage-module [class*="space-y-6"]>:not([hidden])~:not([hidden]){margin-top:16px!important}
+
+/* Dark theme: scoped override so legacy and new modules converge. */
+.saas-workspace[data-theme="dark"]{
+  --sage-canvas:#0b0f14;--sage-surface:#11161d;--sage-surface-subtle:#151b23;--sage-surface-muted:#1c2430;
+  --sage-ink:#f2f4f7;--sage-text:#d0d5dd;--sage-muted:#98a2b3;--sage-faint:#667085;
+  --sage-line:#242c37;--sage-line-strong:#344054;--sage-brand:#34d399;--sage-brand-soft:#052e24;
+  background:var(--sage-canvas)!important;color:var(--sage-ink);
+}
+.saas-workspace[data-theme="dark"] .sage-module{color:var(--sage-ink)}
+.saas-workspace[data-theme="dark"] .sage-module :is(h1,h2,h3,h4){color:var(--sage-ink)!important}
+.saas-workspace[data-theme="dark"] .sage-module [class*="bg-white"]{background:var(--sage-surface)!important}
+.saas-workspace[data-theme="dark"] .sage-module [class*="bg-slate-50"],
+.saas-workspace[data-theme="dark"] .sage-module [class*="bg-slate-100"]{background:var(--sage-surface-subtle)!important}
+.saas-workspace[data-theme="dark"] .sage-module [class*="text-slate-950"],
+.saas-workspace[data-theme="dark"] .sage-module [class*="text-slate-900"],
+.saas-workspace[data-theme="dark"] .sage-module [class*="text-slate-800"]{color:var(--sage-ink)!important}
+.saas-workspace[data-theme="dark"] .sage-module [class*="text-slate-700"],
+.saas-workspace[data-theme="dark"] .sage-module [class*="text-slate-600"],
+.saas-workspace[data-theme="dark"] .sage-module [class*="text-slate-500"]{color:var(--sage-muted)!important}
+.saas-workspace[data-theme="dark"] .sage-module [class*="border-slate-"]{border-color:var(--sage-line)!important}
+.saas-workspace[data-theme="dark"] .sage-module tbody tr:hover{background:#151b23}
+.saas-workspace[data-theme="dark"] .sage-topbar,
+.saas-workspace[data-theme="dark"] .sage-page-context{background:rgba(17,22,29,.94)!important;border-color:var(--sage-line)!important}
+.saas-workspace[data-theme="dark"] .sage-command-kbd{background:#151b23;border-color:#344054;color:#98a2b3;box-shadow:none}
+
+/* Mobile is task-oriented: controls remain tappable and tables scroll rather than crush. */
+@media(max-width:767px){
+  .saas-workspace .sage-module{font-size:14px}
+  .saas-workspace .sage-module :is(input:not([type="checkbox"]):not([type="radio"]),select,textarea,button){min-height:44px}
+  .saas-workspace .sage-module table{min-width:720px}
+  .saas-workspace .sage-module :is(th,td){padding:10px 12px!important}
+}
+@media(prefers-reduced-motion:reduce){
+  .saas-workspace *{scroll-behavior:auto!important;transition-duration:0s!important;animation-duration:.01ms!important;animation-iteration-count:1!important}
+}
