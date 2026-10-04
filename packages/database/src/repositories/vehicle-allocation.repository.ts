@@ -253,7 +253,7 @@ export class VehicleAllocationRepository implements IVehicleAllocationRepository
               )
             ) {
               throw new AvailabilityConflictError(
-                `Vehicle ${data.vehicleId} has an overlapping ${existing.status} allocation (${existing.id}) from ${existing.startsAt} to ${existing.endsAt}.`,
+                `This vehicle already has ${existing.status.toLowerCase()} activity from ${existing.startsAt} to ${existing.endsAt}. Choose another vehicle or time window.`,
                 data.vehicleId,
                 { startsAt: existing.startsAt, endsAt: existing.endsAt }
               );
