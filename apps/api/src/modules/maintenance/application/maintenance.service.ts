@@ -74,6 +74,20 @@ export class MaintenanceService {
     dto: CreateMaintenanceRequestDto,
     actor: ServiceActor
   ): Promise<MaintenanceWorkOrder> {
+    // Schedule-driven dispatch is idempotent while an order is active.
+    if (dto.sourceType === "SCHEDULE" && dto.sourceId) {
+      const existing = await this.maintenanceRepo.list(tenantId, {
+        vehicleId: dto.vehicleId,
+        sourceType: "SCHEDULE",
+      });
+      const active = existing.find(
+        (order) =>
+          order.sourceId === dto.sourceId &&
+          !["COMPLETED", "VERIFIED", "CANCELLED"].includes(order.status)
+      );
+      if (active) return active;
+    }
+
     // 1. Verify vehicle exists
     const vehicle = await this.vehicleRepo.findById(dto.vehicleId, tenantId);
     if (!vehicle) {
