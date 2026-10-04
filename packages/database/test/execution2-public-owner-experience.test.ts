@@ -9,6 +9,7 @@ const ownerView=readFileSync("src/components/VehicleOwnersView.tsx","utf8");
 const publicController=readFileSync("apps/api/src/modules/public-booking/presentation/public-booking.controller.ts","utf8");
 const publicService=readFileSync("apps/api/src/modules/public-booking/application/public-booking.service.ts","utf8");
 const ownerService=readFileSync("apps/api/src/modules/vehicle-owners/application/vehicle-owners.service.ts","utf8");
+const accessController=readFileSync("apps/api/src/modules/access/access.controller.ts","utf8");
 
 assert.match(app,/location\.pathname\.endsWith\('\/account'\).*RenterAccount/,"public renter account must not route into staff workspace");
 assert.match(renter,/bookingReference/);
@@ -37,5 +38,8 @@ assert.match(ownerView,/Manage Terms/);
 assert.match(ownerView,/renegotiateTerms/);
 assert.match(ownerView,/Owner-visible agreement terms/);
 assert.match(ownerService,/dto\.termsSnapshot\?\.trim\(\)/);
+assert.match(accessController,/section===\'myVehicles\'/);
+assert.match(accessController,/agreementTerms:agreement\?\.termsSnapshot/);
+assert.match(accessController,/section===\'mySettlements\'/);
 
 console.log("✓ Execution 2 public website, renter account and owner agreement contract passed");
