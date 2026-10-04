@@ -226,7 +226,8 @@ const AppShell: React.FC = () => {
 
 export default function App() {
   const publicSite=location.pathname.match(/^\/site\/([a-z0-9-]+)(?:\/|$)/);
-  if(publicSite && location.pathname.endsWith('/account')) return <RenterAccount slug={publicSite[1]}/>;
+  if(publicSite && location.pathname.endsWith('/track')) return <RenterAccount slug={publicSite[1]}/>;
+  if(publicSite && location.pathname.endsWith('/account')) return <AccessApp site={publicSite[1]}/>;
   if(publicSite) return <TenantPublicSite slug={publicSite[1]}/>;
   if(isMarketingPath(location.pathname)) return <MarketingSite/>;
   return <AccessApp/>;
