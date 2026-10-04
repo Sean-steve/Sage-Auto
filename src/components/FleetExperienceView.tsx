@@ -311,14 +311,16 @@ function RegisterVehicleDialog({portal,owners,categoryOptions,onClose,onCreated}
         vehicleId=created.id;
         createdIdRef.current=vehicleId;
       }
+      if(!vehicleId)throw new Error("Vehicle registration did not return an asset identifier.");
+      const targetVehicleId=vehicleId;
       if(imageFile){
-        const primaryUrl=await uploadVehiclePrimaryImage(vehicleId,imageFile);
+        const primaryUrl=await uploadVehiclePrimaryImage(targetVehicleId,imageFile);
         if(primaryUrl){
-          const current=created||await unwrap(apiClient.fleet.getVehicle(vehicleId));
-          await unwrap(apiClient.fleet.updateVehicle(vehicleId,{imageUrl:primaryUrl,expectedVersion:current.version}));
+          const current=created||await unwrap(apiClient.fleet.getVehicle(targetVehicleId));
+          await unwrap(apiClient.fleet.updateVehicle(targetVehicleId,{imageUrl:primaryUrl,expectedVersion:current.version}));
         }
       }
-      await onCreated(vehicleId);
+      await onCreated(targetVehicleId);
     }
     catch(err:any){setError(err.message||"Vehicle could not be registered.");}
     finally{setBusy(false);}
