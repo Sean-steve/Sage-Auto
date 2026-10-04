@@ -9,6 +9,7 @@ import {
   RecordNotFoundError,
   ConcurrencyConflictError,
   CrossTenantViolationError,
+  UniqueConstraintViolationError,
 } from "../errors";
 import { TransactionContext } from "../transaction-manager";
 
@@ -83,6 +84,17 @@ export class VehicleOwnerRepository implements IVehicleOwnerRepository {
   }
 
   async create(data: Omit<VehicleOwner, "id" | "createdAt" | "updatedAt">): Promise<VehicleOwner> {
+    const email=data.email.trim().toLowerCase();
+    const phone=data.phone.replace(/[^0-9]/g,"");
+    const identity=data.idOrPassportNumber?.trim().toLowerCase();
+    const taxPin=data.taxPinNumber?.trim().toLowerCase();
+    for(const existing of VehicleOwnerRepository.ownerStore.values()){
+      if(existing.tenantId!==data.tenantId)continue;
+      if(existing.email.trim().toLowerCase()===email)throw new UniqueConstraintViolationError("vehicle-owner email");
+      if(existing.phone.replace(/[^0-9]/g,"")===phone)throw new UniqueConstraintViolationError("vehicle-owner phone number");
+      if(identity&&existing.idOrPassportNumber?.trim().toLowerCase()===identity)throw new UniqueConstraintViolationError("vehicle-owner ID / passport");
+      if(taxPin&&existing.taxPinNumber?.trim().toLowerCase()===taxPin)throw new UniqueConstraintViolationError("vehicle-owner tax PIN");
+    }
     const now = new Date().toISOString();
     const newOwner: VehicleOwner = {
       ...data,
@@ -115,6 +127,13 @@ export class VehicleOwnerRepository implements IVehicleOwnerRepository {
       );
     }
 
+    for(const owner of VehicleOwnerRepository.ownerStore.values()){
+      if(owner.id===id||owner.tenantId!==tenantId)continue;
+      if(data.email&&owner.email.trim().toLowerCase()===data.email.trim().toLowerCase())throw new UniqueConstraintViolationError("vehicle-owner email");
+      if(data.phone&&owner.phone.replace(/[^0-9]/g,"")===data.phone.replace(/[^0-9]/g,""))throw new UniqueConstraintViolationError("vehicle-owner phone number");
+      if(data.idOrPassportNumber&&owner.idOrPassportNumber?.trim().toLowerCase()===data.idOrPassportNumber.trim().toLowerCase())throw new UniqueConstraintViolationError("vehicle-owner ID / passport");
+      if(data.taxPinNumber&&owner.taxPinNumber?.trim().toLowerCase()===data.taxPinNumber.trim().toLowerCase())throw new UniqueConstraintViolationError("vehicle-owner tax PIN");
+    }
     const now = new Date().toISOString();
     const updated: VehicleOwner = {
       ...existing,
