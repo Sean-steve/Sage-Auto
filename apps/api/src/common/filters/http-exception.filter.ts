@@ -86,6 +86,52 @@ export function globalErrorMiddleware(
     });
   }
 
+  const operationalError = err as Error & {
+    isOperational?: unknown;
+    code?: unknown;
+    metadata?: unknown;
+  };
+  if (operationalError.isOperational === true && typeof operationalError.code === "string") {
+    const code = operationalError.code;
+    const statusCode =
+      code.includes("NOT_FOUND") || code === "RECORD_NOT_FOUND" ? 404 :
+      code.includes("CROSS_TENANT") ? 403 :
+      code.includes("SUBSCRIPTION_SUSPENDED") ? 403 :
+      code.includes("CONFLICT") ||
+      code.includes("CONCURRENCY") ||
+      code.includes("UNIQUE_CONSTRAINT") ||
+      code.includes("IMMUTABLE") ||
+      code.includes("ALREADY_") ? 409 :
+      code.includes("INVALID") ||
+      code.includes("NOT_ELIGIBLE") ||
+      code.includes("NOT_OPERATIONAL") ||
+      code.includes("REQUIRED") ? 422 :
+      code === "DATABASE_UNAVAILABLE" ? 503 :
+      400;
+
+    const safeMessage =
+      code === "INTERNAL_DATABASE_ERROR"
+        ? "The request could not be completed because of a data persistence problem."
+        : operationalError.message;
+
+    logger.warn(`Operational Error [${code}]: ${safeMessage}`, {
+      requestId,
+      statusCode,
+      path: req.path,
+      details: operationalError.metadata,
+    });
+
+    return res.status(statusCode).json({
+      error: {
+        code,
+        message: safeMessage,
+        details: operationalError.metadata,
+        requestId,
+        timestamp: new Date().toISOString(),
+      },
+    });
+  }
+
   logger.error(`Unhandled Exception: ${err.message}`, err.stack, {
     requestId,
     path: req.path,
