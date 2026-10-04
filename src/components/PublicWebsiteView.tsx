@@ -35,7 +35,7 @@ export const PublicWebsiteView:React.FC=()=>{
   const [slug,setSlug]=useState(activeTenant.slug||""),[selected,setSelected]=useState("");
   const [tab,setTab]=useState<"content"|"branding">("content");
 
-  async function request(path:string,body?:unknown,method=body!==undefined?"POST":"GET"){
+  async function request(path:string,body?:unknown,method=body!==undefined?'POST':'GET') {
     const result=await apiClient.request(`/website${path}`,{method,...(body!==undefined?{body:JSON.stringify(body)}:{})});
     if(result.error)throw new Error(result.error.message);
     return result.data;
