@@ -5553,10 +5553,11 @@ export interface HeroBlockData {
 export interface VehicleShowcaseBlockData {
   categoryFilter?: string; // "ALL" or specific category ID / name
   limit?: number;
-  layout?: "GRID_3" | "GRID_4" | "CAROUSEL";
+  layout?: "GRID_2" | "GRID_3" | "GRID_4" | "CAROUSEL";
   sortOrder?: "PRICE_ASC" | "POPULARITY" | "FEATURED";
   featuredVehicleIds?: string[];
   customBadge?: string;
+  description?: string;
 }
 
 export interface FeatureGridItem {
@@ -5567,7 +5568,8 @@ export interface FeatureGridItem {
 
 export interface FeatureGridBlockData {
   items: FeatureGridItem[];
-  columns?: 3 | 4;
+  columns?: 2 | 3 | 4;
+  description?: string;
 }
 
 export interface TextImageBlockData {
@@ -5589,6 +5591,8 @@ export interface TestimonialItem {
 
 export interface TestimonialsBlockData {
   testimonials: TestimonialItem[];
+  description?: string;
+  layout?: "GRID" | "CAROUSEL";
 }
 
 export interface FaqItem {
@@ -5598,6 +5602,7 @@ export interface FaqItem {
 
 export interface FaqBlockData {
   faqs: FaqItem[];
+  description?: string;
 }
 
 export interface ContactInfoBlockData {
