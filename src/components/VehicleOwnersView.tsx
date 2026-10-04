@@ -11,12 +11,44 @@ function human(v?:string){return String(v||"").replaceAll("_"," ").toLowerCase()
 export const VehicleOwnersView:React.FC=()=>{
   const {restoration,vehicleOwners,vehicleOwnerships,vehicles,activeTenant,activeTenantId,setIsNewOwnerOpen,setSelectedOwnerId,setCurrentView,showNotification}=useApp();
   const [ownerships,setOwnerships]=useState<any[]>(vehicleOwnerships);
+  const [liveOwners,setLiveOwners]=useState<any[]>([]);
+  const [liveVehicles,setLiveVehicles]=useState<any[]>([]);
   const [managingOwnerId,setManagingOwnerId]=useState<string|null>(null);
-  useEffect(()=>setOwnerships(vehicleOwnerships),[vehicleOwnerships]);
 
-  const tenantOwners=vehicleOwners.filter(o=>o.tenantId===activeTenantId);
-  const tenantVehicles=vehicles.filter(v=>v.tenantId===activeTenantId);
-  const activeForOwner=(ownerId:string)=>ownerships.filter((o:any)=>o.ownerId===ownerId&&o.isActive);
+  useEffect(()=>{
+    let cancelled=false;
+    (async()=>{
+      const [ownerResponse,vehicleResponse]=await Promise.all([
+        apiClient.vehicleOwners.listOwners(),
+        apiClient.fleet.listVehicles({limit:1000}),
+      ]);
+      if(cancelled)return;
+      const ownerRows=!ownerResponse.error?(ownerResponse.data as any[]||[]):vehicleOwners.filter(o=>o.tenantId===activeTenantId);
+      const vehicleRows=!vehicleResponse.error?(vehicleResponse.data as any[]||[]):vehicles.filter(v=>v.tenantId===activeTenantId);
+      setLiveOwners(ownerRows);setLiveVehicles(vehicleRows);
+      const histories=await Promise.all(vehicleRows.filter((v:any)=>v.ownerId).map(async(v:any)=>{
+        const response=await apiClient.vehicleOwners.getOwnershipHistory(v.id);
+        return response.error?[]:(response.data as any[]||[]);
+      }));
+      if(!cancelled)setOwnerships(histories.flat().length?histories.flat():vehicleOwnerships);
+    })().catch(()=>{if(!cancelled){setLiveOwners(vehicleOwners.filter(o=>o.tenantId===activeTenantId));setLiveVehicles(vehicles.filter(v=>v.tenantId===activeTenantId));setOwnerships(vehicleOwnerships);}});
+    return()=>{cancelled=true;};
+  },[activeTenantId,vehicleOwners.length,vehicles.length]);
+
+  const tenantVehicles=(liveVehicles.length?liveVehicles:vehicles.filter(v=>v.tenantId===activeTenantId));
+  const rawOwners=(liveOwners.length?liveOwners:vehicleOwners.filter(o=>o.tenantId===activeTenantId));
+  const tenantOwners=useMemo(()=>{
+    const groups=new Map<string,any>();
+    for(const owner of rawOwners){
+      const key=(owner.email||"").trim().toLowerCase()||String(owner.phone||"").replace(/[^0-9]/g,"")||owner.id;
+      const existing=groups.get(key);
+      if(!existing)groups.set(key,{...owner,_aliasIds:[owner.id]});
+      else existing._aliasIds.push(owner.id);
+    }
+    return [...groups.values()];
+  },[rawOwners]);
+  const aliasIds=(owner:any)=>owner._aliasIds||[owner.id];
+  const activeForOwner=(owner:any)=>ownerships.filter((o:any)=>aliasIds(owner).includes(o.ownerId)&&o.isActive);
 
   return <div id="vehicle-owners-view" className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6">
     <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-xs font-black uppercase tracking-[.18em] text-emerald-600">Owner economics</p><h1 className="mt-1 text-2xl font-black text-slate-950">Vehicle Owners & Revenue Agreements</h1><p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">Every owner sees the active commercial terms for each attached vehicle. Revenue share is vehicle-agreement specific—there is no hidden global “default” percentage that silently overrides a vehicle contract.</p></div><button disabled={restoration} onClick={()=>setIsNewOwnerOpen(true)} className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-black text-white disabled:opacity-50"><Plus size={16}/>Add Vehicle Owner</button></header>
@@ -24,8 +56,8 @@ export const VehicleOwnersView:React.FC=()=>{
     <section className="grid gap-3 sm:grid-cols-3"><Metric label="Registered owners" value={tenantOwners.length}/><Metric label="Active agreements" value={ownerships.filter((o:any)=>o.tenantId===activeTenantId&&o.isActive).length}/><Metric label="Partner vehicles" value={tenantVehicles.filter(v=>Boolean(v.ownerId)).length}/></section>
 
     <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">{tenantOwners.map(owner=>{
-      const ownedVehicles=tenantVehicles.filter(v=>v.ownerId===owner.id);
-      const agreements=activeForOwner(owner.id);
+      const ownedVehicles=tenantVehicles.filter(v=>aliasIds(owner).includes(v.ownerId));
+      const agreements=activeForOwner(owner);
       const primary=agreements[0];
       return <article key={owner.id} className="flex flex-col justify-between rounded-3xl border bg-white p-5 shadow-sm">
         <div>
@@ -42,7 +74,7 @@ export const VehicleOwnersView:React.FC=()=>{
 
     {!tenantOwners.length&&<div className="rounded-3xl border border-dashed bg-white p-12 text-center"><WalletCards className="mx-auto text-slate-300"/><h2 className="mt-3 font-black">No vehicle owners registered</h2><p className="mt-1 text-sm text-slate-500">Add an owner when a vehicle is investor-owned, leased, managed or under a revenue-share agreement.</p></div>}
 
-    {managingOwnerId&&<TermsModal owner={tenantOwners.find(o=>o.id===managingOwnerId)} vehicles={tenantVehicles.filter(v=>v.ownerId===managingOwnerId)} ownerships={ownerships} currency={activeTenant.currency||"KES"} onClose={()=>setManagingOwnerId(null)} onSaved={(agreement:any)=>{setOwnerships(prev=>[agreement,...prev.map((o:any)=>o.vehicleId===agreement.vehicleId&&o.id!==agreement.id?{...o,isActive:false}:o)]);showNotification("Owner agreement terms updated.");}}/>}
+    {managingOwnerId&&<TermsModal owner={tenantOwners.find(o=>o.id===managingOwnerId)} vehicles={tenantVehicles.filter(v=>aliasIds(tenantOwners.find(o=>o.id===managingOwnerId)||{id:managingOwnerId}).includes(v.ownerId))} ownerships={ownerships} currency={activeTenant.currency||"KES"} onClose={()=>setManagingOwnerId(null)} onSaved={(agreement:any)=>{setOwnerships(prev=>[agreement,...prev.map((o:any)=>o.vehicleId===agreement.vehicleId&&o.id!==agreement.id?{...o,isActive:false}:o)]);showNotification("Owner agreement terms updated.");}}/>}
   </div>;
 };
 
