@@ -126,17 +126,22 @@ export const SettlementsView: React.FC = () => {
         return;
       }
 
-      const jobs = await Promise.all([
-        hasPermission("settlement.read") ? apiClient.ownerSettlements.listSettlements() : Promise.resolve({}),
-        hasPermission("settlement.read") ? apiClient.ownerSettlements.listPeriods() : Promise.resolve({}),
-        hasPermission("settlement.read") ? apiClient.ownerSettlements.listBatches() : Promise.resolve({}),
-        hasPermission("settlement.read") ? apiClient.ownerSettlements.listPayables() : Promise.resolve({}),
-        hasPermission("settlement.read")
-          ? apiClient.ownerSettlements.getProfitability({ startDate: month.start, endDate: month.end })
-          : Promise.resolve({}),
-      ]);
+      if (!hasPermission("settlement.read")) {
+        setSettlements([]);
+        setPeriods([]);
+        setBatches([]);
+        setPayables([]);
+        setProfitability(null);
+        return;
+      }
 
-      const [settlementRes, periodRes, batchRes, payableRes, profitabilityRes] = jobs;
+      const [settlementRes, periodRes, batchRes, payableRes, profitabilityRes] = await Promise.all([
+        apiClient.ownerSettlements.listSettlements(),
+        apiClient.ownerSettlements.listPeriods(),
+        apiClient.ownerSettlements.listBatches(),
+        apiClient.ownerSettlements.listPayables(),
+        apiClient.ownerSettlements.getProfitability({ startDate: month.start, endDate: month.end }),
+      ]);
       if (!settlementRes.error && Array.isArray(settlementRes.data)) setSettlements(settlementRes.data);
       if (!periodRes.error && Array.isArray(periodRes.data)) setPeriods(periodRes.data);
       if (!batchRes.error && Array.isArray(batchRes.data)) setBatches(batchRes.data);
