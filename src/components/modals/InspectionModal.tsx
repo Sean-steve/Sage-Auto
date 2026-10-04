@@ -130,7 +130,7 @@ export const InspectionModal: React.FC = () => {
       const booking=bookingId?bookings.find((b:any)=>b.id===bookingId):undefined;
       const canonicalType=inspectionType==="RETURN"?"RETURN":"PRE_RENTAL";
       const customerId=booking?.customerId||targetRental?.customerId||undefined;
-      const driverId=booking?.primaryDriverId||targetRental?.primaryDriverId||undefined;
+      const driverId=booking?.primaryDriverId||(targetRental as any)?.primaryDriverId||undefined;
 
       const createdResponse=await apiClient.inspections.createInspection({
         inspectionType:canonicalType,
