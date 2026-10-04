@@ -649,13 +649,16 @@ export const MaintenanceView: React.FC = () => {
                         </td>
 
                         <td className="px-5 py-3.5 text-right">
-                          <button disabled={restoration} aria-describedby="restoration-actions-note"
-                            onClick={() => handleSpawnOrderFromDue(result)}
-                            className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] shadow-xs transition-colors flex items-center gap-1 ml-auto"
-                          >
-                            <Wrench className="w-3 h-3" />
-                            <span>Dispatch Work Order</span>
-                          </button>
+                          {(()=>{
+                            const activeOrder=tenantOrders.find(order=>order.vehicleId===result.vehicleId&&order.sourceType==="SCHEDULE"&&order.sourceId===result.scheduleId&&!["COMPLETED","VERIFIED","CANCELLED"].includes(order.status));
+                            return <button disabled={restoration||Boolean(activeOrder)} aria-describedby="restoration-actions-note"
+                              onClick={() => handleSpawnOrderFromDue(result)}
+                              className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 disabled:text-slate-600 text-white font-bold text-[11px] shadow-xs transition-colors flex items-center gap-1 ml-auto"
+                            >
+                              {activeOrder?<CheckCircle2 className="w-3 h-3"/>:<Wrench className="w-3 h-3"/>}
+                              <span>{activeOrder?`Active · ${activeOrder.maintenanceNumber}`:"Dispatch Work Order"}</span>
+                            </button>;
+                          })()}
                         </td>
                       </tr>
                     );
