@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   X,
   ClipboardCheck,
@@ -79,23 +79,43 @@ export const InspectionModal: React.FC = () => {
   const [saving,setSaving]=useState(false);
   const [saveError,setSaveError]=useState("");
 
+  const resolvedContext=useMemo(()=>{
+    const explicitRental=inspectionTarget?.rentalId?rentals.find((r:any)=>r.id===inspectionTarget.rentalId):undefined;
+    const vehicleRentals=rentals
+      .filter((r:any)=>r.vehicleId===vehicleId&&!["COMPLETED","CANCELLED","CLOSED"].includes(String(r.status||"").toUpperCase()))
+      .sort((a:any,b:any)=>new Date(b.actualStartAt||b.createdAt||0).getTime()-new Date(a.actualStartAt||a.createdAt||0).getTime());
+    const rental=explicitRental||(inspectionType==="RETURN"?vehicleRentals[0]:undefined);
+    const explicitBookingId=inspectionTarget?.bookingId||rental?.bookingId;
+    const vehicleBookings=bookings
+      .filter((b:any)=>(b.assignedVehicleId===vehicleId||b.requestedVehicleId===vehicleId)&&!["CANCELLED","REJECTED","EXPIRED","NO_SHOW","COMPLETED"].includes(String(b.status||"").toUpperCase()))
+      .sort((a:any,b:any)=>new Date(b.pickupAt||b.createdAt||0).getTime()-new Date(a.pickupAt||a.createdAt||0).getTime());
+    const booking=explicitBookingId?bookings.find((b:any)=>b.id===explicitBookingId):vehicleBookings.find((b:any)=>String(b.status||"").toUpperCase()==="CONFIRMED")||vehicleBookings[0];
+    const customerId=booking?.customerId||rental?.customerId;
+    const driverId=booking?.primaryDriverId||rental?.primaryDriverId;
+    return {
+      rental,
+      booking,
+      bookingId:booking?.id||explicitBookingId,
+      rentalId:rental?.id||inspectionTarget?.rentalId,
+      customer:customers.find((item:any)=>item.id===customerId),
+      driver:drivers.find((item:any)=>item.id===driverId),
+      customerId,
+      driverId,
+    };
+  },[inspectionTarget?.bookingId,inspectionTarget?.rentalId,inspectionType,vehicleId,bookings,rentals,customers,drivers]);
+
   useEffect(()=>{
     if(!isInspectionModalOpen)return;
     if(inspectionTarget?.vehicleId)setVehicleId(inspectionTarget.vehicleId);
     if(inspectionTarget?.type)setInspectionType(inspectionTarget.type);
-    const rental=inspectionTarget?.rentalId?rentals.find((r:any)=>r.id===inspectionTarget.rentalId):undefined;
-    const bookingId=inspectionTarget?.bookingId||rental?.bookingId;
-    const booking=bookingId?bookings.find((b:any)=>b.id===bookingId):undefined;
-    const customer=customers.find((item:any)=>item.id===booking?.customerId);
-    const driver=drivers.find((item:any)=>item.id===booking?.primaryDriverId);
-    setCustomerName(driver?.fullName||customer?.fullName||"");
-    const vehicle=vehicles.find((item:any)=>item.id===inspectionTarget?.vehicleId);
+    setCustomerName(resolvedContext.driver?.fullName||resolvedContext.customer?.fullName||"");
+    const vehicle=vehicles.find((item:any)=>item.id===(inspectionTarget?.vehicleId||vehicleId));
     if(vehicle){
       setOdometer(String(vehicle.odometer||0));
       setFuelLevel(String(vehicle.fuelLevel??100));
     }
     setSaveError("");
-  },[isInspectionModalOpen,inspectionTarget?.vehicleId,inspectionTarget?.bookingId,inspectionTarget?.rentalId,inspectionTarget?.type]);
+  },[isInspectionModalOpen,inspectionTarget?.vehicleId,inspectionTarget?.type,vehicleId,resolvedContext.driver?.id,resolvedContext.customer?.id]);
 
   if (!isInspectionModalOpen) return null;
 
@@ -125,18 +145,16 @@ export const InspectionModal: React.FC = () => {
     setSaving(true);setSaveError("");
 
     try {
-      const targetRental=inspectionTarget?.rentalId?rentals.find((r:any)=>r.id===inspectionTarget.rentalId):undefined;
-      const bookingId=inspectionTarget?.bookingId||targetRental?.bookingId;
-      const booking=bookingId?bookings.find((b:any)=>b.id===bookingId):undefined;
       const canonicalType=inspectionType==="RETURN"?"RETURN":"PRE_RENTAL";
-      const customerId=booking?.customerId||targetRental?.customerId||undefined;
-      const driverId=booking?.primaryDriverId||(targetRental as any)?.primaryDriverId||undefined;
+      const bookingId=resolvedContext.bookingId;
+      const customerId=resolvedContext.customerId;
+      const driverId=resolvedContext.driverId;
 
       const createdResponse=await apiClient.inspections.createInspection({
         inspectionType:canonicalType,
         vehicleId,
         bookingId:bookingId||undefined,
-        rentalId:inspectionTarget?.rentalId||undefined,
+        rentalId:resolvedContext.rentalId||undefined,
         customerId,
         driverId,
         odometer:Number(odometer),
@@ -293,6 +311,13 @@ export const InspectionModal: React.FC = () => {
               </div>
             </div>
 
+            {vehicleId&&<div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-emerald-950">
+              <p className="font-bold">Trip context</p>
+              <p className="mt-1">Customer: {resolvedContext.customer?.fullName||"No linked customer found"} · Driver: {resolvedContext.driver?.fullName||resolvedContext.customer?.fullName||"No linked driver found"}</p>
+              <p className="mt-1 text-[11px] text-emerald-800">{resolvedContext.booking?("Booking "+(resolvedContext.booking.bookingNumber||resolvedContext.booking.id)):"No active booking linked"}{resolvedContext.rental?(" · Rental "+(resolvedContext.rental.rentalNumber||resolvedContext.rental.id)):""}</p>
+              {inspectionType==="RETURN"&&<p className="mt-1 text-[11px]">Return inspections should be completed immediately after vehicle receipt and before damage assessment/final calculation.</p>}
+            </div>}
+
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
                 <label className="block text-slate-600 dark:text-slate-400 font-medium mb-1">Odometer Reading (km) *</label>
@@ -425,7 +450,7 @@ export const InspectionModal: React.FC = () => {
                 onClick={handleAddDamage}
                 className="px-4 py-1.5 rounded-lg bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 font-bold text-xs"
               >
-                + Pin Damage Zone
+                Add defect record
               </button>
             </div>
 
