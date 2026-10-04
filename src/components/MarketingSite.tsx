@@ -386,14 +386,30 @@ function SectionTitle({ eyebrow, title, copy }: { eyebrow: string; title: string
 
 function MarketingHeader() {
   const [open, setOpen] = useState(false);
+  const dropdowns = {
+    Product: productLinks.slice(0, 9),
+    Solutions: solutionLinks.slice(0, 6),
+    Resources: resourceCards.map(item => [item.title, item.href] as const),
+  } as const;
   return <header className="sticky top-0 z-40 border-b border-slate-200/80 bg-[#fbfaf7]/95 backdrop-blur">
     <div className="mx-auto flex h-18 max-w-7xl items-center justify-between px-5 sm:px-8">
       <a href="/" className="flex items-center gap-3 font-semibold tracking-tight text-slate-950">
         <span className="grid h-9 w-9 place-items-center rounded-xl bg-emerald-700 text-white"><CarFront size={19}/></span>
         <span className="text-lg">Sage Auto</span>
       </a>
-      <nav className="hidden items-center gap-7 lg:flex" aria-label="Primary navigation">
-        {navGroups.map(item => <a key={item.href} href={item.href} className="text-sm font-medium text-slate-600 hover:text-slate-950">{item.label}</a>)}
+      <nav className="hidden items-center gap-2 lg:flex" aria-label="Primary navigation">
+        {navGroups.map(item => {
+          const dropdown = dropdowns[item.label as keyof typeof dropdowns];
+          return <div key={item.href} className="group relative">
+            <a href={item.href} className="flex items-center gap-1 rounded-full px-4 py-2 text-sm font-medium text-slate-600 hover:bg-white hover:text-slate-950">
+              {item.label}{dropdown && <ChevronDown size={14}/>}
+            </a>
+            {dropdown && <div className="invisible absolute left-0 top-full z-50 mt-2 w-72 translate-y-1 rounded-2xl border border-slate-200 bg-white p-2 opacity-0 shadow-xl transition group-hover:visible group-hover:translate-y-0 group-hover:opacity-100">
+              {dropdown.map(([label,href]) => <a key={href} href={href} className="flex items-center justify-between rounded-xl px-4 py-3 text-sm font-medium text-slate-700 hover:bg-[#f4f1e9] hover:text-slate-950"><span>{label}</span><ArrowRight size={14}/></a>)}
+              <a href={item.href} className="mt-1 flex items-center gap-2 border-t border-slate-100 px-4 py-3 text-xs font-bold uppercase tracking-[0.12em] text-emerald-700">View all <ArrowRight size={13}/></a>
+            </div>}
+          </div>;
+        })}
       </nav>
       <div className="hidden items-center gap-3 lg:flex">
         <a href="/login" className="px-3 py-2 text-sm font-semibold text-slate-700 hover:text-slate-950">Sign in</a>
@@ -429,7 +445,7 @@ function HeroVisual() {
     <div className="absolute -inset-6 rounded-[2.5rem] bg-emerald-200/40 blur-3xl"/>
     <div className="relative overflow-hidden rounded-[2rem] border border-slate-200 bg-white p-4 shadow-2xl shadow-slate-300/40">
       <div className="rounded-[1.5rem] bg-slate-950 p-5 text-white">
-        <div className="flex items-center justify-between"><div><p className="text-xs text-slate-400">Today</p><p className="mt-1 font-semibold">Operations overview</p></div><span className="rounded-full bg-emerald-400/15 px-3 py-1 text-xs text-emerald-300">Live workflow</span></div>
+        <div className="flex items-center justify-between"><div><p className="text-xs text-slate-400">Illustrative workspace</p><p className="mt-1 font-semibold">Operations overview</p></div><span className="rounded-full bg-emerald-400/15 px-3 py-1 text-xs text-emerald-300">Live workflow</span></div>
         <div className="mt-5 grid gap-3 sm:grid-cols-3">
           {[["Fleet ready","24"],["Due returns","07"],["Open balances","KES 184k"]].map(([a,b])=><div className="rounded-2xl bg-white/7 p-4" key={a}><p className="text-xs text-slate-400">{a}</p><p className="mt-1 text-xl font-semibold">{b}</p></div>)}
         </div>
@@ -488,7 +504,7 @@ function HomePage() {
 
     <section className="bg-slate-950 text-white">
       <div className="mx-auto grid max-w-7xl gap-12 px-5 py-20 sm:px-8 lg:grid-cols-2">
-        <div><p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-400">Built for the realities of rental</p><h2 className="mt-4 text-4xl font-semibold tracking-tight">Local payment realities. Global operating discipline.</h2><p className="mt-5 text-lg leading-8 text-slate-300">Sage Auto is designed for businesses that need M-Pesa and card payment paths, mixed owned and third-party fleets, direct customer channels and strong operating controls—without locking the product to one market.</p><div className="mt-8"><LinkButton href="/solutions">Explore solutions</LinkButton></div></div>
+        <div><p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-400">Built for the realities of rental</p><h2 className="mt-4 text-4xl font-semibold tracking-tight">Local payment realities. Global operating discipline.</h2><p className="mt-5 text-lg leading-8 text-slate-300">Sage Auto is designed for businesses that need M-Pesa and card payment paths, mixed owned and third-party fleets, direct customer channels and strong operating controls—without locking the product to one market.</p><div className="mt-8"><LinkButton href="/solutions" secondary>Explore solutions</LinkButton></div></div>
         <div className="grid gap-4 sm:grid-cols-2">{[
           [CreditCard,"Collections that reconcile","Keep provider references, verification and allocation attached to the purpose of each payment."],
           [WalletCards,"Owner economics","Explain owner settlements from vehicle activity, costs, adjustments and approvals."],
