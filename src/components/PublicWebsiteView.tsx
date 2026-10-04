@@ -17,15 +17,15 @@ const sectionCatalog=[
 
 function makeBlock(type:string){
   const id=`blk-${crypto.randomUUID().slice(0,8)}`;
-  const base={id,type,sortOrder:0,title:sectionCatalog.find(x=>x[0]===type)?.[1]||type,data:{enabled:true}} as any;
-  if(type==="HERO")base.data={enabled:true,badge:"Drive with confidence",headline:"Find the right car for every journey",subheadline:"Transparent pricing, live availability and a smoother rental experience.",primaryCtaLabel:"Browse fleet",primaryCtaLink:"/fleet",showSearchWidget:true};
-  if(type==="FEATURE_GRID")base.data={enabled:true,items:[{icon:"ShieldCheck",title:"Clear rental terms",description:"Know the price, deposit and booking status before pickup."},{icon:"Clock",title:"Fast booking",description:"Choose your dates and send your request online."},{icon:"Car",title:"Quality fleet",description:"Browse published, operational vehicles from the live fleet."}],columns:3};
-  if(type==="VEHICLE_SHOWCASE")base.data={enabled:true,categoryFilter:"ALL",limit:6,layout:"GRID_3",customBadge:"Available fleet"};
-  if(type==="TEXT_IMAGE")base.data={enabled:true,richText:"<p>Tell customers what makes your rental company different, where you operate, and the experience they can expect.</p>",imageAlignment:"RIGHT"};
-  if(type==="TESTIMONIALS")base.data={enabled:true,testimonials:[{quote:"Great service and a smooth pickup experience.",author:"Customer",rating:5}]};
-  if(type==="FAQ")base.data={enabled:true,faqs:[{question:"What do I need to rent a car?",answer:"Bring a valid driving licence and the identification requested during booking."},{question:"When is my booking confirmed?",answer:"Your renter account updates as the rental team reviews and confirms the reservation."}]};
-  if(type==="CALL_TO_ACTION")base.data={enabled:true,headline:"Ready to book your next drive?",description:"Choose your vehicle and dates, then follow the booking from your renter account.",buttonLabel:"Browse vehicles",buttonLink:"/fleet"};
-  if(type==="CONTACT_INFO")base.data={enabled:true,phone:"",email:"",address:"",operatingHours:""};
+  const base={id,type,sortOrder:0,title:"",data:{enabled:true}} as any;
+  if(type==="HERO")base.data={enabled:true,badge:"",headline:"",subheadline:"",imageUrl:"",primaryCtaLabel:"",primaryCtaLink:"",secondaryCtaLabel:"",secondaryCtaLink:"",showSearchWidget:true};
+  if(type==="FEATURE_GRID")base.data={enabled:true,description:"",items:[],columns:3};
+  if(type==="VEHICLE_SHOWCASE")base.data={enabled:true,categoryFilter:"ALL",limit:6,layout:"GRID_3",customBadge:"",description:""};
+  if(type==="TEXT_IMAGE")base.data={enabled:true,richText:"",imageUrl:"",imageAlignment:"RIGHT",ctaLabel:"",ctaLink:""};
+  if(type==="TESTIMONIALS")base.data={enabled:true,description:"",layout:"GRID",testimonials:[]};
+  if(type==="FAQ")base.data={enabled:true,description:"",faqs:[]};
+  if(type==="CALL_TO_ACTION")base.data={enabled:true,headline:"",description:"",buttonLabel:"",buttonLink:"",accentBadge:""};
+  if(type==="CONTACT_INFO")base.data={enabled:true,phone:"",email:"",address:"",operatingHours:"",whatsapp:""};
   return base;
 }
 
@@ -74,7 +74,7 @@ export const PublicWebsiteView:React.FC=()=>{
 
     {tab==="content"&&<div className="grid gap-6 lg:grid-cols-[260px_1fr]">
       <aside className="h-fit rounded-3xl border bg-white p-4 shadow-sm"><p className="px-2 text-xs font-black uppercase tracking-[.15em] text-slate-400">Pages</p><div className="mt-3 space-y-1">{pages.slice().sort((a,b)=>a.displayOrder-b.displayOrder).map(page=><button key={page.id} onClick={()=>setSelected(page.id)} className={"w-full rounded-xl px-3 py-3 text-left "+(selected===page.id?"bg-slate-950 text-white":"hover:bg-slate-50")}><div className="flex items-center justify-between gap-2"><span className="text-sm font-bold">{page.title}</span><span className="text-[10px] opacity-60">{page.status}</span></div><p className="mt-1 text-xs opacity-60">{page.slug}</p></button>)}</div></aside>
-      <main>{selectedPage?<PageEditor key={selectedPage.id} page={selectedPage} busy={busy} save={(blocks,status)=>void act(async()=>{await request(`/pages/${selectedPage.id}`,{contentBlocks:blocks,status},"PUT");})}/>:<div className="rounded-3xl border bg-white p-10 text-center text-slate-500">Select a page to edit.</div>}</main>
+      <main>{selectedPage?<PageEditor key={selectedPage.id} page={selectedPage} pages={pages} busy={busy} save={(blocks,status)=>void act(async()=>{await request(`/pages/${selectedPage.id}`,{contentBlocks:blocks,status},"PUT");})}/>:<div className="rounded-3xl border bg-white p-10 text-center text-slate-500">Select a page to edit.</div>}</main>
     </div>}
 
     {tab==="branding"&&<BrandingEditor site={site} busy={busy} save={branding=>void act(async()=>{await request("/branding",{branding},"PUT");})}/>}
@@ -83,7 +83,7 @@ export const PublicWebsiteView:React.FC=()=>{
   </div>;
 };
 
-function PageEditor({page,busy,save}:{page:any;busy:boolean;save:(blocks:any[],status:string)=>void}){
+function PageEditor({page,pages,busy,save}:{page:any;pages:any[];busy:boolean;save:(blocks:any[],status:string)=>void}){
   const [blocks,setBlocks]=useState<any[]>(page.contentBlocks||[]);
   const [status,setStatus]=useState(page.status||"PUBLISHED");
   useEffect(()=>{setBlocks(page.contentBlocks||[]);setStatus(page.status||"PUBLISHED");},[page.id,page.version]);
@@ -91,25 +91,124 @@ function PageEditor({page,busy,save}:{page:any;busy:boolean;save:(blocks:any[],s
   function normalize(next:any[]){return next.map((b,i)=>({...b,sortOrder:i}));}
   function move(i:number,dir:-1|1){const j=i+dir;if(j<0||j>=blocks.length)return;setBlocks(prev=>{const n=[...prev];[n[i],n[j]]=[n[j],n[i]];return normalize(n);});}
   function setData(i:number,key:string,value:any){setBlocks(prev=>prev.map((b,n)=>n===i?{...b,data:{...b.data,[key]:value}}:b));}
+  function setTitle(i:number,value:string){setBlocks(prev=>prev.map((b,n)=>n===i?{...b,title:value}:b));}
   function add(type:string){setBlocks(prev=>normalize([...prev,makeBlock(type)]));}
 
   return <div className="space-y-5">
-    <section className="rounded-3xl border bg-white p-5 shadow-sm sm:p-6"><div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-xs font-black uppercase tracking-[.15em] text-emerald-600">Editing page</p><h2 className="mt-1 text-2xl font-black">{page.title}</h2><p className="mt-1 text-sm text-slate-500">{page.slug} · Turn sections on/off, reorder them, or add a new section below.</p></div><label className="text-xs font-bold text-slate-500">Page visibility<select value={status} onChange={e=>setStatus(e.target.value)} className={input}><option value="PUBLISHED">Visible on website</option><option value="DRAFT">Hidden / draft</option><option value="ARCHIVED">Archived</option></select></label></div></section>
+    <section className="rounded-3xl border bg-white p-5 shadow-sm sm:p-6"><div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-xs font-black uppercase tracking-[.15em] text-emerald-600">Editing page</p><h2 className="mt-1 text-2xl font-black">{page.title}</h2><p className="mt-1 text-sm text-slate-500">{page.slug} · Every section below is tenant-controlled. Add only the sections and content you want customers to see.</p></div><label className="text-xs font-bold text-slate-500">Page visibility<select value={status} onChange={e=>setStatus(e.target.value)} className={input}><option value="PUBLISHED">Visible on website</option><option value="DRAFT">Hidden / draft</option><option value="ARCHIVED">Archived</option></select></label></div></section>
 
-    <div className="space-y-3">{blocks.map((block,i)=><section key={block.id} className={"rounded-3xl border bg-white p-5 shadow-sm "+(block.data?.enabled===false?"opacity-60":"")}><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs font-black uppercase tracking-[.15em] text-slate-400">{block.type.replaceAll("_"," ")}</p><h3 className="mt-1 font-black">{block.title||"Website section"}</h3></div><div className="flex gap-1"><button title="Move up" type="button" onClick={()=>move(i,-1)} className="rounded-lg border p-2"><ArrowUp size={14}/></button><button title="Move down" type="button" onClick={()=>move(i,1)} className="rounded-lg border p-2"><ArrowDown size={14}/></button><button type="button" onClick={()=>setData(i,"enabled",block.data?.enabled===false)} className="inline-flex items-center gap-1 rounded-lg border px-2.5 py-2 text-xs font-bold">{block.data?.enabled===false?<><Eye size={14}/>Show</>:<><EyeOff size={14}/>Hide</>}</button><button type="button" onClick={()=>setBlocks(prev=>normalize(prev.filter((_,n)=>n!==i)))} className="rounded-lg border border-rose-200 p-2 text-rose-600"><Trash2 size={14}/></button></div></div><BlockFields block={block} setData={(key,value)=>setData(i,key,value)}/></section>)}</div>
+    <div className="space-y-3">{blocks.map((block,i)=><section key={block.id} className={"rounded-3xl border bg-white p-5 shadow-sm "+(block.data?.enabled===false?"opacity-60":"")}><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs font-black uppercase tracking-[.15em] text-slate-400">{block.type.replaceAll("_"," ")}</p><h3 className="mt-1 font-black">{block.title||sectionCatalog.find(x=>x[0]===block.type)?.[1]||"Website section"}</h3></div><div className="flex gap-1"><button title="Move up" type="button" onClick={()=>move(i,-1)} className="rounded-lg border p-2"><ArrowUp size={14}/></button><button title="Move down" type="button" onClick={()=>move(i,1)} className="rounded-lg border p-2"><ArrowDown size={14}/></button><button type="button" onClick={()=>setData(i,"enabled",block.data?.enabled===false)} className="inline-flex items-center gap-1 rounded-lg border px-2.5 py-2 text-xs font-bold">{block.data?.enabled===false?<><Eye size={14}/>Show</>:<><EyeOff size={14}/>Hide</>}</button><button type="button" onClick={()=>setBlocks(prev=>normalize(prev.filter((_,n)=>n!==i)))} className="rounded-lg border border-rose-200 p-2 text-rose-600"><Trash2 size={14}/></button></div></div><BlockFields block={block} pages={pages} setTitle={value=>setTitle(i,value)} setData={(key,value)=>setData(i,key,value)}/></section>)}</div>
 
-    <section className="rounded-3xl border border-dashed bg-white p-5"><h3 className="font-black">Add website section</h3><p className="mt-1 text-sm text-slate-500">Build out a full site without code. New sections are added to this page and can be hidden later.</p><div className="mt-4 grid gap-2 sm:grid-cols-2">{sectionCatalog.map(([type,label])=><button type="button" key={type} onClick={()=>add(type)} className="flex items-center gap-2 rounded-xl border px-3 py-3 text-left text-sm font-semibold hover:border-emerald-300 hover:bg-emerald-50"><Plus size={15}/>{label}</button>)}</div></section>
+    <section className="rounded-3xl border border-dashed bg-white p-5"><h3 className="font-black">Add website section</h3><p className="mt-1 text-sm text-slate-500">New sections start blank. Add the section, then configure its content, cards, links and layout yourself.</p><div className="mt-4 grid gap-2 sm:grid-cols-2">{sectionCatalog.map(([type,label])=><button type="button" key={type} onClick={()=>add(type)} className="flex items-center gap-2 rounded-xl border px-3 py-3 text-left text-sm font-semibold hover:border-emerald-300 hover:bg-emerald-50"><Plus size={15}/>{label}</button>)}</div></section>
 
     <div className="sticky bottom-4 flex justify-end"><button disabled={busy} onClick={()=>save(normalize(blocks),status)} className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-black text-white shadow-lg"><Save size={16}/>{busy?"Saving…":"Save page settings"}</button></div>
   </div>;
 }
 
-function BlockFields({block,setData}:{block:any;setData:(key:string,value:any)=>void}){
-  const d=block.data||{};
-  const fields:string[]=block.type==="HERO"?["badge","headline","subheadline","primaryCtaLabel","primaryCtaLink","imageUrl"]:block.type==="TEXT_IMAGE"?["richText","imageUrl","ctaLabel","ctaLink"]:block.type==="CALL_TO_ACTION"?["headline","description","buttonLabel","buttonLink","accentBadge"]:block.type==="CONTACT_INFO"?["phone","email","address","operatingHours","whatsapp"]:block.type==="VEHICLE_SHOWCASE"?["categoryFilter","customBadge"]: [];
-  return <div className="mt-4 grid gap-3 sm:grid-cols-2">{fields.map(key=><label key={key} className={"text-xs font-bold text-slate-500 "+(["subheadline","richText","description","address","operatingHours"].includes(key)?"sm:col-span-2":"")}>{key.replace(/([A-Z])/g," $1").replace(/^./,c=>c.toUpperCase())}{["subheadline","richText","description","address","operatingHours"].includes(key)?<textarea rows={3} value={String(d[key]||"")} onChange={e=>setData(key,e.target.value)} className={input}/>:<input value={String(d[key]||"")} onChange={e=>setData(key,e.target.value)} className={input}/>}</label>)}{block.type==="FEATURE_GRID"&&<ListSummary title="Benefit cards" count={d.items?.length||0}/>} {block.type==="FAQ"&&<ListSummary title="FAQ entries" count={d.faqs?.length||0}/>} {block.type==="TESTIMONIALS"&&<ListSummary title="Testimonials" count={d.testimonials?.length||0}/>}</div>;
+function destinationOptions(pages:any[]){
+  const options=[
+    {value:"",label:"No link"},
+    {value:"/",label:"Home"},
+    {value:"/fleet",label:"Fleet catalogue"},
+    {value:"/fleet#booking",label:"Booking form"},
+    {value:"/account",label:"Renter account"},
+    {value:"/track",label:"Track a booking"},
+  ];
+  const seen=new Set(options.map(x=>x.value));
+  for(const page of pages.slice().sort((a,b)=>(a.displayOrder||0)-(b.displayOrder||0))){
+    const value=String(page.slug||"");
+    if(value&&!seen.has(value)){options.push({value,label:page.title||value});seen.add(value);}
+  }
+  return options;
 }
-function ListSummary({title,count}:{title:string;count:number}){return <div className="sm:col-span-2 rounded-xl bg-slate-50 p-3 text-sm"><strong>{title}</strong><span className="ml-2 text-slate-500">{count} configured. Defaults are rendered on the public site; structured item editing can be expanded later without changing the section contract.</span></div>;}
+
+function DestinationField({label,value,pages,onChange}:{label:string;value:string;pages:any[];onChange:(value:string)=>void}){
+  const options=destinationOptions(pages);
+  return <label className="text-xs font-bold text-slate-500">{label}<select value={value||""} onChange={e=>onChange(e.target.value)} className={input}>{options.map(option=><option key={option.value||"none"} value={option.value}>{option.label}</option>)}</select></label>;
+}
+
+function BlockFields({block,pages,setTitle,setData}:{block:any;pages:any[];setTitle:(value:string)=>void;setData:(key:string,value:any)=>void}){
+  const d=block.data||{};
+  const rows=(key:string)=>Array.isArray(d[key])?d[key]:[];
+  const updateRow=(key:string,index:number,patch:any)=>setData(key,rows(key).map((row:any,i:number)=>i===index?{...row,...patch}:row));
+  const removeRow=(key:string,index:number)=>setData(key,rows(key).filter((_:any,i:number)=>i!==index));
+  const commonTitle=<label className="text-xs font-bold text-slate-500 sm:col-span-2">Section title<input value={String(block.title||"")} onChange={e=>setTitle(e.target.value)} placeholder="Optional customer-facing heading" className={input}/></label>;
+
+  if(block.type==="HERO")return <div className="mt-4 grid gap-3 sm:grid-cols-2">
+    <label className="text-xs font-bold text-slate-500">Eyebrow / badge<input value={d.badge||""} onChange={e=>setData("badge",e.target.value)} className={input}/></label>
+    <label className="text-xs font-bold text-slate-500">Headline<input value={d.headline||""} onChange={e=>setData("headline",e.target.value)} className={input}/></label>
+    <label className="text-xs font-bold text-slate-500 sm:col-span-2">Subheadline<textarea rows={3} value={d.subheadline||""} onChange={e=>setData("subheadline",e.target.value)} className={input}/></label>
+    <label className="text-xs font-bold text-slate-500 sm:col-span-2">Background / supporting image URL<input value={d.imageUrl||""} onChange={e=>setData("imageUrl",e.target.value)} className={input}/></label>
+    <label className="text-xs font-bold text-slate-500">Primary button label<input value={d.primaryCtaLabel||""} onChange={e=>setData("primaryCtaLabel",e.target.value)} className={input}/></label>
+    <DestinationField label="Primary button destination" value={d.primaryCtaLink||""} pages={pages} onChange={value=>setData("primaryCtaLink",value)}/>
+    <label className="text-xs font-bold text-slate-500">Secondary button label<input value={d.secondaryCtaLabel||""} onChange={e=>setData("secondaryCtaLabel",e.target.value)} className={input}/></label>
+    <DestinationField label="Secondary button destination" value={d.secondaryCtaLink||""} pages={pages} onChange={value=>setData("secondaryCtaLink",value)}/>
+    <label className="flex items-center gap-2 rounded-xl border p-3 text-sm font-semibold sm:col-span-2"><input type="checkbox" checked={d.showSearchWidget!==false} onChange={e=>setData("showSearchWidget",e.target.checked)}/>Show live availability search in hero</label>
+  </div>;
+
+  if(block.type==="FEATURE_GRID"){
+    const items=rows("items");
+    return <div className="mt-4 grid gap-3 sm:grid-cols-2">{commonTitle}
+      <label className="text-xs font-bold text-slate-500 sm:col-span-2">Section description<textarea rows={2} value={d.description||""} onChange={e=>setData("description",e.target.value)} className={input}/></label>
+      <label className="text-xs font-bold text-slate-500">Desktop columns<select value={Number(d.columns||3)} onChange={e=>setData("columns",Number(e.target.value))} className={input}><option value={2}>2 cards</option><option value={3}>3 cards</option><option value={4}>4 cards</option></select></label>
+      <div className="sm:col-span-2 space-y-3">{items.map((item:any,index:number)=><div key={index} className="grid gap-3 rounded-2xl border bg-slate-50 p-4 sm:grid-cols-2"><label className="text-xs font-bold text-slate-500">Card title<input value={item.title||""} onChange={e=>updateRow("items",index,{title:e.target.value})} className={input}/></label><label className="text-xs font-bold text-slate-500">Icon<select value={item.icon||"ShieldCheck"} onChange={e=>updateRow("items",index,{icon:e.target.value})} className={input}><option>ShieldCheck</option><option>Clock</option><option>Car</option><option>Star</option><option>MapPin</option></select></label><label className="text-xs font-bold text-slate-500 sm:col-span-2">Description<textarea rows={2} value={item.description||""} onChange={e=>updateRow("items",index,{description:e.target.value})} className={input}/></label><button type="button" onClick={()=>removeRow("items",index)} className="justify-self-start text-xs font-bold text-rose-600">Remove card</button></div>)}</div>
+      <button type="button" onClick={()=>setData("items",[...items,{icon:"ShieldCheck",title:"",description:""}])} className="sm:col-span-2 inline-flex w-fit items-center gap-2 rounded-xl border px-3 py-2 text-sm font-bold"><Plus size={14}/>Add benefit card</button>
+    </div>;
+  }
+
+  if(block.type==="VEHICLE_SHOWCASE")return <div className="mt-4 grid gap-3 sm:grid-cols-2">{commonTitle}
+    <label className="text-xs font-bold text-slate-500">Eyebrow / badge<input value={d.customBadge||""} onChange={e=>setData("customBadge",e.target.value)} className={input}/></label>
+    <label className="text-xs font-bold text-slate-500">Category filter<input value={d.categoryFilter||"ALL"} onChange={e=>setData("categoryFilter",e.target.value)} className={input}/></label>
+    <label className="text-xs font-bold text-slate-500 sm:col-span-2">Section description<textarea rows={2} value={d.description||""} onChange={e=>setData("description",e.target.value)} className={input}/></label>
+    <label className="text-xs font-bold text-slate-500">Vehicles shown<input type="number" min={1} max={24} value={Number(d.limit||6)} onChange={e=>setData("limit",Number(e.target.value))} className={input}/></label>
+    <label className="text-xs font-bold text-slate-500">Layout<select value={d.layout||"GRID_3"} onChange={e=>setData("layout",e.target.value)} className={input}><option value="GRID_2">2-column grid</option><option value="GRID_3">3-column grid</option><option value="GRID_4">4-column grid</option><option value="CAROUSEL">Horizontal carousel</option></select></label>
+  </div>;
+
+  if(block.type==="TEXT_IMAGE")return <div className="mt-4 grid gap-3 sm:grid-cols-2">{commonTitle}
+    <label className="text-xs font-bold text-slate-500 sm:col-span-2">Content<textarea rows={5} value={d.richText||""} onChange={e=>setData("richText",e.target.value)} className={input}/></label>
+    <label className="text-xs font-bold text-slate-500">Image URL<input value={d.imageUrl||""} onChange={e=>setData("imageUrl",e.target.value)} className={input}/></label>
+    <label className="text-xs font-bold text-slate-500">Image position<select value={d.imageAlignment||"RIGHT"} onChange={e=>setData("imageAlignment",e.target.value)} className={input}><option value="RIGHT">Right</option><option value="LEFT">Left</option></select></label>
+    <label className="text-xs font-bold text-slate-500">Button label<input value={d.ctaLabel||""} onChange={e=>setData("ctaLabel",e.target.value)} className={input}/></label>
+    <DestinationField label="Button destination" value={d.ctaLink||""} pages={pages} onChange={value=>setData("ctaLink",value)}/>
+  </div>;
+
+  if(block.type==="TESTIMONIALS"){
+    const items=rows("testimonials");
+    return <div className="mt-4 grid gap-3 sm:grid-cols-2">{commonTitle}
+      <label className="text-xs font-bold text-slate-500 sm:col-span-2">Section description<textarea rows={2} value={d.description||""} onChange={e=>setData("description",e.target.value)} className={input}/></label>
+      <label className="text-xs font-bold text-slate-500">Card layout<select value={d.layout||"GRID"} onChange={e=>setData("layout",e.target.value)} className={input}><option value="GRID">Responsive grid</option><option value="CAROUSEL">Horizontal carousel</option></select></label>
+      <div className="sm:col-span-2 space-y-3">{items.map((item:any,index:number)=><div key={index} className="grid gap-3 rounded-2xl border bg-slate-50 p-4 sm:grid-cols-2"><label className="text-xs font-bold text-slate-500 sm:col-span-2">Review<textarea rows={3} value={item.quote||""} onChange={e=>updateRow("testimonials",index,{quote:e.target.value})} className={input}/></label><label className="text-xs font-bold text-slate-500">Customer name<input value={item.author||""} onChange={e=>updateRow("testimonials",index,{author:e.target.value})} className={input}/></label><label className="text-xs font-bold text-slate-500">Role / context<input value={item.role||""} onChange={e=>updateRow("testimonials",index,{role:e.target.value})} className={input}/></label><label className="text-xs font-bold text-slate-500">Rating<select value={Number(item.rating||5)} onChange={e=>updateRow("testimonials",index,{rating:Number(e.target.value)})} className={input}>{[5,4,3,2,1].map(n=><option key={n} value={n}>{n} stars</option>)}</select></label><label className="text-xs font-bold text-slate-500">Avatar URL<input value={item.avatarUrl||""} onChange={e=>updateRow("testimonials",index,{avatarUrl:e.target.value})} className={input}/></label><button type="button" onClick={()=>removeRow("testimonials",index)} className="justify-self-start text-xs font-bold text-rose-600">Remove testimonial</button></div>)}</div>
+      <button type="button" onClick={()=>setData("testimonials",[...items,{quote:"",author:"",role:"",rating:5,avatarUrl:""}])} className="sm:col-span-2 inline-flex w-fit items-center gap-2 rounded-xl border px-3 py-2 text-sm font-bold"><Plus size={14}/>Add testimonial</button>
+    </div>;
+  }
+
+  if(block.type==="FAQ"){
+    const items=rows("faqs");
+    return <div className="mt-4 grid gap-3 sm:grid-cols-2">{commonTitle}
+      <label className="text-xs font-bold text-slate-500 sm:col-span-2">Section description<textarea rows={2} value={d.description||""} onChange={e=>setData("description",e.target.value)} className={input}/></label>
+      <div className="sm:col-span-2 space-y-3">{items.map((item:any,index:number)=><div key={index} className="grid gap-3 rounded-2xl border bg-slate-50 p-4"><label className="text-xs font-bold text-slate-500">Question<input value={item.question||""} onChange={e=>updateRow("faqs",index,{question:e.target.value})} className={input}/></label><label className="text-xs font-bold text-slate-500">Answer<textarea rows={3} value={item.answer||""} onChange={e=>updateRow("faqs",index,{answer:e.target.value})} className={input}/></label><button type="button" onClick={()=>removeRow("faqs",index)} className="justify-self-start text-xs font-bold text-rose-600">Remove FAQ</button></div>)}</div>
+      <button type="button" onClick={()=>setData("faqs",[...items,{question:"",answer:""}])} className="sm:col-span-2 inline-flex w-fit items-center gap-2 rounded-xl border px-3 py-2 text-sm font-bold"><Plus size={14}/>Add FAQ</button>
+    </div>;
+  }
+
+  if(block.type==="CALL_TO_ACTION")return <div className="mt-4 grid gap-3 sm:grid-cols-2">{commonTitle}
+    <label className="text-xs font-bold text-slate-500">Eyebrow / badge<input value={d.accentBadge||""} onChange={e=>setData("accentBadge",e.target.value)} className={input}/></label>
+    <label className="text-xs font-bold text-slate-500">Headline<input value={d.headline||""} onChange={e=>setData("headline",e.target.value)} className={input}/></label>
+    <label className="text-xs font-bold text-slate-500 sm:col-span-2">Description<textarea rows={3} value={d.description||""} onChange={e=>setData("description",e.target.value)} className={input}/></label>
+    <label className="text-xs font-bold text-slate-500">Button label<input value={d.buttonLabel||""} onChange={e=>setData("buttonLabel",e.target.value)} className={input}/></label>
+    <DestinationField label="Button destination" value={d.buttonLink||""} pages={pages} onChange={value=>setData("buttonLink",value)}/>
+  </div>;
+
+  if(block.type==="CONTACT_INFO")return <div className="mt-4 grid gap-3 sm:grid-cols-2">{commonTitle}
+    <label className="text-xs font-bold text-slate-500">Phone<input value={d.phone||""} onChange={e=>setData("phone",e.target.value)} className={input}/></label>
+    <label className="text-xs font-bold text-slate-500">Email<input value={d.email||""} onChange={e=>setData("email",e.target.value)} className={input}/></label>
+    <label className="text-xs font-bold text-slate-500 sm:col-span-2">Address<textarea rows={2} value={d.address||""} onChange={e=>setData("address",e.target.value)} className={input}/></label>
+    <label className="text-xs font-bold text-slate-500 sm:col-span-2">Opening hours<textarea rows={2} value={d.operatingHours||""} onChange={e=>setData("operatingHours",e.target.value)} className={input}/></label>
+    <label className="text-xs font-bold text-slate-500">WhatsApp<input value={d.whatsapp||""} onChange={e=>setData("whatsapp",e.target.value)} className={input}/></label>
+  </div>;
+
+  return <div className="mt-4">{commonTitle}</div>;
+}
 
 function BrandingEditor({site,busy,save}:{site:any;busy:boolean;save:(b:any)=>void}){
   const [branding,setBranding]=useState<any>(site.branding||{});
