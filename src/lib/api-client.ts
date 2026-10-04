@@ -264,6 +264,7 @@ class ApiClient {
     assignOwnership: (dto: any) => this.post('/vehicle-owners/ownerships/assign', dto),
     transferOwnership: (dto: any) => this.post('/vehicle-owners/ownerships/transfer', dto),
     renegotiateTerms: (dto: any) => this.post('/vehicle-owners/ownerships/change-terms', dto),
+    getOwnershipHistory: (vehicleId: string) => this.get<any[]>(`/vehicle-owners/ownerships/vehicle/${vehicleId}/history`),
   };
 
   // 5. Bookings & Reservation Engine Context
