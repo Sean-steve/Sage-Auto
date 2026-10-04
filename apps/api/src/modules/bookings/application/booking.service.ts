@@ -239,8 +239,8 @@ export class BookingService {
     const existingCustomerBookings=await this.bookingRepo.findMany(tenantId,{customerId:dto.customerId,limit:1000});
     const duplicate=existingCustomerBookings.items.find(existing=>{
       if(["COMPLETED","CANCELLED","REJECTED","EXPIRED","NO_SHOW"].includes(existing.status))return false;
-      const sameWindow=new Date(existing.pickupAt||existing.startDate||0).getTime()===pickupTime&&new Date(existing.returnAt||existing.endDate||0).getTime()===returnTime;
-      const existingVehicle=existing.requestedVehicleId||existing.assignedVehicleId||existing.vehicleId||null;
+      const sameWindow=new Date(existing.pickupAt||0).getTime()===pickupTime&&new Date(existing.returnAt||0).getTime()===returnTime;
+      const existingVehicle=existing.requestedVehicleId||existing.assignedVehicleId||null;
       const requestedVehicle=requestedVehicleId||null;
       const sameVehicle=existingVehicle===requestedVehicle;
       const sameCategory=(existing.requestedVehicleCategoryId||null)===(dto.requestedVehicleCategoryId||null);
