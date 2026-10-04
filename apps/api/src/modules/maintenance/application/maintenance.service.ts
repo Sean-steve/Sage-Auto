@@ -173,31 +173,32 @@ export class MaintenanceService {
       garageName = garage.name;
     }
 
-    // Create exclusive maintenance allocation lock in Availability Engine
+    // Create an exclusive maintenance allocation lock in Availability.
+    // An omitted end date defaults to a 24-hour service window; zero-length
+    // intervals are invalid and must never silently leave a scheduled vehicle rentable.
     let allocationId = workOrder.allocationId;
+    const scheduledEndAt =
+      dto.scheduledEndAt ||
+      new Date(new Date(dto.scheduledStartAt).getTime() + 24 * 60 * 60 * 1000).toISOString();
     if (!allocationId) {
-      try {
-        const allocation = await this.allocationRepo.createAllocation(tenantId, {
-          vehicleId: workOrder.vehicleId,
-          allocationType: "MAINTENANCE",
-          sourceId: workOrder.id,
-          sourceType: "MAINTENANCE_WORK_ORDER",
-          startsAt: dto.scheduledStartAt,
-          endsAt: dto.scheduledEndAt || dto.scheduledStartAt,
-          status: "CONFIRMED",
-          notes: `Maintenance: ${workOrder.reason}`,
-        });
-        allocationId = allocation.id;
-      } catch (err) {
-        // Log or rethrow as availability conflict
-      }
+      const allocation = await this.allocationRepo.createAllocation(tenantId, {
+        vehicleId: workOrder.vehicleId,
+        allocationType: "MAINTENANCE",
+        sourceId: workOrder.id,
+        sourceType: "MAINTENANCE_WORK_ORDER",
+        startsAt: dto.scheduledStartAt,
+        endsAt: scheduledEndAt,
+        status: "CONFIRMED",
+        notes: `Maintenance: ${workOrder.reason}`,
+      });
+      allocationId = allocation.id;
     }
 
     // Update work order
     const updated = await this.maintenanceRepo.update(id, tenantId, {
       status: "SCHEDULED",
       scheduledStartAt: dto.scheduledStartAt,
-      scheduledEndAt: dto.scheduledEndAt,
+      scheduledEndAt,
       garageId: dto.garageId ?? workOrder.garageId,
       garageName,
       assignedTechnician: dto.assignedTechnician ?? workOrder.assignedTechnician,
@@ -212,7 +213,7 @@ export class MaintenanceService {
       workOrder.status,
       "SCHEDULED",
       actor,
-      dto.notes || `Scheduled from ${dto.scheduledStartAt} to ${dto.scheduledEndAt}`
+      dto.notes || `Scheduled from ${dto.scheduledStartAt} to ${scheduledEndAt}`
     );
 
     // Audit & Outbox
