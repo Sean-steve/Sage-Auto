@@ -37,6 +37,7 @@ export default function TenantPublicSite({slug}:{slug:string}){
   const businessName=branding.businessName||slug.replace(/-/g," ").replace(/\b\w/g,(c:string)=>c.toUpperCase());
   const visibleBlocks=(page?.contentBlocks||[]).filter((b:any)=>b.data?.enabled!==false).sort((a:any,b:any)=>a.sortOrder-b.sortOrder);
   const featuredCars=useMemo(()=>cars.slice(0,6),[cars]);
+  const hasVehicleShowcase=visibleBlocks.some((block:any)=>block.type==="VEHICLE_SHOWCASE");
   const style={
     "--brand-primary":branding.primaryColor||"#059669",
     "--brand-secondary":branding.secondaryColor||"#0f172a",
@@ -94,7 +95,7 @@ export default function TenantPublicSite({slug}:{slug:string}){
       {!site&&!error&&<div className="mx-auto max-w-7xl px-5 py-20 text-center text-slate-500">Loading website…</div>}
       {site&&visibleBlocks.map((block:any)=><Block key={block.id} block={block} cars={featuredCars} base={base} chooseCar={chooseCar} pickupAt={pickupAt} returnAt={returnAt} setPickup={setPickup} setReturn={setReturn} searchAvailability={searchAvailability} busy={busy}/>)}
 
-      {site&&(pageSlug==="/"||pageSlug==="/fleet")&&<section id="fleet" className="mx-auto max-w-7xl px-5 py-14 sm:py-20">
+      {site&&(pageSlug==="/fleet"||(pageSlug==="/"&&!hasVehicleShowcase))&&<section id="fleet" className="mx-auto max-w-7xl px-5 py-14 sm:py-20">
         <div className="mb-7 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-xs font-black uppercase tracking-[.18em] text-[var(--brand-primary)]">{availabilitySearched?"Available for your dates":"Live fleet"}</p><h2 className="mt-2 text-3xl font-black sm:text-4xl">{availabilitySearched?"Cars you can book":"Choose your next drive"}</h2><p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">{availabilitySearched?"These vehicles are clear of bookings, temporary holds and operational blocks for the full requested window.":"Published operational vehicles remain visible here even when temporarily held for another time window. Choose dates to see what is actually free for your trip."}</p></div>{availabilitySearched&&<button onClick={()=>{setCars(allCars);setAvailabilitySearched(false);}} className="rounded-xl border bg-white px-4 py-2 text-sm font-bold">Show full catalogue</button>}</div>
         <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">{cars.map(car=><VehicleCard key={car.id} car={car} chooseCar={chooseCar}/>)}</div>
         {!cars.length&&<div className="rounded-3xl border border-dashed bg-white p-10 text-center"><Car className="mx-auto text-slate-300"/><h3 className="mt-3 font-black">No vehicle is free for those dates</h3><p className="mt-1 text-sm text-slate-500">Try a different time window or contact the rental team for alternatives.</p></div>}
