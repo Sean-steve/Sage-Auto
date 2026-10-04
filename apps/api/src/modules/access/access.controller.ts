@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { TenantRepository, BookingRepository, VehicleRepository, CustomerRepository, RentalRepository, InspectionRepository, UserRepository, AuditRepository, DriverRepository, VehicleOwnerRepository } from '@carhire/database';
+import { TenantRepository, BookingRepository, VehicleRepository, CustomerRepository, RentalRepository, InspectionRepository, UserRepository, AuditRepository, DriverRepository, VehicleOwnerRepository, VehicleOwnershipRepository, OwnerSettlementRepository } from '@carhire/database';
 import { PLATFORM_ROLES, TENANT_SYSTEM_ROLES } from '@carhire/constants';
 import { withRecordTransaction } from '../../../../../packages/database/src/record-store';
 import { AccessService, fail } from './access.service';
@@ -104,7 +104,40 @@ export function accessController(service:AccessService,identity:IdentityModule):
       if(link?.recordId) rows=(await new BookingRepository().findMany(tenantId,{customerId:link.recordId})).items.map(b=>({id:b.id,reference:b.bookingNumber,status:b.status,pickup:b.pickupAt,return:b.returnAt}));
     } else if(section==='myVehicles') {
       const link=service.links.get(`${req.auth.userId}:${tenantId}:VEHICLE_OWNER`);
-      if(link?.recordId) rows=(await new VehicleRepository().findAll(tenantId,{ownerId:link.recordId})).vehicles.map(v=>({id:v.id,registration:v.registrationPlate,name:`${v.make} ${v.model}`,status:v.availabilityStatus}));
+      if(link?.recordId) {
+        const vehicles=(await new VehicleRepository().findAll(tenantId,{ownerId:link.recordId})).vehicles;
+        const ownershipRepo=new VehicleOwnershipRepository();
+        rows=await Promise.all(vehicles.map(async v=>{
+          const agreement=await ownershipRepo.findActiveByVehicleId(v.id,tenantId);
+          return {
+            id:v.id,
+            registration:v.registrationPlate,
+            name:`${v.make} ${v.model}`,
+            status:v.availabilityStatus,
+            ownerShare:agreement?`${agreement.revenueSharePercent}%`:'No active agreement',
+            fixedMonthlyPayout:agreement?.fixedMonthlyPayout??null,
+            expenseDeductions:agreement?.allowableExpenseDeductions?'Allowed':'Not allowed',
+            agreementTerms:agreement?.termsSnapshot||'No owner-visible agreement summary recorded',
+            agreementEffectiveFrom:agreement?.startDate||null,
+          };
+        }));
+      }
+    } else if(section==='mySettlements') {
+      const link=service.links.get(`${req.auth.userId}:${tenantId}:VEHICLE_OWNER`);
+      if(link?.recordId) {
+        const settlements=await new OwnerSettlementRepository().listByTenant(tenantId,{ownerId:link.recordId});
+        rows=settlements.map((s:any)=>({
+          id:s.id,
+          reference:s.settlementNumber,
+          period:`${s.periodStart} → ${s.periodEnd}`,
+          status:s.status,
+          grossRevenue:s.grossRevenue??s.totalRentalRevenue??0,
+          ownerShare:s.ownerShareAmount??s.ownerGrossShare??0,
+          deductions:s.totalDeductions??0,
+          netPayable:s.netPayable??s.netAmountPayable??0,
+          paymentStatus:s.payable?.status||s.paymentStatus||'PENDING',
+        }));
+      }
     } else if(section==='myTrips'||section==='myInspections') {
       const link=service.links.get(`${req.auth.userId}:${tenantId}:DRIVER`);
       if(link?.recordId) {
