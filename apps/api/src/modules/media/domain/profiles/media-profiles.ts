@@ -165,6 +165,7 @@ export class MediaProfileRegistry {
   private static profiles = new Map<string, MediaProcessingProfile>([
     ...Object.entries(CANONICAL_MEDIA_PROFILES),
     ["FLEET_GALLERY_PHOTO", { ...CANONICAL_MEDIA_PROFILES.VEHICLE_GALLERY, name: "FLEET_GALLERY_PHOTO" }],
+    ["VEHICLE_SHOWCASE", { ...CANONICAL_MEDIA_PROFILES.VEHICLE_GALLERY, name: "VEHICLE_SHOWCASE" }],
     ["DAMAGE_INSPECTION", { ...CANONICAL_MEDIA_PROFILES.DAMAGE_EVIDENCE_PREVIEW, name: "DAMAGE_INSPECTION" }],
   ]);
 
@@ -216,5 +217,8 @@ export class MediaProfileRegistry {
     for (const [key, value] of Object.entries(CANONICAL_MEDIA_PROFILES)) {
       this.profiles.set(key, value);
     }
+    this.profiles.set("FLEET_GALLERY_PHOTO", { ...CANONICAL_MEDIA_PROFILES.VEHICLE_GALLERY, name: "FLEET_GALLERY_PHOTO" });
+    this.profiles.set("VEHICLE_SHOWCASE", { ...CANONICAL_MEDIA_PROFILES.VEHICLE_GALLERY, name: "VEHICLE_SHOWCASE" });
+    this.profiles.set("DAMAGE_INSPECTION", { ...CANONICAL_MEDIA_PROFILES.DAMAGE_EVIDENCE_PREVIEW, name: "DAMAGE_INSPECTION" });
   }
 }
