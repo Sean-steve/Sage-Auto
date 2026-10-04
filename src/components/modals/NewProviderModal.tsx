@@ -12,13 +12,17 @@ export const NewProviderModal: React.FC = () => {
   } = useApp();
 
   const [name, setName] = useState("");
-  const [code, setCode] = useState("");
   const [contactPerson, setContactPerson] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [location, setLocation] = useState("");
   const [address, setAddress] = useState("");
   const [servicesProvided, setServicesProvided] = useState<MaintenanceType[]>(["ROUTINE_SERVICE"]);
+  const [paymentMethods,setPaymentMethods]=useState<Array<"MPESA"|"BANK_TRANSFER"|"CASH"|"CARD">>([]);
+  const [mpesaNumber,setMpesaNumber]=useState("");
+  const [bankName,setBankName]=useState("");
+  const [bankAccountName,setBankAccountName]=useState("");
+  const [bankAccountNumber,setBankAccountNumber]=useState("");
   const [notes, setNotes] = useState("");
 
   if (!isNewProviderModalOpen) return null;
@@ -37,24 +41,29 @@ export const NewProviderModal: React.FC = () => {
 
     createServiceProvider({
       name,
-      code: code || name.substring(0, 3).toUpperCase() + Math.floor(100 + Math.random() * 900),
+      // Vendor code is generated centrally as GAR-#### so users never invent identifiers.
       contactPerson: contactPerson || undefined,
       phone: phone || undefined,
       email: email || undefined,
       location: location || "Nairobi, Kenya",
       address: address || undefined,
       servicesProvided: servicesProvided.length > 0 ? servicesProvided : ["ROUTINE_SERVICE"],
+      paymentMethods,
+      mpesaNumber: paymentMethods.includes("MPESA") ? mpesaNumber || undefined : undefined,
+      bankName: paymentMethods.includes("BANK_TRANSFER") ? bankName || undefined : undefined,
+      bankAccountName: paymentMethods.includes("BANK_TRANSFER") ? bankAccountName || undefined : undefined,
+      bankAccountNumber: paymentMethods.includes("BANK_TRANSFER") ? bankAccountNumber || undefined : undefined,
       notes: notes || undefined,
     });
 
     setName("");
-    setCode("");
     setContactPerson("");
     setPhone("");
     setEmail("");
     setLocation("");
     setAddress("");
     setServicesProvided(["ROUTINE_SERVICE"]);
+    setPaymentMethods([]);setMpesaNumber("");setBankName("");setBankAccountName("");setBankAccountNumber("");
     setNotes("");
     setIsNewProviderModalOpen(false);
   };
@@ -98,15 +107,10 @@ export const NewProviderModal: React.FC = () => {
               />
             </div>
 
-            <div>
-              <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1.5">Vendor Code</label>
-              <input
-                type="text"
-                placeholder="GAR-004"
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 focus:outline-hidden focus:ring-2 focus:ring-emerald-500 font-mono"
-              />
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+              <label className="block text-emerald-800 font-semibold mb-1">Vendor Code</label>
+              <p className="font-mono text-sm font-bold text-emerald-900">Assigned automatically</p>
+              <p className="mt-1 text-[10px] leading-4 text-emerald-700">Sage Auto assigns the next workspace code such as GAR-0004 after registration.</p>
             </div>
           </div>
 
@@ -195,6 +199,15 @@ export const NewProviderModal: React.FC = () => {
                 </button>
               ))}
             </div>
+          </div>
+
+          <div className="rounded-xl border border-slate-200 p-4 dark:border-slate-700">
+            <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-2">Accepted payment methods</label>
+            <div className="flex flex-wrap gap-2">
+              {(["MPESA","BANK_TRANSFER","CASH","CARD"] as const).map(method=><label key={method} className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-[11px] font-semibold dark:border-slate-700"><input type="checkbox" checked={paymentMethods.includes(method)} onChange={e=>setPaymentMethods(current=>e.target.checked?[...current,method]:current.filter(item=>item!==method))}/>{method.replaceAll("_"," ")}</label>)}
+            </div>
+            {paymentMethods.includes("MPESA")&&<div className="mt-3"><label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1.5">Garage M-Pesa number / Till / Paybill</label><input value={mpesaNumber} onChange={e=>setMpesaNumber(e.target.value)} placeholder="e.g. 0712 345 678 or Till 123456" className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700"/></div>}
+            {paymentMethods.includes("BANK_TRANSFER")&&<div className="mt-3 grid gap-3 sm:grid-cols-3"><label className="font-semibold text-slate-700 dark:text-slate-300">Bank<input value={bankName} onChange={e=>setBankName(e.target.value)} className="mt-1 w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700"/></label><label className="font-semibold text-slate-700 dark:text-slate-300">Account name<input value={bankAccountName} onChange={e=>setBankAccountName(e.target.value)} className="mt-1 w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700"/></label><label className="font-semibold text-slate-700 dark:text-slate-300">Account number<input value={bankAccountNumber} onChange={e=>setBankAccountNumber(e.target.value)} className="mt-1 w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700"/></label></div>}
           </div>
 
           <div>
