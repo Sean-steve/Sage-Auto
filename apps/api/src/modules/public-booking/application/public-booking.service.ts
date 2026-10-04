@@ -206,8 +206,14 @@ export class PublicBookingService {
     const summaries: PublicVehicleSummaryDto[] = [];
     const categories = await this.categoryRepo.findAll(tenantId);
     const categoryMap = new Map(categories.map((c) => [c.code, c.name]));
+    const publiclyDiscoverable = new Set(
+      (await this.getPublicVehicles(tenantId, { limit: 1000 })).map((vehicle) => vehicle.id)
+    );
 
     for (const candidate of searchResult.vehicles) {
+      // Availability is broader than public discovery. Never leak unpublished,
+      // blocked or maintenance vehicles into the customer search result.
+      if (!publiclyDiscoverable.has(candidate.id)) continue;
       const mediaItems = await this.mediaRepo.listByVehicle(candidate.id, tenantId);
       const images = mediaItems.map((m) => (m as any).url || `/api/v1/media/public/${m.mediaAssetId || m.id}`);
       const primary = mediaItems.find((m) => m.isPrimary);
