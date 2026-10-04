@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
+  AlertTriangle,
   ArrowRightLeft, CalendarDays, CheckCircle2, ChevronRight, Clock3, Loader2,
   Lock, Plus, RefreshCw, Search, ShieldAlert, X
 } from "lucide-react";
@@ -107,8 +108,8 @@ export function AvailabilityExperienceView({portal}:Props){
     if(!pending.length)return;
     const next=Math.min(...pending.map(h=>new Date(h.expiresAt).getTime()));
     const delay=Math.max(250,Math.min(2147483000,next-Date.now()+300));
-    const timer=window.setTimeout(()=>{void refresh();if(selectedVehicle)void loadCalendar(selectedVehicle);},delay);
-    return()=>window.clearTimeout(timer);
+    const timer=globalThis.setTimeout(()=>{void refresh();if(selectedVehicle)void loadCalendar(selectedVehicle);},delay);
+    return()=>globalThis.clearTimeout(timer);
   },[holds,selectedVehicle]);
 
   async function mutate(work:()=>Promise<ApiResponse<any>>,message:string){
