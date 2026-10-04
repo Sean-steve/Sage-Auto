@@ -98,7 +98,7 @@ async function uploadVehiclePrimaryImage(vehicleId:string,file:File):Promise<str
   const finalized:any=await unwrap(apiClient.post("/files/finalize-upload",{sessionId:intent.sessionId,actualSizeBytes:file.size}));
   const processed:any=await unwrap(apiClient.post("/media/process",{
     sourceFileId:finalized.fileId||intent.fileId,
-    profileName:"VEHICLE_SHOWCASE",
+    profileName:"VEHICLE_GALLERY",
     executeSync:true,
   }));
   const mediaAssetId=processed.mediaAsset?.id||processed.mediaAssetId;
