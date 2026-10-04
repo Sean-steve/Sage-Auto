@@ -6,6 +6,7 @@
 export abstract class DatabaseError extends Error {
   public abstract readonly code: string;
   public readonly isOperational: boolean = true;
+  public readonly statusCode: number = 500;
 
   constructor(
     message: string,
@@ -19,6 +20,7 @@ export abstract class DatabaseError extends Error {
 
 export class UniqueConstraintViolationError extends DatabaseError {
   public readonly code = "UNIQUE_CONSTRAINT_VIOLATION";
+  public readonly statusCode = 409;
   constructor(field: string, value?: string, cause?: unknown) {
     super(`A record with the specified ${field}${value ? ` ('${value}')` : ""} already exists.`, cause, { field });
     this.name = "UniqueConstraintViolationError";
@@ -71,8 +73,9 @@ export class TenantContextMissingError extends DatabaseError {
 
 export class RecordNotFoundError extends DatabaseError {
   public readonly code = "RECORD_NOT_FOUND";
+  public readonly statusCode = 404;
   constructor(entityName: string, id: string, cause?: unknown) {
-    super(`${entityName} with id '${id}' was not found.`, cause, { entityName, id });
+    super(`${entityName} was not found.`, cause, { entityName, id });
     this.name = "RecordNotFoundError";
   }
 }
@@ -90,6 +93,7 @@ export class InternalDatabaseError extends DatabaseError {
 
 export class AvailabilityConflictError extends DatabaseError {
   public readonly code = "AVAILABILITY_CONFLICT";
+  public readonly statusCode = 409;
   public readonly vehicleId?: string;
   public readonly conflictingInterval?: { startsAt: string; endsAt: string };
 
@@ -121,6 +125,7 @@ export class DatabaseExclusionViolationError extends DatabaseError {
 
 export class InvalidAvailabilityIntervalError extends DatabaseError {
   public readonly code = "INVALID_AVAILABILITY_INTERVAL";
+  public readonly statusCode = 400;
   constructor(message: string = "Requested availability interval is invalid (endsAt must be strictly greater than startsAt).", cause?: unknown) {
     super(message, cause);
   }
@@ -128,8 +133,9 @@ export class InvalidAvailabilityIntervalError extends DatabaseError {
 
 export class VehicleNotOperationalError extends DatabaseError {
   public readonly code = "VEHICLE_NOT_OPERATIONAL";
+  public readonly statusCode = 409;
   constructor(vehicleId: string, status: string, cause?: unknown) {
-    super(`Vehicle ${vehicleId} is in non-operational lifecycle status '${status}' and cannot be allocated.`, cause);
+    super(`This vehicle is currently ${status.replaceAll("_"," ").toLowerCase()} and cannot be reserved.`, cause, { vehicleId, status });
   }
 }
 
@@ -142,6 +148,7 @@ export class AvailabilityHoldNotFoundError extends DatabaseError {
 
 export class AvailabilityHoldExpiredError extends DatabaseError {
   public readonly code = "AVAILABILITY_HOLD_EXPIRED";
+  public readonly statusCode = 409;
   constructor(holdTokenOrId: string, expiresAt: string, cause?: unknown) {
     super(`Availability hold '${holdTokenOrId}' has expired at ${expiresAt}.`, cause);
   }
