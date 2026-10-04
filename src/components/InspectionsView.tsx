@@ -93,7 +93,7 @@ export const InspectionsView: React.FC = () => {
       </article>;
     })}</div>}
 
-    {selected&&<InspectionReportModal inspection={selected} vehicle={vehicleById.get(selected.vehicleId)} customer={customerById.get(selected.customerId)} driver={driverById.get(selected.driverId)} currencySymbol={activeTenant.currencySymbol} onClose={()=>setSelected(null)}/>}
+    {selected&&<InspectionReportModal inspection={selected} vehicle={vehicleById.get(selected.vehicleId)} customer={customerById.get(selected.customerId)} driver={driverById.get(selected.driverId)} currencySymbol={activeTenant.currencySymbol||activeTenant.currency||"KES"} onClose={()=>setSelected(null)}/>}
   </div>;
 };
 
