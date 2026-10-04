@@ -116,5 +116,12 @@ export interface PublicBookingVoucherDto {
     checkoutUrl?: string;
     instructions?: string;
   };
+  timeline?: Array<{
+    id: string;
+    status: string;
+    occurredAt: string;
+    title: string;
+    message: string;
+  }>;
   createdAt: string;
 }
