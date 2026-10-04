@@ -236,7 +236,7 @@ function TimelinePanel({vehicles,allocations,blocks,window,days,setDays,windowSt
   </div>;
 }
 
-function SearchPanel({portal,categories,customers,onHoldCreated,onOpenBookings}:{portal:AccessPortal;categories:any[];customers:any[];onHoldCreated:()=>Promise<void>;onOpenBookings:()=>void}){
+function SearchPanel({portal,vehicles,categories,customers,onHoldCreated,onOpenBookings}:{portal:AccessPortal;vehicles:any[];categories:any[];customers:any[];onHoldCreated:()=>Promise<void>;onOpenBookings:()=>void}){
   const can=(p:string)=>permits(portal,p);
   const now=new Date();const start=new Date(now.getTime()+2*86400000);const end=new Date(now.getTime()+6*86400000);
   const [results,setResults]=useState<any[]|null>(null),[context,setContext]=useState<any>(null),[loading,setLoading]=useState(false),[error,setError]=useState(""),[holding,setHolding]=useState("");
