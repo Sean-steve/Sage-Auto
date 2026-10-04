@@ -15,7 +15,8 @@ const roleName=(role:string)=>(ACCESS_ROLES as any)[role]?.name||role;
 export default function AccessApp({site}:{site?:string}) {
   const query=new URLSearchParams(location.search);
   const [context,setContext]=useState<Context|null>(null),[loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState('');
-  const [mode,setMode]=useState(query.has('reset')?'reset':'login');
+  const initialMode=location.pathname==='/register'?'register':location.pathname==='/forgot-password'?'forgot':location.pathname==='/reset-password'||query.has('reset')?'reset':'login';
+  const [mode,setMode]=useState(initialMode);
   const [portalId,setPortalId]=useState(sessionStorage.getItem('access_portal')||''),[section,setSection]=useState('');
   const [companyName,setCompanyName]=useState(''),[phone,setPhone]=useState(''),[mail,setMail]=useState<any[]>([]);
   const [invite,setInvite]=useState<any>(null),[token,setToken]=useState(query.get('invite')||'');
