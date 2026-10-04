@@ -45,6 +45,7 @@ export const MaintenanceView: React.FC = () => {
   const [activeTab, setActiveTab] = useState<"orders" | "schedules" | "due" | "providers">("orders");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState("");
+  const [dispatchingScheduleId,setDispatchingScheduleId]=useState<string|null>(null);
 
   const tenantOrders = useMemo(
     () => (maintenanceWorkOrders || []).filter((m) => m.tenantId === activeTenantId),
@@ -121,19 +122,28 @@ export const MaintenanceView: React.FC = () => {
   };
 
   const handleSpawnOrderFromDue = (result: (typeof dueResults)[0]) => {
+    if(dispatchingScheduleId===result.scheduleId)return;
+    const existing=tenantOrders.find(order=>order.vehicleId===result.vehicleId&&order.sourceType==="SCHEDULE"&&order.sourceId===result.scheduleId&&!["COMPLETED","VERIFIED","CANCELLED"].includes(order.status));
+    if(existing){setSelectedMaintenanceId(existing.id);return;}
     const v = tenantVehicles.find((veh) => veh.id === result.vehicleId);
     if (!v) return;
 
-    createMaintenanceRequest({
-      vehicleId: v.id,
-      maintenanceType: result.maintenanceType,
-      priority: result.status === "OVERDUE" || result.isSafetyCritical ? "CRITICAL" : "NORMAL",
-      reason: `Preventive service trigger: ${result.scheduleName}`,
-      description: result.reasons?.join(". ") || "Preventive maintenance due threshold reached",
-      isSafetyCritical: result.isSafetyCritical,
-      sourceType: "SCHEDULE",
-      sourceId: result.scheduleId,
-    });
+    setDispatchingScheduleId(result.scheduleId);
+    try{
+      const created=createMaintenanceRequest({
+        vehicleId: v.id,
+        maintenanceType: result.maintenanceType,
+        priority: result.status === "OVERDUE" || result.isSafetyCritical ? "CRITICAL" : "NORMAL",
+        reason: `Preventive service trigger: ${result.scheduleName}`,
+        description: result.reasons?.join(". ") || "Preventive maintenance due threshold reached",
+        isSafetyCritical: result.isSafetyCritical,
+        sourceType: "SCHEDULE",
+        sourceId: result.scheduleId,
+      });
+      if(created)setSelectedMaintenanceId(created.id);
+    }finally{
+      window.setTimeout(()=>setDispatchingScheduleId(current=>current===result.scheduleId?null:current),400);
+    }
   };
 
   return (
@@ -651,12 +661,13 @@ export const MaintenanceView: React.FC = () => {
                         <td className="px-5 py-3.5 text-right">
                           {(()=>{
                             const activeOrder=tenantOrders.find(order=>order.vehicleId===result.vehicleId&&order.sourceType==="SCHEDULE"&&order.sourceId===result.scheduleId&&!["COMPLETED","VERIFIED","CANCELLED"].includes(order.status));
-                            return <button disabled={restoration||Boolean(activeOrder)} aria-describedby="restoration-actions-note"
+                            const dispatching=dispatchingScheduleId===result.scheduleId;
+                            return <button disabled={restoration||Boolean(activeOrder)||dispatching} aria-describedby="restoration-actions-note"
                               onClick={() => handleSpawnOrderFromDue(result)}
                               className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 disabled:text-slate-600 text-white font-bold text-[11px] shadow-xs transition-colors flex items-center gap-1 ml-auto"
                             >
                               {activeOrder?<CheckCircle2 className="w-3 h-3"/>:<Wrench className="w-3 h-3"/>}
-                              <span>{activeOrder?`Active · ${activeOrder.maintenanceNumber}`:"Dispatch Work Order"}</span>
+                              <span>{activeOrder?`Active · ${activeOrder.maintenanceNumber}`:dispatching?"Dispatching…":"Dispatch Work Order"}</span>
                             </button>;
                           })()}
                         </td>
