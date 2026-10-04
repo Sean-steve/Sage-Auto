@@ -183,7 +183,7 @@ export class MaintenanceRepository implements IMaintenanceRepository {
     }));
 
     const workOrder: MaintenanceWorkOrder = {
-      id: crypto.randomUUID(),
+      id: (data as any).id || crypto.randomUUID(),
       tenantId,
       maintenanceNumber,
       vehicleId: data.vehicleId,
