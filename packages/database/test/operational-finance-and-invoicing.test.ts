@@ -476,7 +476,7 @@ async function runSprint19FinanceTestSuite() {
     primaryDriverId: "drv_test_90",
     vehicleId: "veh_test_90",
     status: "ACTIVE_ON_ROAD",
-    pricingSnapshot: rentalWithoutDeposit.pricingSnapshot as any,
+    pricingSnapshot: (await rentalRepo.getStartSnapshot(rentalWithoutDeposit.id, tenantA))!.pricingSnapshot,
   });
   await assert.rejects(
     () => financeService.generateRentalInvoice(tenantA, { rentalId: activeRental.id }, staffUser1),
