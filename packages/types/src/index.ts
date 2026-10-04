@@ -2210,6 +2210,8 @@ export interface ComplianceDocument {
   expiryState: ComplianceExpiryState;
   isMandatory: boolean;
   fileId?: string;
+  fileUrl?: string;
+  fileName?: string;
   isBlocked: boolean;
   overrideReason?: string;
   overriddenBy?: string;
@@ -4272,6 +4274,11 @@ export interface ServiceProvider {
   notes?: string;
   rating?: number;
   servicesProvided?: MaintenanceType[];
+  paymentMethods?: Array<"MPESA" | "BANK_TRANSFER" | "CASH" | "CARD">;
+  mpesaNumber?: string;
+  bankName?: string;
+  bankAccountName?: string;
+  bankAccountNumber?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -4625,6 +4632,11 @@ export interface CreateServiceProviderDto {
   location?: string;
   address?: string;
   servicesProvided?: MaintenanceType[];
+  paymentMethods?: Array<"MPESA" | "BANK_TRANSFER" | "CASH" | "CARD">;
+  mpesaNumber?: string;
+  bankName?: string;
+  bankAccountName?: string;
+  bankAccountNumber?: string;
   notes?: string;
 }
 
@@ -4638,6 +4650,11 @@ export interface UpdateServiceProviderDto {
   address?: string;
   status?: ServiceProviderStatus;
   servicesProvided?: MaintenanceType[];
+  paymentMethods?: Array<"MPESA" | "BANK_TRANSFER" | "CASH" | "CARD">;
+  mpesaNumber?: string;
+  bankName?: string;
+  bankAccountName?: string;
+  bankAccountNumber?: string;
   notes?: string;
   rating?: number;
 }
