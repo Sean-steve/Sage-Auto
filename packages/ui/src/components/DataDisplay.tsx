@@ -45,11 +45,7 @@ export function MetricCard({
   icon?: React.ReactNode;
   onClick?: () => void;
 }) {
-  const Tag=onClick?"button":"div";
-  return <Tag onClick={onClick} className={cn(
-    "w-full rounded-[14px] border border-slate-200 bg-white p-5 text-left shadow-[0_1px_2px_rgba(16,24,40,.04)] dark:border-slate-800 dark:bg-slate-900",
-    onClick&&"transition hover:border-slate-300 hover:bg-slate-50/60 dark:hover:bg-slate-800/60"
-  )}>
+  const content=<>
     <div className="flex items-start justify-between gap-3">
       <span className="text-xs font-medium text-slate-500 dark:text-slate-400">{label}</span>
       {icon&&<span className="text-slate-400">{icon}</span>}
@@ -59,7 +55,11 @@ export function MetricCard({
       {trend&&<span className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">{trend}</span>}
     </div>
     {detail&&<div className="mt-1.5 text-xs leading-5 text-slate-500 dark:text-slate-400">{detail}</div>}
-  </Tag>;
+  </>;
+  const styles="w-full rounded-[14px] border border-slate-200 bg-white p-5 text-left shadow-[0_1px_2px_rgba(16,24,40,.04)] dark:border-slate-800 dark:bg-slate-900";
+  return onClick
+    ? <button onClick={onClick} className={cn(styles,"transition hover:border-slate-300 hover:bg-slate-50/60 dark:hover:bg-slate-800/60")}>{content}</button>
+    : <div className={styles}>{content}</div>;
 }
 
 export function EmptyState({
