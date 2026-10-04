@@ -14,6 +14,12 @@ import { BookingExperienceView } from "./BookingExperienceView";
 import { ContractHandoverExperienceView } from "./ContractHandoverExperienceView";
 import { CompanyOverviewView } from "./CompanyOverviewView";
 import { TeamWorkspaceView } from "./TeamWorkspaceView";
+import { InspectionModal } from "./modals/InspectionModal";
+import { MaintenanceWorkOrderModal } from "./modals/MaintenanceWorkOrderModal";
+import { NewWorkOrderModal } from "./modals/NewWorkOrderModal";
+import { NewScheduleModal } from "./modals/NewScheduleModal";
+import { NewProviderModal } from "./modals/NewProviderModal";
+import { NewOwnerModal } from "./modals/NewOwnerModal";
 
 const RentalsView=lazy(()=>import("./RentalsView").then(m=>({default:m.RentalsView})));
 const ReturnFinalCalculationView=lazy(()=>import("./ReturnFinalCalculationView").then(m=>({default:m.ReturnFinalCalculationView})));
@@ -171,5 +177,13 @@ function Shell({context,portal,section,onSection,onSwitch,onSignOut}:{context:Ac
 
 export function RestoredWorkspace(props:{context:AccessContext;portal:AccessPortal;section:string;onSection:(s:string)=>void;onSwitch:()=>void;onSignOut:()=>void}) {
   if(!props.portal.sections.some(s=>s.id===props.section))return <p role="alert" className="p-6">This section is not permitted.</p>;
-  return <AppProvider access={{context:props.context,portal:props.portal,section:props.section,onSection:props.onSection}}><Shell {...props}/></AppProvider>;
+  return <AppProvider access={{context:props.context,portal:props.portal,section:props.section,onSection:props.onSection}}>
+    <Shell {...props}/>
+    <InspectionModal/>
+    <MaintenanceWorkOrderModal/>
+    <NewWorkOrderModal/>
+    <NewScheduleModal/>
+    <NewProviderModal/>
+    <NewOwnerModal/>
+  </AppProvider>;
 }
