@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { X, Users, Percent, CreditCard } from "lucide-react";
+import { X, Users, CreditCard } from "lucide-react";
 import { useApp } from "../../lib/store";
 
 export const NewOwnerModal: React.FC = () => {
@@ -11,26 +11,30 @@ export const NewOwnerModal: React.FC = () => {
   const [phone, setPhone] = useState("+254 7");
   const [payoutBank, setPayoutBank] = useState("KCB Bank Kenya");
   const [payoutAcc, setPayoutAcc] = useState("");
-  const [revenueShare, setRevenueShare] = useState("75");
+  const [busy,setBusy]=useState(false);
+  const [error,setError]=useState("");
 
   if (!isNewOwnerOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !email || !payoutAcc) return;
-
-    addVehicleOwner({
-      name,
-      companyName: companyName || undefined,
-      email,
-      phone,
-      ownershipType: companyName ? "COMPANY" : "INDIVIDUAL",
-      payoutBank,
-      payoutAccountNumber: payoutAcc,
-      status: "ACTIVE",
-    });
-
-    setIsNewOwnerOpen(false);
+    setBusy(true);setError("");
+    try{
+      const saved=await addVehicleOwner({
+        name,
+        companyName: companyName || undefined,
+        email,
+        phone,
+        ownershipType: companyName ? "COMPANY" : "INDIVIDUAL",
+        payoutBank,
+        payoutAccountNumber: payoutAcc,
+        status: "ACTIVE",
+      });
+      if(saved)setIsNewOwnerOpen(false);
+      else setError("This owner could not be registered. Check for an existing owner using the same email or phone number.");
+    }catch(err:any){setError(err.message||"Vehicle owner could not be registered.");}
+    finally{setBusy(false);}
   };
 
   return (
@@ -50,6 +54,7 @@ export const NewOwnerModal: React.FC = () => {
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4 text-xs">
+          {error&&<div role="alert" className="rounded-xl bg-rose-50 p-3 font-medium text-rose-700">{error}</div>}
           <div>
             <label className="block text-slate-600 dark:text-slate-400 font-medium mb-1">Owner Full Name *</label>
             <input
@@ -121,9 +126,9 @@ export const NewOwnerModal: React.FC = () => {
             </div>
           </div>
 
-          <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 flex items-center justify-between">
-            <span className="font-semibold text-slate-700 dark:text-slate-300">Default Revenue Share:</span>
-            <span className="font-bold text-emerald-600 dark:text-emerald-400">{revenueShare}% Owner / {100 - parseInt(revenueShare || "0", 10)}% Operator</span>
+          <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900">
+            <p className="font-semibold">Commercial terms are set per vehicle.</p>
+            <p className="mt-1 text-[11px] leading-4">Register the owner first. When you assign a vehicle in Fleet → Ownership, set that vehicle's revenue share, fixed payout and deduction rules. Sage Auto does not apply a hidden global default.</p>
           </div>
 
           <div className="flex justify-end gap-2 pt-2">
@@ -136,7 +141,8 @@ export const NewOwnerModal: React.FC = () => {
             </button>
             <button
               type="submit"
-              className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs transition-colors"
+              disabled={busy}
+              className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-bold shadow-xs transition-colors"
             >
               Register Owner & Agreement
             </button>
