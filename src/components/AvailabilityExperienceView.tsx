@@ -73,9 +73,9 @@ export function AvailabilityExperienceView({portal}:Props){
 
   async function loadReferenceData(){
     const result=await Promise.all([
-      can("vehicle.read")?apiClient.fleet.listVehicles({limit:100}):Promise.resolve({data:[]}),
-      can("vehicle.read")?apiClient.fleet.getCategories():Promise.resolve({data:[]}),
-      can("customer.read")?apiClient.customers.listCustomers({limit:100}):Promise.resolve({data:[]}),
+      can("vehicle.read")?apiClient.fleet.listVehicles({limit:100}):Promise.resolve({data:[] as any[],error:undefined}),
+      can("vehicle.read")?apiClient.fleet.getCategories():Promise.resolve({data:[] as any[],error:undefined}),
+      can("customer.read")?apiClient.customers.listCustomers({limit:100}):Promise.resolve({data:[] as any[],error:undefined}),
     ]);
     setVehicles(result[0].error?[]:result[0].data||[]);
     setCategories(result[1].error?[]:result[1].data||[]);
