@@ -349,7 +349,7 @@ export class HandoverService {
 
     const inspection = await this.inspectionRepo.findById(dto.inspectionId, tenantId);
     if (!inspection) {
-      throw new RecordNotFoundError("Inspection", dto.inspectionId);
+      throw handoverCheckpointError("That inspection could not be found. Refresh the handover and choose the completed pre-rental inspection again.", "HANDOVER_INSPECTION_NOT_FOUND");
     }
     if (inspection.status !== "COMPLETED") {
       throw handoverCheckpointError(`Inspection ${inspection.inspectionNumber} must be completed before handover can continue.`);
@@ -377,7 +377,8 @@ export class HandoverService {
         await this.inspectionTemplateRepo.findByCode(inspection.templateId, tenantId);
     }
     if(!template)template=await this.inspectionTemplateRepo.findDefault(tenantId);
-    const requiredItems = template?.sections.flatMap((section) => section.items.filter((item) => item.required)) || [];
+    const sections = Array.isArray(template?.sections) ? template.sections : [];
+    const requiredItems = sections.flatMap((section:any) => Array.isArray(section.items) ? section.items.filter((item:any) => item.required) : []);
     const answeredCodes = new Set((inspection.responses || []).map((response) => response.itemCode));
     const missingRequired = requiredItems.filter((item) => !answeredCodes.has(item.code));
     if (missingRequired.length > 0) {
@@ -385,7 +386,7 @@ export class HandoverService {
         `Finish these required inspection checks before handover: ${missingRequired.map((item) => item.label).join(", ")}.`
       );
     }
-    const evidenceRequiredItems = template?.sections.flatMap((section) => section.items.filter((item) => item.requiresEvidence)) || [];
+    const evidenceRequiredItems = sections.flatMap((section:any) => Array.isArray(section.items) ? section.items.filter((item:any) => item.requiresEvidence) : []);
     const missingEvidence = evidenceRequiredItems.filter((item) => {
       const response = (inspection.responses || []).find((entry) => entry.itemCode === item.code);
       return response && (!response.evidenceIds || response.evidenceIds.length === 0);
