@@ -207,6 +207,69 @@ export class FileUploadService {
     };
   }
 
+  /** Browser-reachable upload bridge for the in-memory development storage driver. */
+  async uploadSessionBodyForDevelopment(
+    tenantId: string,
+    actorId: string,
+    sessionId: string,
+    body: Buffer,
+    contentType: string
+  ): Promise<{ sessionId: string; fileId: string; sizeBytes: number }> {
+    const isProductionLike =
+      process.env.APP_ENV === "production" ||
+      process.env.APP_ENV === "staging" ||
+      process.env.NODE_ENV === "production" ||
+      process.env.NODE_ENV === "staging";
+    if (isProductionLike) {
+      const err: any = new Error("Direct API uploads are disabled outside local development.");
+      err.statusCode = 404;
+      err.code = "DIRECT_UPLOAD_DISABLED";
+      throw err;
+    }
+
+    const session = await this.sessionRepo.findById(sessionId, tenantId);
+    if (!session) throw new UploadSessionNotFoundError(sessionId);
+    if (session.actorId !== actorId) {
+      const err: any = new Error("Upload session belongs to a different authenticated user.");
+      err.statusCode = 403;
+      err.code = "UPLOAD_SESSION_ACTOR_MISMATCH";
+      throw err;
+    }
+    if (new Date(session.expiresAt).getTime() < Date.now()) {
+      throw new UploadSessionExpiredError(session.id, session.expiresAt);
+    }
+    if (!Buffer.isBuffer(body) || body.length === 0) {
+      const err: any = new Error("Upload body is empty.");
+      err.statusCode = 400;
+      err.code = "EMPTY_UPLOAD_BODY";
+      throw err;
+    }
+    if (body.length > session.maxSizeBytes) {
+      const err: any = new Error(`Upload payload exceeds maximum allowed size of ${session.maxSizeBytes} bytes.`);
+      err.statusCode = 413;
+      err.code = "UPLOAD_TOO_LARGE";
+      throw err;
+    }
+    const normalizedType = String(contentType || "").split(";")[0].trim().toLowerCase();
+    const declaredType = session.declaredContentType.toLowerCase();
+    if (normalizedType && normalizedType !== declaredType) {
+      const err: any = new Error(`Upload Content-Type '${normalizedType}' does not match declared type '${declaredType}'.`);
+      err.statusCode = 400;
+      err.code = "UPLOAD_CONTENT_TYPE_MISMATCH";
+      throw err;
+    }
+
+    const file = await this.fileRepo.findById(session.fileId, tenantId);
+    if (!file) throw new FileNotFoundError(session.fileId);
+    await this.storageDriver.putObject({
+      bucket: file.bucket,
+      key: file.objectKey,
+      body,
+      contentType: session.declaredContentType,
+    });
+    return { sessionId: session.id, fileId: file.id, sizeBytes: body.length };
+  }
+
   /**
    * Step 2: Client signals upload completion.
    * Verifies object exists in storage, validates size and MIME magic bytes,
