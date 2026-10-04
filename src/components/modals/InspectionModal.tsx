@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { useApp } from "../../lib/store";
 import { apiClient } from "../../lib/api-client";
+import { uploadSecureResourceFile } from "../../lib/secure-file";
 import { InspectionDamage, InspectionZone, DamageType } from "../../types";
 
 const DAMAGE_ZONES: { id: InspectionZone; label: string }[] = [
@@ -78,6 +79,8 @@ export const InspectionModal: React.FC = () => {
   const [customerName, setCustomerName] = useState("Kiprono Koech");
   const [saving,setSaving]=useState(false);
   const [saveError,setSaveError]=useState("");
+  const [evidenceLink,setEvidenceLink]=useState("");
+  const [evidenceFile,setEvidenceFile]=useState<File|null>(null);
 
   const resolvedContext=useMemo(()=>{
     const explicitRental=inspectionTarget?.rentalId?rentals.find((r:any)=>r.id===inspectionTarget.rentalId):undefined;
@@ -127,7 +130,7 @@ export const InspectionModal: React.FC = () => {
       type: damageType,
       severity: "MINOR",
       description: damageDesc,
-      photoUrl: "https://images.unsplash.com/photo-1549399542-7e3f8b79c341?auto=format&fit=crop&q=80&w=400",
+      photoUrl: undefined,
       estimatedCost: parseFloat(damageCost) || 0,
       isPreExisting: inspectionType === "HANDOVER",
     };
@@ -170,11 +173,54 @@ export const InspectionModal: React.FC = () => {
       if(started.error)throw new Error(started.error.message);
       inspection=started.data||inspection;
 
+      const evidenceIds:string[]=[];
+      const evidenceReference=evidenceLink.trim();
+      if(evidenceFile||evidenceReference){
+        let fileId:string|undefined;
+        let url=evidenceReference;
+        let mimeType:string|undefined;
+        let fileSize:number|undefined;
+        let evidenceType:"PHOTO"|"DOCUMENT"="DOCUMENT";
+        if(evidenceFile){
+          const uploaded=await uploadSecureResourceFile({
+            resourceType:"INSPECTION",
+            resourceId:inspection.id,
+            resourceRole:"INSPECTION_PHOTO",
+            file:evidenceFile,
+            classification:"RESTRICTED",
+          });
+          fileId=uploaded.fileId;
+          url=uploaded.fileReference;
+          mimeType=uploaded.contentType;
+          fileSize=evidenceFile.size;
+          evidenceType=evidenceFile.type.startsWith("image/")?"PHOTO":"DOCUMENT";
+        }else if(/\.(png|jpe?g|webp|gif)(\?|$)/i.test(url)){
+          evidenceType="PHOTO";
+        }
+        const evidence=await apiClient.inspections.addEvidence(inspection.id,{
+          fileId,
+          evidenceType,
+          url,
+          storageReference:fileId?`file:${fileId}`:undefined,
+          mimeType,
+          fileSize,
+          source:"WEB_PORTAL",
+          metadata:{purpose:"CHECKLIST_EVIDENCE"},
+          expectedVersion:inspection.version,
+        });
+        if(evidence.error)throw new Error(evidence.error.message);
+        if((evidence.data as any)?.id)evidenceIds.push((evidence.data as any).id);
+        const refreshed=await apiClient.inspections.getInspection(inspection.id);
+        if(refreshed.error)throw new Error(refreshed.error.message);
+        inspection=refreshed.data||inspection;
+      }
+
       const checklistResponses=Object.entries(checklist).map(([key,value])=>({
         itemCode:key.replace(/([a-z])([A-Z])/g,"$1_$2").toUpperCase(),
         responseValue:Boolean(value),
         condition:value?"GOOD":"DAMAGED",
         notes:value?"Present / satisfactory":"Missing or requires attention",
+        evidenceIds,
       }));
       const responses=await apiClient.inspections.recordResponses(inspection.id,{responses:checklistResponses,expectedVersion:inspection.version});
       if(responses.error)throw new Error(responses.error.message);
@@ -216,6 +262,8 @@ export const InspectionModal: React.FC = () => {
       setInspectionTarget(null);
       setStep(1);
       setDamages([]);
+      setEvidenceLink("");
+      setEvidenceFile(null);
     } catch(err:any) {
       setSaveError(err.message||"Inspection could not be saved.");
     } finally {
@@ -532,6 +580,20 @@ export const InspectionModal: React.FC = () => {
                   <span className="font-medium text-slate-800 dark:text-slate-200">{item.label}</span>
                 </label>
               ))}
+            </div>
+
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-900/60">
+              <h4 className="font-bold text-slate-800 dark:text-slate-200">Checklist evidence</h4>
+              <p className="mt-1 text-[11px] leading-4 text-slate-500">If the inspection template requires evidence, attach a photo/PDF or paste an evidence link. The evidence is linked to the checklist responses and can satisfy the Handover evidence gate.</p>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <label className="grid gap-1 text-[11px] font-semibold text-slate-600 dark:text-slate-400">Evidence link
+                  <input type="url" value={evidenceLink} onChange={e=>setEvidenceLink(e.target.value)} placeholder="https://…" className="w-full rounded-lg border border-slate-200 bg-white p-2.5 text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"/>
+                </label>
+                <label className="grid gap-1 text-[11px] font-semibold text-slate-600 dark:text-slate-400">Or upload photo / PDF
+                  <input type="file" accept="image/*,application/pdf" onChange={e=>setEvidenceFile(e.target.files?.[0]||null)} className="w-full rounded-lg border border-slate-200 bg-white p-2 text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"/>
+                </label>
+              </div>
+              {(evidenceFile||evidenceLink)&&<p className="mt-2 text-[11px] font-medium text-emerald-700">{evidenceFile?evidenceFile.name:"Evidence link ready"}</p>}
             </div>
 
             <div className="flex justify-between pt-4">
