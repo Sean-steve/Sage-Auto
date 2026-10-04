@@ -31,6 +31,12 @@ assert.match(publicSite,/sage-auto:renter/);
 assert.match(publicSite,/Create \/ open renter account/);
 assert.match(publicSite,/Track booking now/);
 assert.match(accessApp,/defaultValue=\{new URLSearchParams\(location\.search\)\.get\('claim'\)\|\|''\}/);
+assert.match(accessApp,/function RenterBookings/);
+assert.match(accessApp,/Rental progress/);
+assert.match(accessApp,/Latest notifications/);
+assert.match(accessApp,/Updates as the rental team processes your booking/);
+assert.match(accessController,/getStatusHistory\(b\.id,tenantId\)/);
+assert.match(accessController,/findByBookingId\(b\.id,tenantId\)/);
 
 assert.match(publicController,/router\.post\("\/account\/booking"/);
 assert.match(publicService,/getBookingAccount/);
