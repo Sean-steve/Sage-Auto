@@ -49,7 +49,7 @@ assert.match(errorFilter, /typeof domainError\.statusCode === "number"/);
 
 assert.match(fleet, /uploadVehiclePrimaryImage/);
 assert.match(fleet, /\/files\/upload-intent/);
-assert.match(fleet, /profileName:"VEHICLE_SHOWCASE"/);
+assert.match(fleet, /profileName:"VEHICLE_GALLERY"/);
 assert.match(fleet, /\/vehicles\/\$\{vehicleId\}\/media/);
 
 console.log("✓ UI integration repair regression contract passed");
