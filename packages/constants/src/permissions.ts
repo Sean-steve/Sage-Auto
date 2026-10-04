@@ -109,6 +109,13 @@ export const TENANT_PERMISSIONS = {
   CRM_ACTIVITY_CREATE: "crm.activity.create",
   CRM_SETTINGS_MANAGE: "crm.settings.manage",
 
+  // Availability, allocations & operational blocks
+  AVAILABILITY_READ: "availability.read",
+  ALLOCATION_CREATE: "allocation.create",
+  ALLOCATION_MANAGE: "allocation.manage",
+  VEHICLE_BLOCK_CREATE: "vehicle_block.create",
+  VEHICLE_BLOCK_MANAGE: "vehicle_block.manage",
+
   // Bookings
   BOOKING_READ: "booking.read",
   BOOKING_CREATE: "booking.create",
@@ -667,6 +674,53 @@ export const ALL_PERMISSION_DEFINITIONS: PermissionDefinition[] = [
     description: "Block customer from creating new reservations",
     scope: "TENANT",
     riskLevel: "HIGH",
+  },
+
+  // Availability, allocations & operational blocks
+  {
+    key: TENANT_PERMISSIONS.AVAILABILITY_READ,
+    resource: "availability",
+    action: "read",
+    name: "View Fleet Availability",
+    description: "Search date-range availability, holds, allocations, blocks, and fleet calendar state",
+    scope: "TENANT",
+    riskLevel: "LOW",
+  },
+  {
+    key: TENANT_PERMISSIONS.ALLOCATION_CREATE,
+    resource: "allocation",
+    action: "create",
+    name: "Create Availability Holds & Allocations",
+    description: "Create booking allocations and temporary inventory holds",
+    scope: "TENANT",
+    riskLevel: "MEDIUM",
+  },
+  {
+    key: TENANT_PERMISSIONS.ALLOCATION_MANAGE,
+    resource: "allocation",
+    action: "manage",
+    name: "Manage Vehicle Allocations",
+    description: "Release, substitute, or otherwise manage active vehicle allocations",
+    scope: "TENANT",
+    riskLevel: "MEDIUM",
+  },
+  {
+    key: TENANT_PERMISSIONS.VEHICLE_BLOCK_CREATE,
+    resource: "vehicle_block",
+    action: "create",
+    name: "Create Vehicle Availability Blocks",
+    description: "Block a vehicle from sale for operational, maintenance, or compliance reasons",
+    scope: "TENANT",
+    riskLevel: "MEDIUM",
+  },
+  {
+    key: TENANT_PERMISSIONS.VEHICLE_BLOCK_MANAGE,
+    resource: "vehicle_block",
+    action: "manage",
+    name: "Manage Vehicle Availability Blocks",
+    description: "Release or administer vehicle availability blocks",
+    scope: "TENANT",
+    riskLevel: "MEDIUM",
   },
 
   // Bookings
