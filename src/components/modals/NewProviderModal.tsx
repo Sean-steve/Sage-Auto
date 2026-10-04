@@ -24,6 +24,8 @@ export const NewProviderModal: React.FC = () => {
   const [bankAccountName,setBankAccountName]=useState("");
   const [bankAccountNumber,setBankAccountNumber]=useState("");
   const [notes, setNotes] = useState("");
+  const [busy,setBusy]=useState(false);
+  const [error,setError]=useState("");
 
   if (!isNewProviderModalOpen) return null;
 
@@ -35,11 +37,11 @@ export const NewProviderModal: React.FC = () => {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name) return;
-
-    createServiceProvider({
+    if (!name || busy) return;
+    setBusy(true);setError("");
+    const saved=await createServiceProvider({
       name,
       // Vendor code is generated centrally as GAR-#### so users never invent identifiers.
       contactPerson: contactPerson || undefined,
@@ -55,6 +57,7 @@ export const NewProviderModal: React.FC = () => {
       bankAccountNumber: paymentMethods.includes("BANK_TRANSFER") ? bankAccountNumber || undefined : undefined,
       notes: notes || undefined,
     });
+    if(!saved){setError("The garage could not be registered. Review any duplicate or required details and try again.");setBusy(false);return;}
 
     setName("");
     setContactPerson("");
@@ -66,6 +69,7 @@ export const NewProviderModal: React.FC = () => {
     setPaymentMethods([]);setMpesaNumber("");setBankName("");setBankAccountName("");setBankAccountNumber("");
     setNotes("");
     setIsNewProviderModalOpen(false);
+    setBusy(false);
   };
 
   return (
@@ -78,7 +82,7 @@ export const NewProviderModal: React.FC = () => {
               <Building2 className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-sm font-bold text-slate-900 dark:text-white">Register Service Provider / Garage</h2>
+              <h2 className="text-sm font-bold text-slate-900 dark:text-white">{busy?"Registering…":"Register Service Provider"} / Garage</h2>
               <p className="text-xs text-slate-500 dark:text-slate-400">Add trusted workshop vendor to workspace network</p>
             </div>
           </div>
