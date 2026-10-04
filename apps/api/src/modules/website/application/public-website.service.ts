@@ -179,20 +179,17 @@ export class PublicWebsiteService {
       allVehicles = Array.isArray(res) ? res : res.vehicles;
     }
 
-    // Invariant 4: Filter out DECOMMISSIONED, ARCHIVED, or non-active vehicles
+    // Public catalogue eligibility is distinct from date availability.
+    // A temporary hold does not hide a vehicle globally; overlapping holds are
+    // enforced later by Availability for the customer's requested interval.
     const rentableVehicles = allVehicles.filter((v) => {
       const status = ((v as any).status || "").toUpperCase();
       const lifecycle = (v.lifecycleStatus || "").toUpperCase();
       const availability = (v.availabilityStatus || "").toUpperCase();
-      if (lifecycle === "DECOMMISSIONED" || lifecycle === "SOLD" || lifecycle === "RETIRED" || lifecycle === "INACTIVE") {
-        return false;
-      }
-      if (status === "DECOMMISSIONED" || status === "MAINTENANCE") {
-        return false;
-      }
-      if (availability === "MAINTENANCE" || availability === "BLOCKED") {
-        return false;
-      }
+      if ((v as any).isPublishedToWebsite === false) return false;
+      if (["DECOMMISSIONED","SOLD","RETIRED","INACTIVE","ARCHIVED"].includes(lifecycle)) return false;
+      if (["DECOMMISSIONED","MAINTENANCE","ARCHIVED"].includes(status)) return false;
+      if (["MAINTENANCE","BLOCKED"].includes(availability)) return false;
       return true;
     });
 
