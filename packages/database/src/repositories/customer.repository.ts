@@ -9,6 +9,7 @@ import {
   RecordNotFoundError,
   ConcurrencyConflictError,
   CrossTenantViolationError,
+  UniqueConstraintViolationError,
 } from "../errors";
 import { TransactionContext } from "../transaction-manager";
 
@@ -137,6 +138,17 @@ export class CustomerRepository implements ICustomerRepository {
   async create(
     data: Omit<Customer, "id" | "customerNumber" | "totalRentalsCount" | "version" | "createdAt" | "updatedAt"> & { customerNumber?: string; totalRentalsCount?: number }
   ): Promise<Customer> {
+    const email=data.email.trim().toLowerCase();
+    const phone=data.phone.replace(/[^0-9]/g,"");
+    const identity=data.idOrPassportNumber.trim().toLowerCase();
+    const licence=data.licenseNumber.trim().toLowerCase();
+    for(const existing of CustomerRepository.customerStore.values()){
+      if(existing.tenantId!==data.tenantId)continue;
+      if(existing.email.trim().toLowerCase()===email)throw new UniqueConstraintViolationError("customer email");
+      if(existing.phone.replace(/[^0-9]/g,"")===phone)throw new UniqueConstraintViolationError("customer phone number");
+      if(existing.idOrPassportNumber.trim().toLowerCase()===identity)throw new UniqueConstraintViolationError("ID / passport number");
+      if(existing.licenseNumber.trim().toLowerCase()===licence)throw new UniqueConstraintViolationError("driving licence number");
+    }
     const now = new Date().toISOString();
     CustomerRepository.customerSequence++;
     const num = String(CustomerRepository.customerSequence).padStart(6, "0");
@@ -144,6 +156,10 @@ export class CustomerRepository implements ICustomerRepository {
 
     const newCustomer: Customer = {
       ...data,
+      email,
+      phone:data.phone.trim(),
+      idOrPassportNumber:data.idOrPassportNumber.trim(),
+      licenseNumber:data.licenseNumber.trim(),
       id: crypto.randomUUID(),
       customerNumber,
       customerType: data.customerType || "INDIVIDUAL",
@@ -175,6 +191,14 @@ export class CustomerRepository implements ICustomerRepository {
 
     if (expectedVersion !== undefined && customer.version !== expectedVersion) {
       throw new ConcurrencyConflictError(`Customer ${id} version mismatch: expected ${expectedVersion}, actual ${customer.version}`);
+    }
+
+    for(const existing of CustomerRepository.customerStore.values()){
+      if(existing.id===id||existing.tenantId!==tenantId)continue;
+      if(data.email&&existing.email.trim().toLowerCase()===data.email.trim().toLowerCase())throw new UniqueConstraintViolationError("customer email");
+      if(data.phone&&existing.phone.replace(/[^0-9]/g,"")===data.phone.replace(/[^0-9]/g,""))throw new UniqueConstraintViolationError("customer phone number");
+      if(data.idOrPassportNumber&&existing.idOrPassportNumber.trim().toLowerCase()===data.idOrPassportNumber.trim().toLowerCase())throw new UniqueConstraintViolationError("ID / passport number");
+      if(data.licenseNumber&&existing.licenseNumber.trim().toLowerCase()===data.licenseNumber.trim().toLowerCase())throw new UniqueConstraintViolationError("driving licence number");
     }
 
     const updatedCustomer: Customer = {
