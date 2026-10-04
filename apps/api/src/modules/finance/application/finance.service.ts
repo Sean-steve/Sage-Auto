@@ -1280,7 +1280,11 @@ export class FinanceService {
     dto: CreateDepositPositionDto,
     actor: FinanceActor
   ): Promise<DepositPosition> {
-    const existing = await this.depositPositionRepo.findByRentalId(dto.rentalId, tenantId);
+    const existing = dto.rentalId
+      ? await this.depositPositionRepo.findByRentalId(dto.rentalId, tenantId)
+      : dto.bookingId
+        ? await this.depositPositionRepo.findByBookingId(dto.bookingId, tenantId)
+        : null;
     if (existing) {
       return existing;
     }
