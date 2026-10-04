@@ -24,6 +24,19 @@ for(const type of ["HERO","FEATURE_GRID","VEHICLE_SHOWCASE","TEXT_IMAGE","TESTIM
 }
 assert.match(websiteStudio,/block\.data\?\.enabled===false/);
 assert.match(websiteStudio,/Save page settings/);
+assert.match(websiteStudio,/testimonials:\[\]/);
+assert.match(websiteStudio,/faqs:\[\]/);
+assert.match(websiteStudio,/function destinationOptions/);
+assert.match(websiteStudio,/Fleet catalogue/);
+assert.match(websiteStudio,/Booking form/);
+assert.match(websiteStudio,/Add testimonial/);
+assert.match(websiteStudio,/Add FAQ/);
+assert.match(websiteStudio,/Add benefit card/);
+assert.match(websiteStudio,/Horizontal carousel/);
+assert.match(publicSite,/function routeHref/);
+assert.match(publicSite,/repeat\(auto-fit,minmax/);
+assert.match(publicSite,/snap-x/);
+assert.match(publicSite,/secondaryCtaLink/);
 
 assert.match(publicSite,/booking\/availability/);
 assert.match(publicSite,/temporarily held for another time window/);
