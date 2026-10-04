@@ -405,7 +405,7 @@ function MarketingHeader() {
               {item.label}{dropdown && <ChevronDown size={14}/>}
             </a>
             {dropdown && <div className="invisible absolute left-0 top-full z-50 mt-2 w-72 translate-y-1 rounded-2xl border border-slate-200 bg-white p-2 opacity-0 shadow-xl transition group-hover:visible group-hover:translate-y-0 group-hover:opacity-100">
-              {dropdown.map(([label,href]) => <a key={href} href={href} className="flex items-center justify-between rounded-xl px-4 py-3 text-sm font-medium text-slate-700 hover:bg-[#f4f1e9] hover:text-slate-950"><span>{label}</span><ArrowRight size={14}/></a>)}
+              {dropdown.map(item => { const label=item[0], href=item[1]; return <a key={href} href={href} className="flex items-center justify-between rounded-xl px-4 py-3 text-sm font-medium text-slate-700 hover:bg-[#f4f1e9] hover:text-slate-950"><span>{label}</span><ArrowRight size={14}/></a>; })}
               <a href={item.href} className="mt-1 flex items-center gap-2 border-t border-slate-100 px-4 py-3 text-xs font-bold uppercase tracking-[0.12em] text-emerald-700">View all <ArrowRight size={13}/></a>
             </div>}
           </div>;
@@ -434,7 +434,7 @@ function MarketingFooter() {
   return <footer className="border-t border-slate-200 bg-slate-950 text-slate-300">
     <div className="mx-auto grid max-w-7xl gap-12 px-5 py-14 sm:px-8 lg:grid-cols-[1.2fr_3fr]">
       <div><div className="flex items-center gap-3 text-white"><span className="grid h-9 w-9 place-items-center rounded-xl bg-emerald-600"><CarFront size={18}/></span><strong>Sage Auto</strong></div><p className="mt-4 max-w-sm text-sm leading-6 text-slate-400">The operating platform for rental businesses that want commercial speed, fleet control and financial clarity in one system.</p></div>
-      <div className="grid grid-cols-2 gap-8 md:grid-cols-4">{groups.map(([title,items])=><div key={title}><h3 className="mb-4 text-sm font-semibold text-white">{title}</h3><div className="grid gap-3">{items.map(([label,href])=><a className="text-sm text-slate-400 hover:text-white" href={href} key={href}>{label}</a>)}</div></div>)}</div>
+      <div className="grid grid-cols-2 gap-8 md:grid-cols-4">{groups.map(([title,items])=><div key={title}><h3 className="mb-4 text-sm font-semibold text-white">{title}</h3><div className="grid gap-3">{items.map(item=>{const label=item[0], href=item[1]; return <a className="text-sm text-slate-400 hover:text-white" href={href} key={href}>{label}</a>;})}</div></div>)}</div>
     </div>
     <div className="border-t border-slate-800 px-5 py-6 text-center text-xs text-slate-500">Sage Auto · Rental operations, connected.</div>
   </footer>;
@@ -546,7 +546,7 @@ function HubPage({ type }: { type: "product" | "solutions" }) {
   const items = type === "product" ? productLinks : solutionLinks;
   return <>
     <section className="bg-[#fbfaf7]"><div className="mx-auto max-w-7xl px-5 py-20 sm:px-8"><SectionTitle eyebrow={type === "product" ? "Product" : "Solutions"} title={type === "product" ? "One system around the entire rental lifecycle." : "A stronger operating model for the business you actually run."} copy={type === "product" ? "Sage Auto modules share the same customer, vehicle, booking, rental and financial context so each workflow starts with what the previous workflow already knows." : "Different rental businesses feel different pressure. Sage Auto keeps one operating foundation while letting you focus on the outcomes that matter most to your model."}/></div></section>
-    <section className="bg-white"><div className="mx-auto max-w-7xl px-5 py-18 sm:px-8"><div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">{items.map(([label,href])=><a href={href} key={href} className="group rounded-3xl border border-slate-200 p-7 hover:border-emerald-300 hover:shadow-lg"><h2 className="text-xl font-semibold">{label}</h2><p className="mt-3 text-sm leading-6 text-slate-600">{type === "product" ? "See the workflow, operating controls and business outcome." : "See how Sage Auto supports this operating model."}</p><span className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-emerald-700">Explore <ArrowRight size={15} className="transition group-hover:translate-x-1"/></span></a>)}</div></div></section>
+    <section className="bg-white"><div className="mx-auto max-w-7xl px-5 py-18 sm:px-8"><div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">{items.map(item=>{const label=item[0], href=item[1]; return <a href={href} key={href} className="group rounded-3xl border border-slate-200 p-7 hover:border-emerald-300 hover:shadow-lg"><h2 className="text-xl font-semibold">{label}</h2><p className="mt-3 text-sm leading-6 text-slate-600">{type === "product" ? "See the workflow, operating controls and business outcome." : "See how Sage Auto supports this operating model."}</p><span className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-emerald-700">Explore <ArrowRight size={15} className="transition group-hover:translate-x-1"/></span></a>;})}</div></div></section>
     <CallToAction/>
   </>;
 }
