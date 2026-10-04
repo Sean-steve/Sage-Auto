@@ -235,7 +235,7 @@ export class VehicleOwnersService {
         revenueSharePercent: dto.revenueSharePercent,
         fixedMonthlyPayout: dto.fixedMonthlyPayout !== undefined ? dto.fixedMonthlyPayout : active.fixedMonthlyPayout,
         allowableExpenseDeductions: dto.allowableExpenseDeductions !== undefined ? dto.allowableExpenseDeductions : active.allowableExpenseDeductions,
-        termsSnapshot: `Agreement terms updated: Revenue share changed to ${dto.revenueSharePercent}%`,
+        termsSnapshot: dto.termsSnapshot?.trim() || `Revenue share: ${dto.revenueSharePercent}%. Expense deductions: ${(dto.allowableExpenseDeductions !== undefined ? dto.allowableExpenseDeductions : active.allowableExpenseDeductions) ? "allowed" : "not allowed"}.`,
         notes: dto.notes || active.notes,
         startDate: dto.effectiveDate || new Date().toISOString(),
       },
