@@ -640,10 +640,32 @@ export class BookingService {
       return booking;
     }
 
-    // Determine target vehicle
-    const vehicleId = dto.assignedVehicleId || booking.assignedVehicleId || booking.requestedVehicleId;
+    // Determine target vehicle. Desk users do not have to scroll through the
+    // whole fleet: a specific request/assignment wins, then a live Hold, then
+    // Availability chooses the first eligible vehicle for the requested category.
+    const holdToken = dto.holdToken || booking.holdToken;
+    let vehicleId = dto.assignedVehicleId || booking.assignedVehicleId || booking.requestedVehicleId || undefined;
+
+    if (!vehicleId && holdToken) {
+      const liveHolds = await this.availabilityService.listHolds(tenantId, { status: "PENDING" });
+      vehicleId = liveHolds.find((hold) => hold.holdToken === holdToken)?.vehicleId;
+    }
+
     if (!vehicleId) {
-      throw new Error("Cannot confirm booking without an assigned vehicle ID.");
+      const candidates = await this.availabilityService.searchAvailableVehicles(tenantId, {
+        pickupAt: booking.pickupAt || new Date().toISOString(),
+        returnAt: booking.returnAt || new Date(Date.now() + 86400000).toISOString(),
+        vehicleCategoryId: booking.requestedVehicleCategoryId || undefined,
+        limit: 50,
+      });
+      vehicleId = candidates.vehicles[0]?.id;
+    }
+
+    if (!vehicleId) {
+      throw new BookingAvailabilityConflictError(
+        `No eligible vehicle is available for booking #${booking.bookingNumber} in the requested time window.`,
+        booking.requestedVehicleCategoryId || "fleet"
+      );
     }
 
     // Verify Vehicle Operability
@@ -664,7 +686,6 @@ export class BookingService {
     // 1. Authoritative Vehicle Allocation via AvailabilityService
     let allocationId: string;
 
-    const holdToken = dto.holdToken || booking.holdToken;
     if (holdToken) {
       try {
         const confirmedHold = await this.availabilityService.confirmHold(
