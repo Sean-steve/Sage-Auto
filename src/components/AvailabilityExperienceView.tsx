@@ -63,7 +63,6 @@ export function AvailabilityExperienceView({portal}:Props){
   const [release,setRelease]=useState<{kind:"allocation"|"block";record:any}|null>(null);
   const refreshSeq=useRef(0),calendarSeq=useRef(0);
   const refreshInFlight=useRef<Promise<void>|null>(null);
-  const selectedVehicleRef=useRef("");
   const initialAvailabilityLoaded=useRef(false);
 
   const window=useMemo(()=>{
@@ -110,8 +109,9 @@ export function AvailabilityExperienceView({portal}:Props){
         if(request===refreshSeq.current)setLoading(false);
       }
     })();
-    refreshInFlight.current=work.finally(()=>{if(refreshInFlight.current===work)refreshInFlight.current=null;});
-    return refreshInFlight.current;
+    const tracked=work.finally(()=>{if(refreshInFlight.current===tracked)refreshInFlight.current=null;});
+    refreshInFlight.current=tracked;
+    return tracked;
   }
 
   useEffect(()=>{void loadReferenceData().catch((e:any)=>setError(e.message||"Unable to load Availability reference data."));},[portal.id]);
@@ -127,23 +127,39 @@ export function AvailabilityExperienceView({portal}:Props){
     catch(e:any){if(request===calendarSeq.current)setError(e.message||"Unable to load Vehicle calendar.");}
     finally{if(request===calendarSeq.current)setCalendarLoading(false);}
   }
-  useEffect(()=>{selectedVehicleRef.current=selectedVehicle;},[selectedVehicle]);
   useEffect(()=>{
     const timer=globalThis.setTimeout(()=>{if(selectedVehicle)void loadCalendar(selectedVehicle);else {calendarSeq.current++;setCalendar(null);setCalendarLoading(false);}},180);
     return()=>globalThis.clearTimeout(timer);
   },[selectedVehicle,window.start,window.end]);
   useEffect(()=>{
     const now=Date.now();
-    const futureExpiries=holds
-      .filter(h=>h.status==="PENDING"&&h.expiresAt)
-      .map(h=>Date.parse(h.expiresAt))
-      .filter((value:number)=>Number.isFinite(value)&&value>now+250);
-    if(!futureExpiries.length)return;
-    const next=Math.min(...futureExpiries);
+    const pending=holds
+      .map((hold:any)=>({hold,expiresAt:Date.parse(hold.expiresAt)}))
+      .filter(({hold,expiresAt})=>hold.status==="PENDING"&&Number.isFinite(expiresAt)&&expiresAt>now+250);
+    if(!pending.length)return;
+    const next=Math.min(...pending.map(item=>item.expiresAt));
     const delay=Math.min(2147483000,Math.max(500,next-now+500));
     const timer=globalThis.setTimeout(()=>{
-      void refresh({showLoading:false});
-      if(selectedVehicleRef.current)void loadCalendar(selectedVehicleRef.current);
+      const expiredAt=Date.now();
+      const expiredAllocationIds=new Set<string>();
+      setHolds(current=>current.map((hold:any)=>{
+        const expiresAt=Date.parse(hold.expiresAt);
+        if(hold.status==="PENDING"&&Number.isFinite(expiresAt)&&expiresAt<=expiredAt){
+          if(hold.allocationId)expiredAllocationIds.add(hold.allocationId);
+          return {...hold,status:"EXPIRED"};
+        }
+        return hold;
+      }));
+      setAllocations(current=>current.map((allocation:any)=>{
+        const expiresAt=allocation.holdExpiresAt?Date.parse(allocation.holdExpiresAt):NaN;
+        return allocation.status==="HELD"&&Number.isFinite(expiresAt)&&expiresAt<=expiredAt
+          ? {...allocation,status:"EXPIRED"}
+          : allocation;
+      }));
+      setCalendar((current:any)=>{
+        if(!current?.entries)return current;
+        return {...current,entries:current.entries.map((entry:any)=>expiredAllocationIds.has(entry.id)?{...entry,status:"EXPIRED",isBlocking:false}:entry)};
+      });
     },delay);
     return()=>globalThis.clearTimeout(timer);
   },[holds]);
