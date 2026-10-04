@@ -32,14 +32,37 @@ export const CreateCustomerSchema = z.object({
 });
 
 export const CreateBookingSchema = z.object({
-  vehicleId: z.string().min(1, "Vehicle selection is required"),
   customerId: z.string().min(1, "Customer selection is required"),
+  corporateAccountId: z.string().optional(),
+  primaryDriverId: z.string().optional(),
   driverId: z.string().optional(),
-  startDate: z.string().min(1, "Start date is required"),
-  endDate: z.string().min(1, "End date is required"),
-  pickupLocation: z.string().default("Nairobi HQ"),
-  returnLocation: z.string().default("Nairobi HQ"),
-  source: z.enum(["WALK_IN", "PHONE", "PUBLIC_WEBSITE", "AGENT_REFERRAL", "CORPORATE"]).default("WALK_IN"),
+  additionalDriverIds: z.array(z.string()).optional(),
+  agentId: z.string().optional(),
+  vehicleId: z.string().optional(),
+  requestedVehicleId: z.string().optional(),
+  assignedVehicleId: z.string().optional(),
+  requestedVehicleCategoryId: z.string().optional(),
+  pickupAt: z.string().min(1).optional(),
+  returnAt: z.string().min(1).optional(),
+  startDate: z.string().min(1).optional(),
+  endDate: z.string().min(1).optional(),
+  pickupLocationName: z.string().optional(),
+  returnLocationName: z.string().optional(),
+  pickupLocation: z.string().optional(),
+  returnLocation: z.string().optional(),
+  source: z.enum(["TENANT_ADMIN","OPERATIONS_DESK","PUBLIC_WEBSITE","PUBLIC_PORTAL","AGENT_REFERRAL","CORPORATE","CORPORATE_PORTAL","PHONE","WALK_IN","API","BACKOFFICE","WEB"]).default("OPERATIONS_DESK"),
+  promoCode: z.string().optional(),
+  requestedFeeCodes: z.array(z.string()).optional(),
+  ratePlanId: z.string().optional(),
+  specialInstructions: z.string().optional(),
+  customerNotes: z.string().optional(),
+  internalNotes: z.string().optional(),
+  holdToken: z.string().optional(),
+  autoQuote: z.boolean().optional(),
+  idempotencyKey: z.string().optional(),
+}).superRefine((value,ctx)=>{
+  if(!(value.pickupAt||value.startDate))ctx.addIssue({code:z.ZodIssueCode.custom,path:["pickupAt"],message:"Pickup date and time are required"});
+  if(!(value.returnAt||value.endDate))ctx.addIssue({code:z.ZodIssueCode.custom,path:["returnAt"],message:"Return date and time are required"});
 });
 
 export const CreateRentalDispatchSchema = z.object({
