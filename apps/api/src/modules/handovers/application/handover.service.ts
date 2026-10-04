@@ -62,6 +62,13 @@ function toAuditActorType(
   return "USER";
 }
 
+function handoverCheckpointError(message:string, code="HANDOVER_CHECKPOINT_BLOCKED"){
+  const err:any=new Error(message);
+  err.statusCode=409;
+  err.code=code;
+  return err;
+}
+
 export class HandoverService {
   private readonly handoverRepo: IHandoverRepository;
   private readonly bookingRepo: IBookingRepository;
@@ -334,9 +341,10 @@ export class HandoverService {
       throw new HandoverNotFoundError(handoverId);
     }
 
-    HandoverStateMachine.validateTransition(handover.status, "PRE_RENTAL_INSPECTION");
+    try{HandoverStateMachine.validateTransition(handover.status, "PRE_RENTAL_INSPECTION");}
+    catch(err:any){throw handoverCheckpointError(err.message||"Complete the previous handover checkpoint first.");}
     if (!dto.passed) {
-      throw new Error("Vehicle inspection failed. Vehicle is not roadworthy for handover.");
+      throw handoverCheckpointError("The inspection is marked as failed. Resolve the inspection findings before continuing handover.");
     }
 
     const inspection = await this.inspectionRepo.findById(dto.inspectionId, tenantId);
@@ -344,34 +352,37 @@ export class HandoverService {
       throw new RecordNotFoundError("Inspection", dto.inspectionId);
     }
     if (inspection.status !== "COMPLETED") {
-      throw new Error(`Pre-rental Inspection ${inspection.inspectionNumber} must be COMPLETED before Handover can advance.`);
+      throw handoverCheckpointError(`Inspection ${inspection.inspectionNumber} must be completed before handover can continue.`);
     }
     if (inspection.inspectionType !== "PRE_RENTAL") {
-      throw new Error(`Inspection ${inspection.inspectionNumber} is ${inspection.inspectionType}; Handover requires PRE_RENTAL.`);
+      throw handoverCheckpointError(`Inspection ${inspection.inspectionNumber} is not a pre-rental inspection. Complete a pre-rental inspection for this vehicle.`);
     }
     if (inspection.vehicleId !== handover.vehicleId) {
-      throw new Error(`Inspection ${inspection.inspectionNumber} belongs to a different Vehicle.`);
+      throw handoverCheckpointError(`Inspection ${inspection.inspectionNumber} belongs to another vehicle. Choose the inspection completed for this handover vehicle.`);
     }
     if (inspection.bookingId && inspection.bookingId !== handover.bookingId) {
-      throw new Error(`Inspection ${inspection.inspectionNumber} belongs to a different Booking.`);
+      throw handoverCheckpointError(`Inspection ${inspection.inspectionNumber} is linked to another booking. Choose the inspection completed for this booking.`);
     }
     if (inspection.handoverId && inspection.handoverId !== handover.id) {
-      throw new Error(`Inspection ${inspection.inspectionNumber} belongs to a different Handover.`);
+      throw handoverCheckpointError(`Inspection ${inspection.inspectionNumber} is already linked to another handover.`);
     }
     if (inspection.odometer < 0 || inspection.fuelLevel < 0 || inspection.fuelLevel > 100) {
-      throw new Error(`Inspection ${inspection.inspectionNumber} contains invalid odometer/fuel readings.`);
+      throw handoverCheckpointError(`Inspection ${inspection.inspectionNumber} has invalid odometer or fuel readings. Correct the inspection before continuing.`);
     }
 
-    const template =
-      await this.inspectionTemplateRepo.findById(inspection.templateId, tenantId) ||
-      await this.inspectionTemplateRepo.findByCode(inspection.templateId, tenantId) ||
-      await this.inspectionTemplateRepo.findDefault(tenantId);
+    let template=null;
+    if(inspection.templateId){
+      template =
+        await this.inspectionTemplateRepo.findById(inspection.templateId, tenantId) ||
+        await this.inspectionTemplateRepo.findByCode(inspection.templateId, tenantId);
+    }
+    if(!template)template=await this.inspectionTemplateRepo.findDefault(tenantId);
     const requiredItems = template?.sections.flatMap((section) => section.items.filter((item) => item.required)) || [];
     const answeredCodes = new Set((inspection.responses || []).map((response) => response.itemCode));
     const missingRequired = requiredItems.filter((item) => !answeredCodes.has(item.code));
     if (missingRequired.length > 0) {
-      throw new Error(
-        `Inspection ${inspection.inspectionNumber} is not Handover-ready; mandatory checklist items remain: ${missingRequired.map((item) => item.label).join(", ")}.`
+      throw handoverCheckpointError(
+        `Finish these required inspection checks before handover: ${missingRequired.map((item) => item.label).join(", ")}.`
       );
     }
     const evidenceRequiredItems = template?.sections.flatMap((section) => section.items.filter((item) => item.requiresEvidence)) || [];
@@ -380,8 +391,8 @@ export class HandoverService {
       return response && (!response.evidenceIds || response.evidenceIds.length === 0);
     });
     if (missingEvidence.length > 0) {
-      throw new Error(
-        `Inspection ${inspection.inspectionNumber} is not Handover-ready; evidence is missing for: ${missingEvidence.map((item) => item.label).join(", ")}.`
+      throw handoverCheckpointError(
+        `Attach the required inspection evidence for: ${missingEvidence.map((item) => item.label).join(", ")}.`
       );
     }
 
