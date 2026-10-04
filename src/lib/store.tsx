@@ -234,7 +234,7 @@ interface AppContextType {
   addVehicle: (vehicle: Omit<Vehicle, "id" | "tenantId" | "createdAt" | "updatedAt">) => Promise<Vehicle | null>;
   updateVehicle: (id: string, updates: Partial<Vehicle>) => void;
   deleteVehicle: (id: string) => void;
-  addVehicleOwner: (owner: Omit<VehicleOwner, "id" | "tenantId" | "createdAt">) => VehicleOwner;
+  addVehicleOwner: (owner: Omit<VehicleOwner, "id" | "tenantId" | "createdAt">) => Promise<VehicleOwner | null>;
   attachVehicleOwnership: (ownership: Omit<VehicleOwnership, "id" | "tenantId" | "createdAt">) => VehicleOwnership;
 
   // Domain Actions - Customers & Drivers
@@ -1380,21 +1380,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode; access?:{context
   }, [showNotification]);
 
   const addVehicleOwner = useCallback(
-    (ownerData: Omit<VehicleOwner, "id" | "tenantId" | "createdAt">): VehicleOwner => {
-      const newOwner: VehicleOwner = {
-        ...ownerData,
-        id: `owner-${Date.now().toString(36)}`,
-        tenantId: activeTenantId,
-        createdAt: new Date().toISOString(),
-      };
-      setVehicleOwners((prev) => [newOwner, ...prev]);
-      // Live backend API synchronization
-      apiClient.vehicleOwners.createOwner(ownerData).catch(() => null);
-      emitDomainFact("VehicleOwnerCreated", "VehicleOwner", newOwner.id, { name: newOwner.name }, "vehicle_owners.create");
-      showNotification(`Vehicle Owner ${newOwner.name} registered.`);
-      return newOwner;
+    async (ownerData: Omit<VehicleOwner, "id" | "tenantId" | "createdAt">): Promise<VehicleOwner | null> => {
+      const response=await apiClient.vehicleOwners.createOwner(ownerData);
+      if(response.error){showNotification(response.error.message,"error");return null;}
+      const saved=response.data as VehicleOwner;
+      setVehicleOwners(prev=>prev.some(item=>item.id===saved.id)?prev:[saved,...prev]);
+      emitDomainFact("VehicleOwnerCreated","VehicleOwner",saved.id,{name:saved.name},"vehicle_owners.create");
+      showNotification(`Vehicle Owner ${saved.name} registered.`);
+      return saved;
     },
-    [activeTenantId, serviceProviders, emitDomainFact, showNotification]
+    [emitDomainFact, showNotification]
   );
 
   const attachVehicleOwnership = useCallback(
