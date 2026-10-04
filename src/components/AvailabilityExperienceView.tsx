@@ -62,6 +62,9 @@ export function AvailabilityExperienceView({portal}:Props){
   const [substitute,setSubstitute]=useState<any>(null);
   const [release,setRelease]=useState<{kind:"allocation"|"block";record:any}|null>(null);
   const refreshSeq=useRef(0),calendarSeq=useRef(0);
+  const refreshInFlight=useRef<Promise<void>|null>(null);
+  const selectedVehicleRef=useRef("");
+  const initialAvailabilityLoaded=useRef(false);
 
   const window=useMemo(()=>{
     const start=new Date(windowStart+"T00:00:00");
@@ -69,31 +72,53 @@ export function AvailabilityExperienceView({portal}:Props){
     return {start:start.toISOString(),end:end.toISOString()};
   },[windowStart,days]);
 
-  async function refresh(){
-    const request=++refreshSeq.current;setLoading(true);setError("");
-    try{
-      const queries={from:window.start,to:window.end};
-      const tasks:Promise<any>[]=[
-        apiClient.availability.listAllocations(queries),
-        apiClient.availability.listHolds(queries),
-        apiClient.availability.listBlocks(queries),
-        can("vehicle.read")?apiClient.fleet.listVehicles({limit:100}):Promise.resolve({data:[]}),
-        can("vehicle.read")?apiClient.fleet.getCategories():Promise.resolve({data:[]}),
-        can("customer.read")?apiClient.customers.listCustomers({limit:100}):Promise.resolve({data:[]}),
-      ];
-      const result=await Promise.all(tasks);
-      if(request!==refreshSeq.current)return;
-      for(let i=0;i<3;i++)if(result[i].error)throw new Error(result[i].error.message);
-      setAllocations(result[0].data||[]);
-      setHolds(result[1].data||[]);
-      setBlocks(result[2].data||[]);
-      setVehicles(result[3].error?[]:result[3].data||[]);
-      setCategories(result[4].error?[]:result[4].data||[]);
-      setCustomers(result[5].error?[]:result[5].data||[]);
-    }catch(e:any){if(request===refreshSeq.current)setError(e.message||"Unable to load Availability.");}
-    finally{if(request===refreshSeq.current)setLoading(false);}
+  async function loadReferenceData(){
+    const result=await Promise.all([
+      can("vehicle.read")?apiClient.fleet.listVehicles({limit:100}):Promise.resolve({data:[]}),
+      can("vehicle.read")?apiClient.fleet.getCategories():Promise.resolve({data:[]}),
+      can("customer.read")?apiClient.customers.listCustomers({limit:100}):Promise.resolve({data:[]}),
+    ]);
+    setVehicles(result[0].error?[]:result[0].data||[]);
+    setCategories(result[1].error?[]:result[1].data||[]);
+    setCustomers(result[2].error?[]:result[2].data||[]);
   }
-  useEffect(()=>{void refresh();},[portal.id,window.start,window.end]);
+
+  function refresh(options:{showLoading?:boolean}={}){
+    if(refreshInFlight.current)return refreshInFlight.current;
+    const request=++refreshSeq.current;
+    const shouldShowLoading=options.showLoading??!initialAvailabilityLoaded.current;
+    if(shouldShowLoading)setLoading(true);
+    setError("");
+    const work=(async()=>{
+      try{
+        const queries={from:window.start,to:window.end};
+        const result=await Promise.all([
+          apiClient.availability.listAllocations(queries),
+          apiClient.availability.listHolds(queries),
+          apiClient.availability.listBlocks(queries),
+        ]);
+        if(request!==refreshSeq.current)return;
+        for(const response of result)if(response.error)throw new Error(response.error.message);
+        const now=Date.now();
+        setAllocations((result[0].data||[]).map((a:any)=>a.status==="HELD"&&a.holdExpiresAt&&Number.isFinite(Date.parse(a.holdExpiresAt))&&Date.parse(a.holdExpiresAt)<=now?{...a,status:"EXPIRED"}:a));
+        setHolds((result[1].data||[]).map((h:any)=>h.status==="PENDING"&&h.expiresAt&&Number.isFinite(Date.parse(h.expiresAt))&&Date.parse(h.expiresAt)<=now?{...h,status:"EXPIRED"}:h));
+        setBlocks(result[2].data||[]);
+        initialAvailabilityLoaded.current=true;
+      }catch(e:any){
+        if(request===refreshSeq.current)setError(e.message||"Unable to load Availability.");
+      }finally{
+        if(request===refreshSeq.current)setLoading(false);
+      }
+    })();
+    refreshInFlight.current=work.finally(()=>{if(refreshInFlight.current===work)refreshInFlight.current=null;});
+    return refreshInFlight.current;
+  }
+
+  useEffect(()=>{void loadReferenceData().catch((e:any)=>setError(e.message||"Unable to load Availability reference data."));},[portal.id]);
+  useEffect(()=>{
+    const timer=globalThis.setTimeout(()=>{void refresh({showLoading:!initialAvailabilityLoaded.current});},180);
+    return()=>globalThis.clearTimeout(timer);
+  },[portal.id,window.start,window.end]);
 
   async function loadCalendar(vehicleId=selectedVehicle){
     if(!vehicleId){setCalendar(null);return;}
@@ -102,19 +127,30 @@ export function AvailabilityExperienceView({portal}:Props){
     catch(e:any){if(request===calendarSeq.current)setError(e.message||"Unable to load Vehicle calendar.");}
     finally{if(request===calendarSeq.current)setCalendarLoading(false);}
   }
-  useEffect(()=>{if(selectedVehicle)void loadCalendar(selectedVehicle);else {calendarSeq.current++;setCalendar(null);setCalendarLoading(false);}},[selectedVehicle,window.start,window.end]);
+  useEffect(()=>{selectedVehicleRef.current=selectedVehicle;},[selectedVehicle]);
   useEffect(()=>{
-    const pending=holds.filter(h=>h.status==="PENDING"&&h.expiresAt);
-    if(!pending.length)return;
-    const next=Math.min(...pending.map(h=>new Date(h.expiresAt).getTime()));
-    const delay=Math.max(250,Math.min(2147483000,next-Date.now()+300));
-    const timer=globalThis.setTimeout(()=>{void refresh();if(selectedVehicle)void loadCalendar(selectedVehicle);},delay);
+    const timer=globalThis.setTimeout(()=>{if(selectedVehicle)void loadCalendar(selectedVehicle);else {calendarSeq.current++;setCalendar(null);setCalendarLoading(false);}},180);
     return()=>globalThis.clearTimeout(timer);
-  },[holds,selectedVehicle]);
+  },[selectedVehicle,window.start,window.end]);
+  useEffect(()=>{
+    const now=Date.now();
+    const futureExpiries=holds
+      .filter(h=>h.status==="PENDING"&&h.expiresAt)
+      .map(h=>Date.parse(h.expiresAt))
+      .filter((value:number)=>Number.isFinite(value)&&value>now+250);
+    if(!futureExpiries.length)return;
+    const next=Math.min(...futureExpiries);
+    const delay=Math.min(2147483000,Math.max(500,next-now+500));
+    const timer=globalThis.setTimeout(()=>{
+      void refresh({showLoading:false});
+      if(selectedVehicleRef.current)void loadCalendar(selectedVehicleRef.current);
+    },delay);
+    return()=>globalThis.clearTimeout(timer);
+  },[holds]);
 
   async function mutate(work:()=>Promise<ApiResponse<any>>,message:string){
     setError("");setNotice("");
-    try{await unwrap(work());setNotice(message);await refresh();if(selectedVehicle)await loadCalendar(selectedVehicle);}
+    try{await unwrap(work());setNotice(message);await refresh({showLoading:false});if(selectedVehicle)await loadCalendar(selectedVehicle);}
     catch(e:any){setError(e.message||"Availability operation failed.");throw e;}
   }
 
@@ -131,7 +167,7 @@ export function AvailabilityExperienceView({portal}:Props){
   ];
 
   return <div className="mx-auto max-w-[1500px] space-y-6 p-4 sm:p-6 lg:p-8">
-    <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between"><div><p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-600">Dispatch control</p><h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">Availability & Allocation</h1><p className="mt-2 max-w-3xl text-sm text-slate-500">Server-authoritative interval checks, holds, blocks and dispatch allocations. Empty calendar space is never treated as proof of availability.</p></div><div className="flex flex-wrap gap-2"><button onClick={()=>void refresh()} className={secondary}><RefreshCw size={16}/>Refresh</button>{can("allocation.create")&&<button onClick={()=>setCreateHold(true)} className={primary}><Clock3 size={16}/>Create hold</button>}</div></header>
+    <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between"><div><p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-600">Dispatch control</p><h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">Availability & Allocation</h1><p className="mt-2 max-w-3xl text-sm text-slate-500">Server-authoritative interval checks, holds, blocks and dispatch allocations. Empty calendar space is never treated as proof of availability.</p></div><div className="flex flex-wrap gap-2"><button onClick={()=>void refresh({showLoading:false})} className={secondary}><RefreshCw size={16}/>Refresh</button>{can("allocation.create")&&<button onClick={()=>setCreateHold(true)} className={primary}><Clock3 size={16}/>Create hold</button>}</div></header>
 
     {error&&<ErrorBox text={error}/>}
     {notice&&<Notice text={notice}/>}
@@ -141,19 +177,19 @@ export function AvailabilityExperienceView({portal}:Props){
 
     {loading?<div className="grid place-items-center rounded-2xl border bg-white p-20 text-slate-500"><Loader2 className="mb-3 animate-spin"/>Loading dispatch state…</div>:<>
       {tab==="timeline"&&<TimelinePanel vehicles={vehicles} allocations={allocations} blocks={blocks} window={window} days={days} setDays={setDays} windowStart={windowStart} setWindowStart={setWindowStart} selectedVehicle={selectedVehicle} setSelectedVehicle={setSelectedVehicle} calendar={calendar} calendarLoading={calendarLoading}/>}
-      {tab==="search"&&<SearchPanel portal={portal} categories={categories} customers={customers} onHoldCreated={async()=>{setNotice("Temporary Hold created.");await refresh();}} onOpenBookings={()=>navigateSection("bookings")}/>}
+      {tab==="search"&&<SearchPanel portal={portal} categories={categories} customers={customers} onHoldCreated={async()=>{setNotice("Temporary Hold created.");await refresh({showLoading:false});}} onOpenBookings={()=>navigateSection("bookings")}/>}
       {tab==="allocations"&&<AllocationsPanel allocations={allocations} vehicles={vehicles} canCreate={can("allocation.create")} canManage={can("allocation.manage")} onCreate={()=>setCreateAllocation(true)} onRelease={record=>setRelease({kind:"allocation",record})} onSubstitute={setSubstitute}/>}
       {tab==="holds"&&<HoldsPanel holds={holds} vehicles={vehicles} customers={customers} canCreate={can("allocation.create")} onCreate={()=>setCreateHold(true)} onRelease={hold=>void mutate(()=>apiClient.availability.releaseHold(hold.id),"Hold released.")} onConfirm={setConfirmHold}/>}
       {tab==="blocks"&&<BlocksPanel blocks={blocks} vehicles={vehicles} canCreate={can("vehicle_block.create")} canManage={can("vehicle_block.manage")} onCreate={()=>setCreateBlock(true)} onRelease={record=>setRelease({kind:"block",record})}/>}
       {tab==="check"&&<CheckPanel vehicles={vehicles} categories={categories}/>}
     </>}
 
-    {createAllocation&&<AllocationForm vehicles={vehicles} onClose={()=>setCreateAllocation(false)} onSave={async dto=>{try{await unwrap(apiClient.availability.createAllocation(dto));setCreateAllocation(false);setNotice("Allocation created.");await refresh();}catch(e:any){setError(e.message);}}}/>}
-    {createHold&&<HoldForm vehicles={vehicles} customers={customers} onClose={()=>setCreateHold(false)} onSave={async dto=>{try{await unwrap(apiClient.availability.createHold(dto));setCreateHold(false);setNotice("Temporary Hold created.");await refresh();}catch(e:any){setError(e.message);}}}/>}
-    {createBlock&&<BlockForm vehicles={vehicles} onClose={()=>setCreateBlock(false)} onSave={async dto=>{try{await unwrap(apiClient.availability.createBlock(dto));setCreateBlock(false);setNotice("Vehicle Block created.");await refresh();}catch(e:any){setError(e.message);}}}/>}
-    {confirmHold&&<ConfirmHoldModal hold={confirmHold} onClose={()=>setConfirmHold(null)} onSave={async dto=>{try{await unwrap(apiClient.availability.confirmHold(dto));setConfirmHold(null);setNotice("Hold converted to confirmed allocation.");await refresh();}catch(e:any){setError(e.message);}}}/>}
-    {substitute&&<SubstituteModal allocation={substitute} vehicles={vehicles} onClose={()=>setSubstitute(null)} onSave={async newVehicleId=>{try{await unwrap(apiClient.availability.substituteAllocation(substitute.id,newVehicleId));setSubstitute(null);setNotice("Vehicle substituted without changing the allocation interval.");await refresh();}catch(e:any){setError(e.message);}}}/>}
-    {release&&<ReleaseModal kind={release.kind} onClose={()=>setRelease(null)} onSave={async reason=>{try{if(release.kind==="allocation")await unwrap(apiClient.availability.releaseAllocation(release.record.id,reason));else await unwrap(apiClient.availability.releaseBlock(release.record.id,reason));const releasedKind=release.kind;setRelease(null);setNotice(human(releasedKind)+" released.");await refresh();}catch(e:any){setError(e.message);}}}/>}
+    {createAllocation&&<AllocationForm vehicles={vehicles} onClose={()=>setCreateAllocation(false)} onSave={async dto=>{try{await unwrap(apiClient.availability.createAllocation(dto));setCreateAllocation(false);setNotice("Allocation created.");await refresh({showLoading:false});}catch(e:any){setError(e.message);}}}/>}
+    {createHold&&<HoldForm vehicles={vehicles} customers={customers} onClose={()=>setCreateHold(false)} onSave={async dto=>{try{await unwrap(apiClient.availability.createHold(dto));setCreateHold(false);setNotice("Temporary Hold created.");await refresh({showLoading:false});}catch(e:any){setError(e.message);}}}/>}
+    {createBlock&&<BlockForm vehicles={vehicles} onClose={()=>setCreateBlock(false)} onSave={async dto=>{try{await unwrap(apiClient.availability.createBlock(dto));setCreateBlock(false);setNotice("Vehicle Block created.");await refresh({showLoading:false});}catch(e:any){setError(e.message);}}}/>}
+    {confirmHold&&<ConfirmHoldModal hold={confirmHold} onClose={()=>setConfirmHold(null)} onSave={async dto=>{try{await unwrap(apiClient.availability.confirmHold(dto));setConfirmHold(null);setNotice("Hold converted to confirmed allocation.");await refresh({showLoading:false});}catch(e:any){setError(e.message);}}}/>}
+    {substitute&&<SubstituteModal allocation={substitute} vehicles={vehicles} onClose={()=>setSubstitute(null)} onSave={async newVehicleId=>{try{await unwrap(apiClient.availability.substituteAllocation(substitute.id,newVehicleId));setSubstitute(null);setNotice("Vehicle substituted without changing the allocation interval.");await refresh({showLoading:false});}catch(e:any){setError(e.message);}}}/>}
+    {release&&<ReleaseModal kind={release.kind} onClose={()=>setRelease(null)} onSave={async reason=>{try{if(release.kind==="allocation")await unwrap(apiClient.availability.releaseAllocation(release.record.id,reason));else await unwrap(apiClient.availability.releaseBlock(release.record.id,reason));const releasedKind=release.kind;setRelease(null);setNotice(human(releasedKind)+" released.");await refresh({showLoading:false});}catch(e:any){setError(e.message);}}}/>}
   </div>;
 }
 
