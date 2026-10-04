@@ -16,6 +16,11 @@ assert.match(fleet,/removeMedia/);
 assert.doesNotMatch(availability,/return\(\)=>\{refreshSeq\.current\+\+;\}/);
 assert.match(availability,/automatically stop blocking after their TTL expires/);
 assert.match(availability,/Sage Auto found capacity for the requested dates/);
+assert.match(availability,/async function loadReferenceData\(\)/);
+assert.match(availability,/const result=await Promise\.all\(\[\n\s*apiClient\.availability\.listAllocations/);
+assert.match(availability,/if\(refreshInFlight\.current\)return refreshInFlight\.current/);
+assert.match(availability,/setHolds\(current=>current\.map/);
+assert.doesNotMatch(availability,/const timer=globalThis\.setTimeout\(\(\)=>\{\n\s*void refresh\(\{showLoading:false\}\);/);
 
 assert.match(bookingSchema,/requestedVehicleCategoryId: z\.string\(\)\.optional\(\)/);
 assert.match(bookingSchema,/pickupAt: z\.string\(\)\.min\(1\)\.optional\(\)/);
