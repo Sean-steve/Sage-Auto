@@ -63,16 +63,16 @@ export function CompanyOverviewView({portal}:{portal:AccessPortal}) {
   const go=(id:string)=>{if(hasSection(id)) window.dispatchEvent(new CustomEvent("sage:navigate",{detail:{section:id}}));};
 
   return <div className="mx-auto max-w-[1500px] space-y-6 p-4 sm:p-6 lg:p-8">
-    <section className="overflow-hidden rounded-[28px] border border-slate-800 bg-slate-950 p-6 text-white shadow-xl sm:p-8">
-      <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
+    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+      <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
         <div className="max-w-3xl">
-          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-xs font-semibold text-emerald-300"><Sparkles size={13}/>Company command center</div>
-          <h1 className="text-3xl font-black tracking-[-0.035em] sm:text-4xl">Run today from one operational view.</h1>
-          <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">Live fleet, reservation, rental and finance signals. Every action opens the authoritative workflow rather than a restored preview.</p>
+          <div className="mb-2 inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[.16em] text-emerald-700"><Sparkles size={13}/>Operational command center</div>
+          <h1 className="text-2xl font-black tracking-[-0.03em] text-slate-950 sm:text-3xl">What needs your attention today?</h1>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">Live fleet, booking, rental and finance signals with direct routes into the authoritative workflow.</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <button onClick={()=>void load()} className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-semibold hover:bg-white/10"><RefreshCw size={15} className={loading?"animate-spin":""}/>Refresh</button>
-          {hasSection("bookings")&&<button onClick={()=>go("bookings")} className="inline-flex items-center gap-2 rounded-xl bg-emerald-400 px-4 py-2.5 text-sm font-bold text-slate-950 hover:bg-emerald-300">Open bookings<ArrowRight size={15}/></button>}
+          <button onClick={()=>void load()} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"><RefreshCw size={15} className={loading?"animate-spin":""}/>Refresh</button>
+          {hasSection("bookings")&&<button onClick={()=>go("bookings")} className="inline-flex items-center gap-2 rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-bold text-white hover:bg-slate-800">Open bookings<ArrowRight size={15}/></button>}
         </div>
       </div>
     </section>
@@ -85,8 +85,8 @@ export function CompanyOverviewView({portal}:{portal:AccessPortal}) {
         {label:"Bookings",value:state.bookingsTotal,sub:"Reservation dossiers",icon:CalendarCheck2,section:"bookings"},
         {label:"Active rentals",value:state.activeRentals,sub:state.overdue?`${state.overdue} overdue`:"No overdue rentals",icon:Clock3,section:"rentals"},
         {label:"Collected",value:money(state.collected,state.currency),sub:`${money(state.receivables,state.currency)} receivable`,icon:CircleDollarSign,section:"finance"},
-      ].map(item=>{const Icon=item.icon;return <button key={item.label} onClick={()=>go(item.section)} disabled={!hasSection(item.section)} className="group rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-md disabled:cursor-default disabled:hover:translate-y-0">
-        <div className="flex items-start justify-between"><span className="grid h-10 w-10 place-items-center rounded-xl bg-slate-100 text-slate-700 group-hover:bg-emerald-50 group-hover:text-emerald-700"><Icon size={19}/></span><ArrowRight size={16} className="text-slate-300 group-hover:text-emerald-600"/></div>
+      ].map(item=>{const Icon=item.icon;return <button key={item.label} onClick={()=>go(item.section)} disabled={!hasSection(item.section)} className="group rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:border-slate-300 hover:bg-slate-50/60 disabled:cursor-default">
+        <div className="flex items-start justify-between"><span className="text-slate-400 group-hover:text-emerald-700"><Icon size={19}/></span><ArrowRight size={16} className="text-slate-300 group-hover:text-emerald-600"/></div>
         <div className="mt-5 text-2xl font-black tracking-tight text-slate-950">{loading?"—":item.value}</div>
         <div className="mt-1 text-sm font-semibold text-slate-600">{item.label}</div>
         <div className="mt-1 text-xs text-slate-400">{item.sub}</div>
