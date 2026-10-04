@@ -316,7 +316,7 @@ function RegisterVehicleDialog({portal,owners,categoryOptions,onClose,onCreated}
       if(imageFile){
         const primaryUrl=await uploadVehiclePrimaryImage(targetVehicleId,imageFile);
         if(primaryUrl){
-          const current=created||await unwrap(apiClient.fleet.getVehicle(targetVehicleId));
+          const current:any=await unwrap(apiClient.fleet.getVehicle(targetVehicleId));
           await unwrap(apiClient.fleet.updateVehicle(targetVehicleId,{imageUrl:primaryUrl,expectedVersion:current.version}));
         }
       }
@@ -493,7 +493,11 @@ function MediaTab({vehicle,documents,canUpdate,busy,mutate}:{vehicle:any;documen
   const [imageFile,setImageFile]=useState<File|null>(null);
   const [imagePreview,setImagePreview]=useState("");
   const [imageError,setImageError]=useState("");
+  const [removing,setRemoving]=useState(false);
   const preview=imagePreview||imageUrl||vehicle.imageUrl||"";
+
+  useEffect(()=>{setImageUrl(vehicle.imageUrl||"");setImageFile(null);setImagePreview("");setImageError("");},[vehicle.id,vehicle.imageUrl]);
+
   function attach(file?:File){
     setImageError("");
     if(imagePreview.startsWith("blob:"))URL.revokeObjectURL(imagePreview);
@@ -502,16 +506,34 @@ function MediaTab({vehicle,documents,canUpdate,busy,mutate}:{vehicle:any;documen
     if(file.size>15*1024*1024){setImageError("Vehicle images must be 15 MB or smaller.");return;}
     setImageFile(file);setImagePreview(URL.createObjectURL(file));
   }
+
   async function save(e:React.FormEvent<HTMLFormElement>){
     e.preventDefault();setImageError("");
     try{
       let nextUrl=imageUrl.trim();
       if(imageFile)nextUrl=await uploadVehiclePrimaryImage(vehicle.id,imageFile);
-      await mutate(()=>apiClient.fleet.updateVehicle(vehicle.id,{imageUrl:nextUrl,expectedVersion:vehicle.version}));
+      const current:any=await unwrap(apiClient.fleet.getVehicle(vehicle.id));
+      await mutate(()=>apiClient.fleet.updateVehicle(vehicle.id,{imageUrl:nextUrl,expectedVersion:current.version}));
       setImageFile(null);setImagePreview("");setImageUrl(nextUrl);
     }catch(e:any){setImageError(e.message||"Image could not be saved.");}
   }
-  return <div className="space-y-5"><SectionTitle title="Media" subtitle="Set the vehicle's primary image by direct URL or secure image attachment."/><div className="grid gap-5 lg:grid-cols-[320px_1fr]"><div>{preview?<img src={preview} onError={()=>setImageError("The image could not be displayed. Use a direct image URL or attach the file.")} alt={`${vehicle.make} ${vehicle.model}`} className="aspect-[4/3] w-full rounded-2xl border border-slate-200 object-cover"/>:<div className="grid aspect-[4/3] place-items-center rounded-2xl bg-slate-100 text-slate-400"><ImageIcon size={32}/></div>}</div><div>{canUpdate&&<form onSubmit={save} className="space-y-3"><Field label="Primary image URL"><input name="imageUrl" type="url" value={imageUrl} onChange={e=>setImageUrl(e.target.value)} placeholder="https://…/vehicle.jpg" className={inputClass}/></Field><Field label="Or attach primary image"><input type="file" accept="image/*" onChange={e=>attach(e.target.files?.[0])} className={inputClass}/></Field>{imageError&&<p className="text-xs font-medium text-rose-700">{imageError}</p>}<p className="text-xs leading-5 text-slate-500">URL links must point directly to an image. File attachments go through Sage Auto's file scan, VEHICLE_SHOWCASE processing profile and primary vehicle-media association.</p><button disabled={busy||Boolean(imageError)} className={buttonPrimary}><ImageIcon size={16}/>Save primary image</button></form>}<div className="mt-5"><p className="mb-2 text-sm font-semibold">Attached Fleet documents</p><p className="text-sm text-slate-500">{documents.length} attachment record{documents.length===1?"":"s"} linked to this vehicle.</p></div></div></div></div>;
+
+  async function removeImage(){
+    setRemoving(true);setImageError("");
+    try{
+      const media=await apiClient.fleet.listMedia(vehicle.id);
+      if(media.error)throw new Error(media.error.message);
+      const linked=(media.data||[]).filter((item:any)=>item.isPrimary);
+      for(const item of linked)await unwrap(apiClient.fleet.removeMedia(vehicle.id,item.mediaAssetId));
+      const current:any=await unwrap(apiClient.fleet.getVehicle(vehicle.id));
+      await mutate(()=>apiClient.fleet.updateVehicle(vehicle.id,{imageUrl:"",expectedVersion:current.version}));
+      if(imagePreview.startsWith("blob:"))URL.revokeObjectURL(imagePreview);
+      setImageFile(null);setImagePreview("");setImageUrl("");
+    }catch(e:any){setImageError(e.message||"Image could not be removed.");}
+    finally{setRemoving(false);}
+  }
+
+  return <div className="space-y-5"><SectionTitle title="Media" subtitle="Set the vehicle's primary image by direct URL or secure image attachment."/><div className="grid gap-5 lg:grid-cols-[320px_1fr]"><div>{preview?<img src={preview} onError={()=>setImageError("That link does not return a displayable image. Use a direct image URL or attach the image file.")} alt={`${vehicle.make} ${vehicle.model}`} className="aspect-[4/3] w-full rounded-2xl border border-slate-200 object-cover"/>:<div className="grid aspect-[4/3] place-items-center rounded-2xl bg-slate-100 text-slate-400"><ImageIcon size={32}/></div>}</div><div>{canUpdate&&<form onSubmit={save} className="space-y-3"><Field label="Primary image URL"><input name="imageUrl" type="url" value={imageUrl} onChange={e=>{setImageError("");setImageUrl(e.target.value);}} placeholder="https://…/vehicle.jpg" className={inputClass}/></Field><Field label="Or attach primary image"><input type="file" accept="image/*" onChange={e=>attach(e.target.files?.[0])} className={inputClass}/></Field>{imageError&&<p role="alert" className="rounded-xl bg-rose-50 px-3 py-2 text-xs font-medium text-rose-700">{imageError}</p>}<p className="text-xs leading-5 text-slate-500">Direct links must return the image itself. Attachments are scanned, processed through Sage Auto's registered vehicle-media profile and linked as the primary fleet image.</p><div className="flex flex-wrap gap-2"><button disabled={busy||removing||Boolean(imageError)} className={buttonPrimary}><ImageIcon size={16}/>Save image</button>{(vehicle.imageUrl||imageUrl||imageFile)&&<button type="button" disabled={busy||removing} onClick={()=>void removeImage()} className="inline-flex items-center justify-center gap-2 rounded-xl border border-rose-200 bg-white px-4 py-2.5 text-sm font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-50"><X size={16}/>{removing?"Removing…":"Remove image"}</button>}</div></form>}<div className="mt-5"><p className="mb-2 text-sm font-semibold">Attached Fleet documents</p><p className="text-sm text-slate-500">{documents.length} attachment record{documents.length===1?"":"s"} linked to this vehicle.</p></div></div></div></div>;
 }
 
 function HistoryTab({twin}:{twin:any}) {
