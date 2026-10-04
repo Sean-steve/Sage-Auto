@@ -140,6 +140,30 @@ class ApiClient {
     }
   }
 
+  public async uploadBinary<T = any>(endpoint: string, body: Blob, contentType: string): Promise<ApiResponse<T>> {
+    const url = endpoint.startsWith('http') ? endpoint : `${this.baseUrl}${endpoint.startsWith('/') ? '' : '/'}${endpoint}`;
+    try {
+      const response = await fetch(url, {
+        method: 'PUT',
+        headers: this.getHeaders({ 'Content-Type': contentType }),
+        body,
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        return {
+          error: {
+            code: data.error?.code || `HTTP_${response.status}`,
+            message: data.error?.message || data.message || response.statusText || 'Upload failed',
+            details: data.error?.details,
+          },
+        };
+      }
+      return data as ApiResponse<T>;
+    } catch (err: any) {
+      return { error: { code: 'NETWORK_ERROR', message: err.message || 'Upload failed' } };
+    }
+  }
+
   // HTTP Verbs
   public get<T = any>(endpoint: string, headers?: Record<string, string>) {
     return this.request<T>(endpoint, { method: 'GET', headers });
