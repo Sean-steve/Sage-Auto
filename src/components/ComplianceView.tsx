@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { useApp } from "../lib/store";
 import { ComplianceDocument, ComplianceExpiryState } from "../types";
+import { openAttachmentReference, uploadSecureResourceFile, type SecureResourceRole } from "../lib/secure-file";
 
 export const ComplianceView: React.FC = () => {
   const { restoration } = useApp();
@@ -32,39 +33,68 @@ export const ComplianceView: React.FC = () => {
   const [docType, setDocType] = useState<ComplianceDocument["documentType"]>("COMMERCIAL_INSURANCE");
   const [docNumber, setDocNumber] = useState("");
   const [expiryDate, setExpiryDate] = useState("");
+  const [documentLink,setDocumentLink]=useState("");
+  const [documentFile,setDocumentFile]=useState<File|null>(null);
+  const [attachmentError,setAttachmentError]=useState("");
+  const [submitting,setSubmitting]=useState(false);
 
   const tenantCompliance = (complianceDocs || []).filter((c) => c.tenantId === activeTenantId);
   const tenantVehicles = (vehicles || []).filter((v) => v.tenantId === activeTenantId);
   const tenantDrivers = (drivers || []).filter((d) => d.tenantId === activeTenantId);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!subjectId || !docNumber || !expiryDate) return;
+    setSubmitting(true);setAttachmentError("");
 
-    const expTime = new Date(expiryDate).getTime();
-    const now = Date.now();
-    const daysLeft = Math.ceil((expTime - now) / 86400000);
+    try{
+      const expTime = new Date(expiryDate).getTime();
+      const now = Date.now();
+      const daysLeft = Math.ceil((expTime - now) / 86400000);
 
-    let expiryState: ComplianceExpiryState = "VALID";
-    if (daysLeft < 0) expiryState = "EXPIRED";
-    else if (daysLeft <= 7) expiryState = "URGENT";
-    else if (daysLeft <= 30) expiryState = "EXPIRING_SOON";
+      let expiryState: ComplianceExpiryState = "VALID";
+      if (daysLeft < 0) expiryState = "EXPIRED";
+      else if (daysLeft <= 7) expiryState = "URGENT";
+      else if (daysLeft <= 30) expiryState = "EXPIRING_SOON";
 
-    addComplianceDocument({
-      subjectType,
-      subjectId,
-      documentType: docType,
-      documentNumber: docNumber,
-      issueDate: new Date().toISOString().split("T")[0],
-      expiryDate,
-      expiryState,
-      isMandatory: true,
-      isBlocked: expiryState === "EXPIRED",
-    });
+      let fileId:string|undefined;
+      let fileUrl=documentLink.trim()||undefined;
+      let fileName:string|undefined;
+      if(documentFile){
+        const role:SecureResourceRole =
+          docType==="LOGBOOK"?"VEHICLE_LOGBOOK":
+          docType==="COMMERCIAL_INSURANCE"?"INSURANCE_CERTIFICATE":
+          docType==="DRIVER_DRIVING_LICENSE"?"DRIVER_LICENCE_FRONT":"OTHER";
+        const uploaded=await uploadSecureResourceFile({
+          resourceType:subjectType,
+          resourceId:subjectId,
+          resourceRole:role,
+          file:documentFile,
+          classification:"RESTRICTED",
+        });
+        fileId=uploaded.fileId;fileUrl=uploaded.fileReference;fileName=uploaded.fileName;
+      }
+      if(!fileUrl)throw new Error("Attach a PDF/image or paste a document link.");
 
-    setIsNewDocOpen(false);
-    setDocNumber("");
-    setExpiryDate("");
+      addComplianceDocument({
+        subjectType,
+        subjectId,
+        documentType: docType,
+        documentNumber: docNumber,
+        issueDate: new Date().toISOString().split("T")[0],
+        expiryDate,
+        expiryState,
+        isMandatory: true,
+        fileId,
+        fileUrl,
+        fileName,
+        isBlocked: expiryState === "EXPIRED",
+      });
+
+      setIsNewDocOpen(false);
+      setDocNumber("");setExpiryDate("");setDocumentLink("");setDocumentFile(null);
+    }catch(err:any){setAttachmentError(err.message||"Compliance document could not be attached.");}
+    finally{setSubmitting(false);}
   };
 
   const getExpiryBadge = (state: ComplianceExpiryState) => {
@@ -164,6 +194,7 @@ export const ComplianceView: React.FC = () => {
             </div>
           </div>
 
+          {attachmentError&&<div role="alert" className="rounded-xl bg-rose-50 p-3 text-xs font-medium text-rose-700">{attachmentError}</div>}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
             <div>
               <label className="block text-slate-600 dark:text-slate-400 font-medium mb-1">Certificate / Policy Number *</label>
@@ -189,6 +220,18 @@ export const ComplianceView: React.FC = () => {
             </div>
           </div>
 
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+            <div>
+              <label className="block text-slate-600 dark:text-slate-400 font-medium mb-1">Document link</label>
+              <input type="url" value={documentLink} onChange={e=>setDocumentLink(e.target.value)} placeholder="https://…" className="w-full p-2 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200"/>
+            </div>
+            <div>
+              <label className="block text-slate-600 dark:text-slate-400 font-medium mb-1">Or upload PDF / image</label>
+              <input type="file" accept="application/pdf,image/*" onChange={e=>setDocumentFile(e.target.files?.[0]||null)} className="w-full p-2 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200"/>
+            </div>
+          </div>
+          <p className="text-[11px] text-slate-500">Choose one source. Secure uploads are access-controlled; links are stored as references.</p>
+
           <div className="flex justify-end gap-2 pt-2">
             <button
               type="button"
@@ -197,7 +240,7 @@ export const ComplianceView: React.FC = () => {
             >
               Cancel
             </button>
-            <button disabled={restoration} aria-describedby="restoration-actions-note"
+            <button disabled={restoration||submitting} aria-describedby="restoration-actions-note"
               type="submit"
               className="px-4 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-bold shadow-xs"
             >
@@ -240,6 +283,7 @@ export const ComplianceView: React.FC = () => {
                   <p className="text-xs text-slate-500 mt-0.5">
                     Cert #{doc.documentNumber} • Expiry: {new Date(doc.expiryDate).toLocaleDateString()}
                   </p>
+                  {(doc.fileUrl||doc.fileId)&&<button type="button" onClick={()=>void openAttachmentReference(doc.fileUrl||(`file:${doc.fileId}`)).catch(()=>setAttachmentError("The document could not be opened."))} className="mt-1 text-[11px] font-semibold text-emerald-700 underline">Open document</button>}
                   {doc.overrideReason && (
                     <p className="text-[11px] text-amber-600 italic mt-0.5">
                       ⚠️ Overridden by {doc.overriddenBy}: "{doc.overrideReason}"
