@@ -1180,6 +1180,7 @@ export interface ChangeOwnershipAgreementDto {
   fixedMonthlyPayout?: number;
   allowableExpenseDeductions?: boolean;
   effectiveDate?: string;
+  termsSnapshot?: string;
   notes?: string;
 }
 
