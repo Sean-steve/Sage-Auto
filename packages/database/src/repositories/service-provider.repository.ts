@@ -69,11 +69,20 @@ export class ServiceProviderRepository implements IServiceProviderRepository {
     }
 
     const now = new Date().toISOString();
+    const existing=Array.from(this.providers.values()).filter(p=>p.tenantId===tenantId);
+    const nextNumber=existing.reduce((max,p)=>{
+      const match=String(p.code||"").match(/^GAR-(\d+)$/);
+      return match?Math.max(max,Number(match[1])):max;
+    },0)+1;
+    const code=(data.code?.trim().toUpperCase()||`GAR-${String(nextNumber).padStart(4,"0")}`);
+    if(existing.some(p=>String(p.code||"").toUpperCase()===code)){
+      const err:any=new Error(`Vendor code ${code} is already in use.`);err.statusCode=409;err.code="VENDOR_CODE_DUPLICATE";throw err;
+    }
     const provider: ServiceProvider = {
       id: crypto.randomUUID(),
       tenantId,
       name: data.name.trim(),
-      code: data.code?.trim().toUpperCase(),
+      code,
       contactPerson: data.contactPerson?.trim(),
       phone: data.phone?.trim(),
       email: data.email?.trim().toLowerCase(),
@@ -82,6 +91,11 @@ export class ServiceProviderRepository implements IServiceProviderRepository {
       status: "ACTIVE",
       notes: data.notes?.trim(),
       servicesProvided: data.servicesProvided || [],
+      paymentMethods: data.paymentMethods || [],
+      mpesaNumber: data.mpesaNumber?.trim(),
+      bankName: data.bankName?.trim(),
+      bankAccountName: data.bankAccountName?.trim(),
+      bankAccountNumber: data.bankAccountNumber?.trim(),
       rating: 5.0,
       createdAt: now,
       updatedAt: now,
@@ -166,6 +180,11 @@ export class ServiceProviderRepository implements IServiceProviderRepository {
       address: data.address !== undefined ? data.address.trim() : provider.address,
       status: data.status !== undefined ? data.status : provider.status,
       servicesProvided: data.servicesProvided !== undefined ? data.servicesProvided : provider.servicesProvided,
+      paymentMethods: data.paymentMethods !== undefined ? data.paymentMethods : provider.paymentMethods,
+      mpesaNumber: data.mpesaNumber !== undefined ? data.mpesaNumber.trim() : provider.mpesaNumber,
+      bankName: data.bankName !== undefined ? data.bankName.trim() : provider.bankName,
+      bankAccountName: data.bankAccountName !== undefined ? data.bankAccountName.trim() : provider.bankAccountName,
+      bankAccountNumber: data.bankAccountNumber !== undefined ? data.bankAccountNumber.trim() : provider.bankAccountNumber,
       notes: data.notes !== undefined ? data.notes.trim() : provider.notes,
       rating: data.rating !== undefined ? data.rating : provider.rating,
       updatedAt: new Date().toISOString(),
