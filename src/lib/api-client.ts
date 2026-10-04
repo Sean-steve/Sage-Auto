@@ -250,6 +250,9 @@ class ApiClient {
     changeAvailabilityStatus: (id: string, dto: any) => this.post(`/fleet/vehicles/${id}/availability-status`, dto),
     recordMileage: (id: string, dto: any) => this.post(`/fleet/vehicles/${id}/mileage`, dto),
     recordFuel: (id: string, dto: any) => this.post(`/fleet/vehicles/${id}/fuel`, dto),
+    listMedia: (id: string) => this.get<any[]>(`/vehicles/${id}/media`),
+    getPrimaryMedia: (id: string) => this.get<any>(`/vehicles/${id}/media/primary`),
+    removeMedia: (id: string, mediaAssetId: string) => this.delete(`/vehicles/${id}/media/${mediaAssetId}`),
   };
 
   // 4. Vehicle Owners & Revenue Shares Context
