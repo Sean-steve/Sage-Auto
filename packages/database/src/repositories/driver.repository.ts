@@ -13,6 +13,7 @@ import {
   RecordNotFoundError,
   ConcurrencyConflictError,
   CrossTenantViolationError,
+  UniqueConstraintViolationError,
 } from "../errors";
 import { TransactionContext } from "../transaction-manager";
 
@@ -120,6 +121,17 @@ export class DriverRepository implements IDriverRepository {
   async create(
     data: Omit<Driver, "id" | "driverNumber" | "version" | "createdAt" | "updatedAt"> & { driverNumber?: string }
   ): Promise<Driver> {
+    const email=data.email?.trim().toLowerCase();
+    const phone=data.phone.replace(/[^0-9]/g,"");
+    const licence=data.licenseNumber.trim().toLowerCase();
+    const nationalId=data.nationalId?.trim().toLowerCase();
+    for(const existing of DriverRepository.driverStore.values()){
+      if(existing.tenantId!==data.tenantId)continue;
+      if(email&&existing.email?.trim().toLowerCase()===email)throw new UniqueConstraintViolationError("driver email");
+      if(existing.phone.replace(/[^0-9]/g,"")===phone)throw new UniqueConstraintViolationError("driver phone number");
+      if(existing.licenseNumber.trim().toLowerCase()===licence)throw new UniqueConstraintViolationError("driving licence number");
+      if(nationalId&&existing.nationalId?.trim().toLowerCase()===nationalId)throw new UniqueConstraintViolationError("driver national ID");
+    }
     const now = new Date().toISOString();
     DriverRepository.driverSequence++;
     const num = String(DriverRepository.driverSequence).padStart(6, "0");
@@ -157,6 +169,14 @@ export class DriverRepository implements IDriverRepository {
 
     if (expectedVersion !== undefined && driver.version !== expectedVersion) {
       throw new ConcurrencyConflictError(`Driver ${id} version mismatch: expected ${expectedVersion}, actual ${driver.version}`);
+    }
+
+    for(const existing of DriverRepository.driverStore.values()){
+      if(existing.id===id||existing.tenantId!==tenantId)continue;
+      if(data.email&&existing.email?.trim().toLowerCase()===data.email.trim().toLowerCase())throw new UniqueConstraintViolationError("driver email");
+      if(data.phone&&existing.phone.replace(/[^0-9]/g,"")===data.phone.replace(/[^0-9]/g,""))throw new UniqueConstraintViolationError("driver phone number");
+      if(data.licenseNumber&&existing.licenseNumber.trim().toLowerCase()===data.licenseNumber.trim().toLowerCase())throw new UniqueConstraintViolationError("driving licence number");
+      if(data.nationalId&&existing.nationalId?.trim().toLowerCase()===data.nationalId.trim().toLowerCase())throw new UniqueConstraintViolationError("driver national ID");
     }
 
     const updatedDriver: Driver = {
