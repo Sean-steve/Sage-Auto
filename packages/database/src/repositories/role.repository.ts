@@ -42,7 +42,8 @@ export class InMemoryRoleRepository implements IRoleRepository {
   private seedSystemRolesSync(): void {
     for (const [code, def] of Object.entries(TENANT_SYSTEM_ROLES)) {
       const roleId = `sys-role-${code.toLowerCase()}`;
-      if (!this.roles.has(roleId)) {
+      const existing = this.roles.get(roleId);
+      if (!existing) {
         this.roles.set(roleId, {
           id: roleId,
           code: def.code,
@@ -54,6 +55,17 @@ export class InMemoryRoleRepository implements IRoleRepository {
           permissions: [...def.defaultPermissions],
           createdAt: new Date("2026-01-01T00:00:00.000Z").toISOString(),
           updatedAt: new Date("2026-01-01T00:00:00.000Z").toISOString(),
+        });
+      } else if (existing.isSystem) {
+        this.roles.set(roleId, {
+          ...existing,
+          code: def.code,
+          name: def.name,
+          description: def.description,
+          isOwnerRole: Boolean(def.isOwnerRole),
+          status: "ACTIVE",
+          permissions: [...def.defaultPermissions],
+          updatedAt: new Date().toISOString(),
         });
       }
     }
