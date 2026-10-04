@@ -1394,7 +1394,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode; access?:{context
       showNotification(`Vehicle Owner ${newOwner.name} registered.`);
       return newOwner;
     },
-    [activeTenantId, emitDomainFact, showNotification]
+    [activeTenantId, serviceProviders, emitDomainFact, showNotification]
   );
 
   const attachVehicleOwnership = useCallback(
@@ -2651,12 +2651,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode; access?:{context
     (dto: CreateServiceProviderDto): ServiceProvider => {
       const providerId = `sp-${Date.now().toString(36)}`;
       const now = new Date().toISOString();
+      const nextNumber=serviceProviders.filter(p=>p.tenantId===activeTenantId).reduce((max,p)=>{
+        const match=String(p.code||"").match(/^GAR-(\d+)$/);
+        return match?Math.max(max,Number(match[1])):max;
+      },0)+1;
+      const vendorCode=dto.code||`GAR-${String(nextNumber).padStart(4,"0")}`;
 
       const newProvider: ServiceProvider = {
         id: providerId,
         tenantId: activeTenantId,
         name: dto.name,
-        code: dto.code,
+        code: vendorCode,
         contactPerson: dto.contactPerson,
         phone: dto.phone,
         email: dto.email,
@@ -2665,6 +2670,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode; access?:{context
         status: "ACTIVE",
         rating: 5.0,
         servicesProvided: dto.servicesProvided || ["ROUTINE_SERVICE"],
+        paymentMethods: dto.paymentMethods || [],
+        mpesaNumber: dto.mpesaNumber,
+        bankName: dto.bankName,
+        bankAccountName: dto.bankAccountName,
+        bankAccountNumber: dto.bankAccountNumber,
         notes: dto.notes,
         createdAt: now,
         updatedAt: now,
