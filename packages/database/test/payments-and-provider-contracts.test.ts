@@ -363,7 +363,7 @@ async function runPaymentSuite() {
     { paymentId: manualPayment.id, amount: "5000.0000", reason: "Manual bank payment refund requires offline confirmation" },
     actor
   );
-  const refundApprover = { userId: "usr-finance-approver", actorType: "USER" as const, name: "Finance Approver" };
+  const refundApprover = { userId: "usr-finance-approver", tenantId, role: "FINANCE_ADMIN" };
   await assert.rejects(
     () => paymentService.approveAndExecuteRefund(tenantId, manualRefundReq.id, refundApprover),
     (err: any) => err?.code === "MANUAL_REFUND_REQUIRES_OFFLINE_CONFIRMATION"
