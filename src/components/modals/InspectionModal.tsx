@@ -91,7 +91,7 @@ export const InspectionModal: React.FC = () => {
       .sort((a:any,b:any)=>new Date(b.pickupAt||b.createdAt||0).getTime()-new Date(a.pickupAt||a.createdAt||0).getTime());
     const booking=explicitBookingId?bookings.find((b:any)=>b.id===explicitBookingId):vehicleBookings.find((b:any)=>String(b.status||"").toUpperCase()==="CONFIRMED")||vehicleBookings[0];
     const customerId=booking?.customerId||rental?.customerId;
-    const driverId=booking?.primaryDriverId||rental?.primaryDriverId;
+    const driverId=booking?.primaryDriverId||(rental as any)?.primaryDriverId;
     return {
       rental,
       booking,
