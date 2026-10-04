@@ -230,7 +230,25 @@ export class BookingService {
     const pickupTime = new Date(pickupAt).getTime();
     const returnTime = new Date(returnAt).getTime();
     if (isNaN(pickupTime) || isNaN(returnTime) || returnTime <= pickupTime) {
-      throw new Error("Invalid booking date interval: returnAt must be strictly greater than pickupAt.");
+      const err:any=new Error("Choose a return date and time that is after the pickup date and time.");
+      err.statusCode=422;err.code="BOOKING_INTERVAL_INVALID";throw err;
+    }
+
+    // Prevent accidental duplicate checkout submissions without preventing a
+    // customer from intentionally reserving a different vehicle.
+    const existingCustomerBookings=await this.bookingRepo.findMany(tenantId,{customerId:dto.customerId,limit:1000});
+    const duplicate=existingCustomerBookings.items.find(existing=>{
+      if(["COMPLETED","CANCELLED","REJECTED","EXPIRED","NO_SHOW"].includes(existing.status))return false;
+      const sameWindow=new Date(existing.pickupAt||existing.startDate||0).getTime()===pickupTime&&new Date(existing.returnAt||existing.endDate||0).getTime()===returnTime;
+      const existingVehicle=existing.requestedVehicleId||existing.assignedVehicleId||existing.vehicleId||null;
+      const requestedVehicle=requestedVehicleId||null;
+      const sameVehicle=existingVehicle===requestedVehicle;
+      const sameCategory=(existing.requestedVehicleCategoryId||null)===(dto.requestedVehicleCategoryId||null);
+      return sameWindow&&sameVehicle&&sameCategory;
+    });
+    if(duplicate){
+      const err:any=new Error(`You already have booking ${duplicate.bookingNumber} for the same trip. Open that booking instead of creating another one.`);
+      err.statusCode=409;err.code="DUPLICATE_BOOKING";throw err;
     }
 
     // 7. Resolve Pricing Snapshot
@@ -638,6 +656,21 @@ export class BookingService {
     // Duplicate confirmation idempotency
     if (booking.status === "CONFIRMED") {
       return booking;
+    }
+
+    // A single driver cannot be confirmed on two overlapping trips. Customers
+    // may still intentionally reserve multiple vehicles when different drivers are used.
+    if(booking.primaryDriverId){
+      const driverBookings=await this.bookingRepo.findMany(tenantId,{driverId:booking.primaryDriverId,limit:1000});
+      const start=new Date(booking.pickupAt||0).getTime(),end=new Date(booking.returnAt||0).getTime();
+      const conflict=driverBookings.items.find(other=>
+        other.id!==booking.id&&["CONFIRMED","ACTIVE"].includes(other.status)&&
+        new Date(other.pickupAt||0).getTime()<end&&start<new Date(other.returnAt||0).getTime()
+      );
+      if(conflict){
+        const err:any=new Error(`This driver is already assigned to booking ${conflict.bookingNumber} during part of the requested time. Choose another driver or change the dates.`);
+        err.statusCode=409;err.code="DRIVER_DOUBLE_BOOKED";throw err;
+      }
     }
 
     // Determine target vehicle. Desk users do not have to scroll through the
