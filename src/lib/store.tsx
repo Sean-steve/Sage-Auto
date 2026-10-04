@@ -1978,6 +1978,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode; access?:{context
   // --------------------------------------------------------------------------
   const createMaintenanceRequest = useCallback(
     (dto: CreateMaintenanceRequestDto): MaintenanceWorkOrder | null => {
+      if (dto.sourceType === "SCHEDULE" && dto.sourceId) {
+        const existing = maintenanceWorkOrders.find(
+          (order) =>
+            order.tenantId === activeTenantId &&
+            order.vehicleId === dto.vehicleId &&
+            order.sourceType === "SCHEDULE" &&
+            order.sourceId === dto.sourceId &&
+            !["COMPLETED", "VERIFIED", "CANCELLED"].includes(order.status)
+        );
+        if (existing) {
+          showNotification(`Work order ${existing.maintenanceNumber} is already active for this service trigger.`, "info");
+          return existing;
+        }
+      }
+
       const targetVehicle = vehicles.find((v) => v.id === dto.vehicleId && v.tenantId === activeTenantId);
       if (!targetVehicle) {
         showNotification("Target vehicle not found in workspace registry.", "error");
