@@ -181,15 +181,72 @@ export class TenantWebsiteService {
       },
       {
         id: `blk-${randomUUID().slice(0, 8)}`,
+        type: "FEATURE_GRID",
+        sortOrder: 1,
+        title: "Why Rent With Us",
+        data: {
+          enabled: true,
+          columns: 3,
+          items: [
+            { icon: "ShieldCheck", title: "Clear rental terms", description: "See pricing, deposit expectations and booking progress before pickup." },
+            { icon: "Clock", title: "Fast online booking", description: "Choose your dates, check live availability and submit your reservation online." },
+            { icon: "Car", title: "Quality fleet", description: "Browse vehicles that are published and operational in the live fleet." },
+          ],
+        },
+      },
+      {
+        id: `blk-${randomUUID().slice(0, 8)}`,
         type: "VEHICLE_SHOWCASE",
         sortOrder: 2,
         title: "Featured Vehicles",
         data: {
+          enabled: true,
           categoryFilter: "ALL",
           limit: 6,
           layout: "GRID_3",
           sortOrder: "FEATURED",
           customBadge: "Popular Choice",
+        },
+      },
+      {
+        id: `blk-${randomUUID().slice(0, 8)}`,
+        type: "TEXT_IMAGE",
+        sortOrder: 3,
+        title: "A Better Rental Experience",
+        data: {
+          enabled: true,
+          richText: "<p>From choosing a vehicle to pickup and return, we keep the rental journey clear, connected and easy to follow.</p>",
+          imageAlignment: "RIGHT",
+          ctaLabel: "Explore the fleet",
+          ctaLink: "/fleet",
+        },
+      },
+      {
+        id: `blk-${randomUUID().slice(0, 8)}`,
+        type: "FAQ",
+        sortOrder: 4,
+        title: "Frequently Asked Questions",
+        data: {
+          enabled: true,
+          faqs: [
+            { question: "What do I need to rent a vehicle?", answer: "You will need the valid identification and driving licence details requested during booking." },
+            { question: "How do I know my booking is confirmed?", answer: "Open My Booking using your booking reference and email to follow the reservation status as the rental team processes it." },
+            { question: "Can a vehicle shown on the website be unavailable for my dates?", answer: "Yes. The catalogue shows rentable vehicles; your date search also checks existing bookings, temporary holds and operating blocks." },
+          ],
+        },
+      },
+      {
+        id: `blk-${randomUUID().slice(0, 8)}`,
+        type: "CALL_TO_ACTION",
+        sortOrder: 5,
+        title: "Ready to Drive?",
+        data: {
+          enabled: true,
+          headline: "Find a car that fits your next journey",
+          description: "Search live availability, submit your reservation and follow its progress from your renter account.",
+          buttonLabel: "Browse vehicles",
+          buttonLink: "/fleet",
+          accentBadge: "Book online",
         },
       },
     ];
