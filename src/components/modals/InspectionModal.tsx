@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   X,
   ClipboardCheck,
@@ -12,6 +12,7 @@ import {
   PenTool,
 } from "lucide-react";
 import { useApp } from "../../lib/store";
+import { apiClient } from "../../lib/api-client";
 import { InspectionDamage, InspectionZone, DamageType } from "../../types";
 
 const DAMAGE_ZONES: { id: InspectionZone; label: string }[] = [
@@ -38,7 +39,10 @@ export const InspectionModal: React.FC = () => {
     vehicles,
     activeTenant,
     activeTenantId,
-    recordInspection,
+    bookings,
+    rentals,
+    customers,
+    drivers,
     inspectionTarget,
     setInspectionTarget,
   } = useApp();
@@ -72,6 +76,26 @@ export const InspectionModal: React.FC = () => {
   // Signatures
   const [inspectorName, setInspectorName] = useState("Stanley Njoroge");
   const [customerName, setCustomerName] = useState("Kiprono Koech");
+  const [saving,setSaving]=useState(false);
+  const [saveError,setSaveError]=useState("");
+
+  useEffect(()=>{
+    if(!isInspectionModalOpen)return;
+    if(inspectionTarget?.vehicleId)setVehicleId(inspectionTarget.vehicleId);
+    if(inspectionTarget?.type)setInspectionType(inspectionTarget.type);
+    const rental=inspectionTarget?.rentalId?rentals.find((r:any)=>r.id===inspectionTarget.rentalId):undefined;
+    const bookingId=inspectionTarget?.bookingId||rental?.bookingId;
+    const booking=bookingId?bookings.find((b:any)=>b.id===bookingId):undefined;
+    const customer=customers.find((item:any)=>item.id===booking?.customerId);
+    const driver=drivers.find((item:any)=>item.id===booking?.primaryDriverId);
+    setCustomerName(driver?.fullName||customer?.fullName||"");
+    const vehicle=vehicles.find((item:any)=>item.id===inspectionTarget?.vehicleId);
+    if(vehicle){
+      setOdometer(String(vehicle.odometer||0));
+      setFuelLevel(String(vehicle.fuelLevel??100));
+    }
+    setSaveError("");
+  },[isInspectionModalOpen,inspectionTarget?.vehicleId,inspectionTarget?.bookingId,inspectionTarget?.rentalId,inspectionTarget?.type]);
 
   if (!isInspectionModalOpen) return null;
 
@@ -95,29 +119,90 @@ export const InspectionModal: React.FC = () => {
     setDamages(damages.filter((d) => d.id !== id));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!vehicleId) return;
+    if (!vehicleId || saving) return;
+    setSaving(true);setSaveError("");
 
-    recordInspection({
-      vehicleId,
-      rentalId: inspectionTarget?.rentalId,
-      bookingId: inspectionTarget?.bookingId,
-      type: inspectionType,
-      odometer: parseInt(odometer, 10),
-      fuelLevel: parseInt(fuelLevel, 10),
-      cleanlinessRating: cleanliness,
-      damages,
-      checklist,
-      inspectorName,
-      customerName,
-      inspectorSignatureUrl: "data:image/svg+xml;utf8,<svg>inspector</svg>",
-      customerSignatureUrl: "data:image/svg+xml;utf8,<svg>customer</svg>",
-    });
+    try {
+      const targetRental=inspectionTarget?.rentalId?rentals.find((r:any)=>r.id===inspectionTarget.rentalId):undefined;
+      const bookingId=inspectionTarget?.bookingId||targetRental?.bookingId;
+      const booking=bookingId?bookings.find((b:any)=>b.id===bookingId):undefined;
+      const canonicalType=inspectionType==="RETURN"?"RETURN":"PRE_RENTAL";
+      const customerId=booking?.customerId||targetRental?.customerId||undefined;
+      const driverId=booking?.primaryDriverId||targetRental?.primaryDriverId||undefined;
 
-    setIsInspectionModalOpen(false);
-    setInspectionTarget(null);
-    setStep(1);
+      const createdResponse=await apiClient.inspections.createInspection({
+        inspectionType:canonicalType,
+        vehicleId,
+        bookingId:bookingId||undefined,
+        rentalId:inspectionTarget?.rentalId||undefined,
+        customerId,
+        driverId,
+        odometer:Number(odometer),
+        fuelLevel:Number(fuelLevel),
+        overallCondition:cleanliness==="EXCELLENT"?"EXCELLENT":cleanliness==="DIRTY"?"FAIR":"GOOD",
+        notes:[inspectorName&&`Inspector: ${inspectorName}`,customerName&&`Customer/driver present: ${customerName}`].filter(Boolean).join(" · "),
+        idempotencyKey:typeof crypto!=="undefined"&&crypto.randomUUID?crypto.randomUUID():`inspection-${Date.now()}`,
+      });
+      if(createdResponse.error)throw new Error(createdResponse.error.message);
+      let inspection:any=createdResponse.data;
+
+      const started=await apiClient.inspections.startInspection(inspection.id,{expectedVersion:inspection.version});
+      if(started.error)throw new Error(started.error.message);
+      inspection=started.data||inspection;
+
+      const checklistResponses=Object.entries(checklist).map(([key,value])=>({
+        itemCode:key.replace(/([a-z])([A-Z])/g,"$1_$2").toUpperCase(),
+        responseValue:Boolean(value),
+        condition:value?"GOOD":"DAMAGED",
+        notes:value?"Present / satisfactory":"Missing or requires attention",
+      }));
+      const responses=await apiClient.inspections.recordResponses(inspection.id,{responses:checklistResponses,expectedVersion:inspection.version});
+      if(responses.error)throw new Error(responses.error.message);
+      inspection=responses.data||inspection;
+
+      const zoneMap:Record<string,string>={
+        LEFT_QUARTER_PANEL:"LEFT_REAR_QUARTER",
+        RIGHT_QUARTER_PANEL:"RIGHT_REAR_QUARTER",
+        TAILGATE:"REAR_BUMPER",
+      };
+      for(const defect of damages){
+        const result=await apiClient.inspections.recordDamage(inspection.id,{
+          bodyZone:zoneMap[defect.zone]||defect.zone,
+          damageType:defect.type,
+          severity:defect.severity||"MINOR",
+          description:defect.description,
+          preExisting:canonicalType==="PRE_RENTAL"||defect.isPreExisting,
+          attribution:canonicalType==="PRE_RENTAL"?"PRE_EXISTING":"RENTAL_PERIOD_OBSERVED",
+          estimatedCost:defect.estimatedCost||0,
+        });
+        if(result.error)throw new Error(result.error.message);
+      }
+
+      const latest=await apiClient.inspections.getInspection(inspection.id);
+      if(latest.error)throw new Error(latest.error.message);
+      inspection=latest.data||inspection;
+      const completed=await apiClient.inspections.completeInspection(inspection.id,{
+        odometer:Number(odometer),
+        fuelLevel:Number(fuelLevel),
+        overallCondition:cleanliness==="EXCELLENT"?"EXCELLENT":cleanliness==="DIRTY"?"FAIR":"GOOD",
+        notes:[inspection.notes,damages.length?`${damages.length} defect(s) recorded`:"No defects recorded"].filter(Boolean).join(" · "),
+        idempotencyKey:typeof crypto!=="undefined"&&crypto.randomUUID?crypto.randomUUID():`inspection-complete-${Date.now()}`,
+        expectedVersion:inspection.version,
+      });
+      if(completed.error)throw new Error(completed.error.message);
+
+      window.dispatchEvent(new CustomEvent("sage:inspection-saved",{detail:{inspectionId:(completed.data as any)?.id}}));
+      setIsInspectionModalOpen(false);
+      setInspectionTarget(null);
+      setStep(1);
+      setDamages([]);
+    } catch(err:any) {
+      setSaveError(err.message||"Inspection could not be saved.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const totalDamageCost = damages.reduce((acc, curr) => acc + curr.estimatedCost, 0);
@@ -446,7 +531,8 @@ export const InspectionModal: React.FC = () => {
         {/* Step 4: Signatures & Submit */}
         {step === 4 && (
           <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-4 text-xs">
-            <h3 className="font-bold text-slate-900 dark:text-white">Digital Signatures & Legal Acknowledgment</h3>
+            <h3 className="font-bold text-slate-900 dark:text-white">Inspection acknowledgement & certification</h3>
+            {saveError&&<div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-medium text-rose-800">{saveError}</div>}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
@@ -459,7 +545,7 @@ export const InspectionModal: React.FC = () => {
                   className="w-full p-2.5 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200"
                 />
                 <div className="mt-2 p-3 rounded-lg bg-slate-100 dark:bg-slate-900 font-mono text-[11px] text-slate-400 italic text-center">
-                  [Digitally signed via Car Hire OS Staff Auth]
+                  Authenticated inspector identity will be retained with the canonical audit record.
                 </div>
               </div>
 
@@ -473,7 +559,7 @@ export const InspectionModal: React.FC = () => {
                   className="w-full p-2.5 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200"
                 />
                 <div className="mt-2 p-3 rounded-lg bg-slate-100 dark:bg-slate-900 font-mono text-[11px] text-slate-400 italic text-center">
-                  [Touch signature captured on handover terminal]
+                  Customer/driver association is retained on the inspection. Signature evidence is recorded only when actually captured.
                 </div>
               </div>
             </div>
@@ -499,9 +585,10 @@ export const InspectionModal: React.FC = () => {
               </button>
               <button
                 type="submit"
-                className="px-6 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs"
+                disabled={saving}
+                className="px-6 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold text-xs shadow-xs"
               >
-                Certify & Save Inspection Audit
+                {saving?"Saving canonical inspection…":"Certify & Save Inspection Audit"}
               </button>
             </div>
           </form>
