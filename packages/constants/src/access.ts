@@ -12,7 +12,7 @@ export const ACCESS_SECTIONS: Record<string, {label:string; permission?:string}>
   fleet:{label:'Fleet',permission:'vehicle.read'},
   bookings:{label:'Bookings',permission:'booking.read'},
   handover:{label:'Contract & Handover',permission:'rental.read'},
-  availability:{label:'Availability',permission:'vehicle.read'},
+  availability:{label:'Availability',permission:'availability.read'},
   customers:{label:'Customers & drivers',permission:'customer.read'},
   rentals:{label:'Rentals',permission:'rental.read'},
   returns:{label:'Returns & final calculation',permission:'rental.read'},
