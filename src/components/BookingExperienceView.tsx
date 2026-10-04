@@ -69,10 +69,10 @@ export function BookingExperienceView({portal}:Props){
   const [amendOpen,setAmendOpen]=useState(false);
   const [substituteOpen,setSubstituteOpen]=useState(false);
   const [action,setAction]=useState<ActionKind|null>(null);
-  const seq=useRef(0);
+  const auxSeq=useRef(0),registerSeq=useRef(0),detailSeq=useRef(0);
 
   async function loadAux(){
-    const request=++seq.current;
+    const request=++auxSeq.current;
     const tasks:Promise<any>[]=[
       can("customer.read")?apiClient.customers.listCustomers({limit:100}):Promise.resolve({data:[]}),
       can("customer.read")?apiClient.corporateAccounts.listAccounts({limit:100}):Promise.resolve({data:[]}),
@@ -85,7 +85,7 @@ export function BookingExperienceView({portal}:Props){
       can("availability.read")?apiClient.availability.listHolds({status:"PENDING"}):Promise.resolve({data:[]}),
     ];
     const r=await Promise.all(tasks);
-    if(request!==seq.current)return;
+    if(request!==auxSeq.current)return;
     setCustomers(r[0].error?[]:r[0].data||[]);
     setCorporates(r[1].error?[]:r[1].data||[]);
     setDrivers(r[2].error?[]:r[2].data||[]);
@@ -98,36 +98,36 @@ export function BookingExperienceView({portal}:Props){
   }
 
   async function loadRegister(){
-    const request=++seq.current;setLoading(true);setError("");
+    const request=++registerSeq.current;setLoading(true);setError("");
     try{
       const params:any={limit:100,sortBy:"createdAt",sortOrder:"desc"};
       if(status!=="ALL")params.status=status;
       if(source!=="ALL")params.source=source;
       if(search)params.search=search;
       const res=await apiClient.bookings.listBookings(params);
-      if(request!==seq.current)return;
+      if(request!==registerSeq.current)return;
       if(res.error)throw new Error(res.error.message);
       setBookings(res.data||[]);
-    }catch(e:any){if(request===seq.current)setError(e.message||"Unable to load Bookings.");}
-    finally{if(request===seq.current)setLoading(false);}
+    }catch(e:any){if(request===registerSeq.current)setError(e.message||"Unable to load Bookings.");}
+    finally{if(request===registerSeq.current)setLoading(false);}
   }
 
   async function loadDetail(id:string){
     if(!id){setDetail(null);setReadiness(null);return;}
-    const request=++seq.current;setDetailLoading(true);setError("");setReadiness(null);
+    const request=++detailSeq.current;setDetailLoading(true);setError("");setReadiness(null);
     try{
       const data:any=await unwrap(apiClient.bookings.getBooking(id));
-      if(request!==seq.current)return;
+      if(request!==detailSeq.current)return;
       setDetail(data);
       if(data.status==="CONFIRMED"){
         const ready=await apiClient.bookings.getHandoverReadiness(id);
-        if(request===seq.current&&!ready.error)setReadiness(ready.data);
+        if(request===detailSeq.current&&!ready.error)setReadiness(ready.data);
       }
-    }catch(e:any){if(request===seq.current)setError(e.message||"Unable to load Booking.");}
-    finally{if(request===seq.current)setDetailLoading(false);}
+    }catch(e:any){if(request===detailSeq.current)setError(e.message||"Unable to load Booking.");}
+    finally{if(request===detailSeq.current)setDetailLoading(false);}
   }
 
-  useEffect(()=>{void loadAux();void loadRegister();return()=>{seq.current++;};},[portal.id]);
+  useEffect(()=>{void loadAux();void loadRegister();return()=>{auxSeq.current++;registerSeq.current++;detailSeq.current++;};},[portal.id]);
   useEffect(()=>{void loadRegister();},[status,source,search]);
   useEffect(()=>{setSelectedId("");setDetail(null);setReadiness(null);setCreateOpen(false);setEditOpen(false);setQuoteOpen(false);setConfirmOpen(false);setAmendOpen(false);setSubstituteOpen(false);setAction(null);},[portal.id]);
 
