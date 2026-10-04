@@ -6,6 +6,7 @@ import { withRecordTransaction } from '../../../../../packages/database/src/reco
 import { AccessService, fail } from './access.service';
 import type { IdentityModule } from '../identity/identity.module';
 import type { DevelopmentEmailDeliveryAdapter } from '../identity/application/services/email-delivery.service';
+import { BookingService } from '../bookings/application/booking.service';
 const profile=z.object({intent:z.enum(['company','renter']).optional(),site:z.string().regex(/^[a-z0-9-]+$/).max(100).optional(),companyName:z.string().trim().min(2).max(120).optional(),phone:z.string().trim().max(30).optional()}).strict();
 const invitation=z.object({scope:z.enum(['platform','tenant']),tenantId:z.string().min(1).optional(),email:z.string().email(),role:z.string(),linkedRecordId:z.string().optional()}).strict();
 export function accessController(service:AccessService,identity:IdentityModule): Router {
@@ -179,6 +180,28 @@ export function accessController(service:AccessService,identity:IdentityModule):
     else return {available:false,rows:[],message:'Your access is configured. This workflow will be connected in the next business-module milestone.'};
     return {available:true,rows};
   }));
+  router.post('/my-bookings/:id/cancel',run(async req=>{
+    const user=await service.user(req.auth.userId,true);
+    const dto=z.object({portal:z.string().min(1),reason:z.string().trim().min(3).max(300).default('Cancelled by renter')}).parse(req.body);
+    const portal=await service.portal(user.id,dto.portal);
+    if(portal.kind!=='renter')return fail('Renter portal required',403);
+    const link=service.links.get(`${user.id}:${portal.tenantId}:RENTER`);
+    if(!link?.recordId)return fail('Link your booking to this account before cancelling it',403);
+    const repo=new BookingRepository();
+    const booking=await repo.findById(req.params.id,portal.tenantId);
+    if(!booking||booking.customerId!==link.recordId)return fail('Booking ownership could not be verified',403);
+    if(!['DRAFT','PENDING','PENDING_CONFIRMATION','QUOTED','AWAITING_PAYMENT','CONFIRMED'].includes(booking.status)){
+      return fail('This booking can no longer be cancelled from your account. Contact the rental company for assistance.',409);
+    }
+    const updated=await new BookingService().cancelBooking(
+      portal.tenantId,
+      booking.id,
+      {reason:dto.reason,expectedVersion:booking.version},
+      {userId:user.id,actorType:'CUSTOMER',name:user.fullName}
+    );
+    return {cancelled:true,reference:updated.bookingNumber,status:updated.status};
+  }));
+
   // Explicit claim; merely knowing a reference never grants access. The account
   // must control the verified email saved on that guest customer record.
   router.post('/claim-booking',run(async req=>{
