@@ -54,19 +54,19 @@ export default function RenterAccount({slug}:{slug:string}){
   return <div className="min-h-screen bg-slate-50 text-slate-950">
     <header className="border-b bg-white">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-5 py-4">
-        <div><p className="text-xs font-bold uppercase tracking-[.18em] text-emerald-600">Renter account</p><h1 className="text-xl font-black">{businessName}</h1></div>
+        <div><p className="text-xs font-bold uppercase tracking-[.18em] text-emerald-600">Booking tracker</p><h1 className="text-xl font-black">{businessName}</h1></div>
         <a href={base} className="inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold"><ArrowLeft size={16}/>Back to website</a>
       </div>
     </header>
 
     <main className="mx-auto max-w-6xl space-y-6 px-5 py-8">
       {!booking&&<section className="mx-auto max-w-xl rounded-3xl border bg-white p-6 shadow-sm sm:p-8">
-        <div className="mb-6"><h2 className="text-2xl font-black">View your rental journey</h2><p className="mt-2 text-sm leading-6 text-slate-500">Use the booking reference and email from your reservation. Your account shows confirmation, handover progress and rental updates as the rental team processes them.</p></div>
+        <div className="mb-6"><h2 className="text-2xl font-black">Track your rental journey</h2><p className="mt-2 text-sm leading-6 text-slate-500">Use the booking reference and email from your reservation. This tracker shows confirmation and rental-stage updates. For a persistent verified profile across bookings, use your renter account.</p></div>
         {error&&<div role="alert" className="mb-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">{error}</div>}
         <form onSubmit={e=>{e.preventDefault();void load();}} className="grid gap-4">
           <label className="grid gap-1 text-sm font-semibold">Booking reference<input required value={bookingReference} onChange={e=>setBookingReference(e.target.value)} placeholder="BKG-2026-000123" className="rounded-xl border px-3 py-3 font-mono"/></label>
           <label className="grid gap-1 text-sm font-semibold">Booking email<input required type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="you@example.com" className="rounded-xl border px-3 py-3"/></label>
-          <button disabled={busy} className="rounded-xl bg-slate-950 px-5 py-3 font-bold text-white disabled:opacity-60">{busy?"Opening account…":"Open my booking"}</button>
+          <button disabled={busy} className="rounded-xl bg-slate-950 px-5 py-3 font-bold text-white disabled:opacity-60">{busy?"Opening account…":"Track my booking"}</button>
         </form>
       </section>}
 
