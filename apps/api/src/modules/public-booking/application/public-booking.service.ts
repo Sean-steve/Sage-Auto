@@ -105,9 +105,13 @@ export class PublicBookingService {
     const categories = await this.categoryRepo.findAll(tenantId);
     const categoryMap = new Map(categories.map((c) => [c.code, c.name]));
 
-    const operationalVehicles = fleetResult.vehicles.filter(
-      (v) => ["ACTIVE", "OPERATIONAL"].includes(v.lifecycleStatus) && v.isPublishedToWebsite !== false
-    );
+    const operationalVehicles = fleetResult.vehicles.filter((v) => {
+      const lifecycle=String(v.lifecycleStatus||"").toUpperCase();
+      const availability=String(v.availabilityStatus||"").toUpperCase();
+      return ["ACTIVE","OPERATIONAL"].includes(lifecycle)
+        && v.isPublishedToWebsite !== false
+        && !["MAINTENANCE","BLOCKED"].includes(availability);
+    });
 
     const summaries: PublicVehicleSummaryDto[] = [];
 
@@ -149,7 +153,9 @@ export class PublicBookingService {
     vehicleId: string
   ): Promise<PublicVehicleSummaryDto> {
     const vehicle = await this.vehicleRepo.findById(vehicleId, tenantId);
-    if (!vehicle || !["ACTIVE", "OPERATIONAL"].includes(vehicle.lifecycleStatus) || vehicle.isPublishedToWebsite === false) {
+    const lifecycle=String(vehicle?.lifecycleStatus||"").toUpperCase();
+    const availability=String(vehicle?.availabilityStatus||"").toUpperCase();
+    if (!vehicle || !["ACTIVE","OPERATIONAL"].includes(lifecycle) || vehicle.isPublishedToWebsite === false || ["MAINTENANCE","BLOCKED"].includes(availability)) {
       throw new VehicleNotPubliclyRentableError(vehicleId);
     }
 
@@ -486,6 +492,32 @@ export class PublicBookingService {
   // 5. BOOKING STATUS & SERVER-VERIFIED PAYMENT CONFIRMATION
   // --------------------------------------------------------------------------
 
+  private toPublicTimeline(booking: any): NonNullable<PublicBookingVoucherDto["timeline"]> {
+    const labels:Record<string,string>={
+      DRAFT:"Booking started",
+      PENDING_CONFIRMATION:"Request received",
+      QUOTED:"Price confirmed",
+      AWAITING_PAYMENT:"Awaiting payment",
+      CONFIRMED:"Booking confirmed",
+      ACTIVE:"Vehicle handed over",
+      COMPLETED:"Rental completed",
+      CANCELLED:"Booking cancelled",
+      REJECTED:"Booking declined",
+      NO_SHOW:"Marked as no-show",
+      EXPIRED:"Booking expired",
+    };
+    return (booking.statusHistory||[])
+      .slice()
+      .sort((a:any,b:any)=>new Date(a.occurredAt||a.changedAt||0).getTime()-new Date(b.occurredAt||b.changedAt||0).getTime())
+      .map((row:any)=>({
+        id:row.id,
+        status:row.toStatus,
+        occurredAt:row.occurredAt||row.changedAt||booking.updatedAt||booking.createdAt,
+        title:labels[row.toStatus]||String(row.toStatus||"Update").replaceAll("_"," "),
+        message:row.reason||"Your rental team updated this booking.",
+      }));
+  }
+
   async getBookingStatus(
     tenantId: string,
     bookingId: string
@@ -535,8 +567,23 @@ export class PublicBookingService {
         grossTotal: booking.pricingSnapshot?.grossRentalTotal || 0,
         isPaid: booking.paymentStatus === "FULLY_PAID",
       },
+      timeline: this.toPublicTimeline(booking),
       createdAt: booking.createdAt,
     };
+  }
+
+  async getBookingAccount(
+    tenantId: string,
+    bookingReference: string,
+    email: string
+  ): Promise<PublicBookingVoucherDto> {
+    const booking=await this.bookingRepo.findByBookingNumber(bookingReference.trim(),tenantId);
+    if(!booking)throw new PublicBookingNotFoundError(bookingReference);
+    const customer=await this.customerRepo.findById(booking.customerId,tenantId);
+    if(!customer||customer.email.trim().toLowerCase()!==email.trim().toLowerCase()){
+      throw new PublicBookingNotFoundError(bookingReference);
+    }
+    return this.getBookingStatus(tenantId,booking.id);
   }
 
   async verifyPaymentAndConfirmBooking(
