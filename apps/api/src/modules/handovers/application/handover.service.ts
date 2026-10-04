@@ -370,7 +370,7 @@ export class HandoverService {
       throw handoverCheckpointError(`Inspection ${inspection.inspectionNumber} has invalid odometer or fuel readings. Correct the inspection before continuing.`);
     }
 
-    let template=null;
+    let template:any=null;
     if(inspection.templateId){
       template =
         await this.inspectionTemplateRepo.findById(inspection.templateId, tenantId) ||
