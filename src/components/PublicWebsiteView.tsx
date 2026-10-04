@@ -6,8 +6,8 @@ export const PublicWebsiteView:React.FC=()=>{
   const {activeTenant}=useApp();
   const [site,setSite]=useState<any>(null),[pages,setPages]=useState<any[]>([]),[error,setError]=useState(''),[busy,setBusy]=useState(false);
   const [slug,setSlug]=useState(activeTenant.slug||''),[selected,setSelected]=useState(''),[content,setContent]=useState('');
-  async function request(path:string,body?:unknown,method='POST') {
-    const result=await apiClient.request(`/website${path}`,body?{method,body:JSON.stringify(body)}:{});
+  async function request(path:string,body?:unknown,method=body!==undefined?'POST':'GET') {
+    const result=await apiClient.request(`/website${path}`,{method,...(body!==undefined?{body:JSON.stringify(body)}:{})});
     if(result.error)throw new Error(result.error.message);
     return result.data;
   }
