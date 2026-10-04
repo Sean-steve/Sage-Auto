@@ -454,6 +454,7 @@ function HeroVisual() {
         <div className="rounded-2xl border border-slate-200 p-4">
           <div className="mb-4 flex items-center justify-between"><strong className="text-sm">Rental flow</strong><Route size={17} className="text-emerald-700"/></div>
           <div className="grid gap-3">{["Booking confirmed","Vehicle ready","Handover complete","Rental active"].map((step,i)=><div key={step} className="flex items-center gap-3"><span className={cx("grid h-7 w-7 place-items-center rounded-full text-xs font-bold", i<3?"bg-emerald-100 text-emerald-800":"bg-amber-100 text-amber-800")}>{i<3?<Check size={14}/>:4}</span><span className="text-sm text-slate-700">{step}</span></div>)}</div>
+        </div>
         <div className="rounded-2xl bg-[#f4f1e9] p-4"><div className="flex items-center justify-between"><strong className="text-sm">Vehicle readiness</strong><Gauge size={17}/></div><p className="mt-6 text-3xl font-semibold">Ready</p><p className="mt-2 text-sm leading-6 text-slate-600">Availability, compliance and maintenance checks are aligned for the next booking.</p></div>
       </div>
     </div>
