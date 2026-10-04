@@ -101,7 +101,37 @@ export function accessController(service:AccessService,identity:IdentityModule):
     else if(section==='customers') rows=(await new CustomerRepository().findAll(tenantId)).customers.map(c=>({id:c.id,name:c.fullName,email:c.email,status:c.status}));
     else if(section==='myBookings') {
       const link=service.links.get(`${req.auth.userId}:${tenantId}:RENTER`);
-      if(link?.recordId) rows=(await new BookingRepository().findMany(tenantId,{customerId:link.recordId})).items.map(b=>({id:b.id,reference:b.bookingNumber,status:b.status,pickup:b.pickupAt,return:b.returnAt}));
+      if(link?.recordId) {
+        const bookingRepo=new BookingRepository(),vehicleRepo=new VehicleRepository(),rentalRepo=new RentalRepository();
+        const bookings=(await bookingRepo.findMany(tenantId,{customerId:link.recordId})).items;
+        rows=await Promise.all(bookings.map(async b=>{
+          const history=await bookingRepo.getStatusHistory(b.id,tenantId);
+          const vehicleId=b.assignedVehicleId||b.requestedVehicleId||undefined;
+          const vehicle=vehicleId?await vehicleRepo.findById(vehicleId,tenantId):null;
+          const rental=await rentalRepo.findByBookingId(b.id,tenantId);
+          const progressStatus=rental?.state||rental?.status||b.status;
+          return {
+            id:b.id,
+            reference:b.bookingNumber,
+            status:b.status,
+            progressStatus,
+            pickup:b.pickupAt,
+            return:b.returnAt,
+            pickupLocation:b.pickupLocationName||'Main Station',
+            returnLocation:b.returnLocationName||b.pickupLocationName||'Main Station',
+            vehicle:vehicle?{id:vehicle.id,registration:vehicle.registrationPlate,name:`${vehicle.make} ${vehicle.model}`,imageUrl:vehicle.imageUrl||null}:null,
+            amount:b.grossTotal||b.pricingSnapshot?.grossRentalTotal||0,
+            currency:b.currency||b.pricingSnapshot?.currency||'KES',
+            rental:rental?{id:rental.id,reference:rental.rentalNumber,status:rental.state||rental.status,scheduledReturnAt:rental.scheduledReturnAt}:null,
+            history:history.map((h:any)=>({fromStatus:h.fromStatus||null,toStatus:h.toStatus,reason:h.reason||null,occurredAt:h.occurredAt||h.createdAt||null})),
+            notifications:history.slice().reverse().slice(0,6).map((h:any)=>({
+              title:String(h.toStatus||'Booking update').replaceAll('_',' '),
+              message:h.reason||`Your booking moved to ${String(h.toStatus||'the next stage').replaceAll('_',' ').toLowerCase()}.`,
+              occurredAt:h.occurredAt||h.createdAt||null,
+            })),
+          };
+        }));
+      }
     } else if(section==='myVehicles') {
       const link=service.links.get(`${req.auth.userId}:${tenantId}:VEHICLE_OWNER`);
       if(link?.recordId) {
