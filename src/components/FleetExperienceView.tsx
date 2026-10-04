@@ -22,6 +22,7 @@ import {
 import { apiClient, type ApiResponse } from "../lib/api-client";
 import { permits, type AccessPortal } from "../lib/access-context";
 import { useApp } from "../lib/store";
+import { openAttachmentReference, uploadSecureResourceFile, type SecureResourceRole } from "../lib/secure-file";
 
 type FleetExperienceProps = {
   portal: AccessPortal;
@@ -471,12 +472,61 @@ function AvailabilityTab({vehicle,canOverride,canUpdate,busy,mutate,openAvailabi
 }
 
 function ComplianceTab({twin,records,readiness,canAttach,busy,mutate,openCompliance}:{twin:any;records:any[];readiness:any;canAttach:boolean;busy:boolean;mutate:(w:()=>Promise<ApiResponse<any>>)=>Promise<void>;openCompliance:()=>void}) {
-  async function attach(e:React.FormEvent<HTMLFormElement>){e.preventDefault();const d=new FormData(e.currentTarget);await mutate(()=>apiClient.fleet.addDocument(twin.vehicle.id,{documentType:d.get("documentType"),documentNumber:String(d.get("documentNumber")||"")||undefined,fileUrl:String(d.get("fileUrl")||"")||undefined,fileName:String(d.get("fileName")||"")||undefined,expiresAt:String(d.get("expiresAt")||"")||undefined}));(e.currentTarget as HTMLFormElement).reset();}
+  const [attachmentFile,setAttachmentFile]=useState<File|null>(null);
+  const [attachmentError,setAttachmentError]=useState("");
+  const [opening,setOpening]=useState("");
+
+  function roleFor(type:string):SecureResourceRole{
+    if(type==="LOGBOOK_TITLE")return "VEHICLE_LOGBOOK";
+    if(type==="INSURANCE_CERTIFICATE")return "INSURANCE_CERTIFICATE";
+    return "OTHER";
+  }
+
+  async function openDoc(doc:any){
+    const reference=doc.fileUrl||doc.fileReference;
+    if(!reference)return;
+    setOpening(doc.id||reference);setAttachmentError("");
+    try{await openAttachmentReference(reference);}
+    catch(e:any){setAttachmentError(e.message||"The document could not be opened.");}
+    finally{setOpening("");}
+  }
+
+  async function attach(e:React.FormEvent<HTMLFormElement>){
+    e.preventDefault();setAttachmentError("");
+    const form=e.currentTarget;
+    const d=new FormData(form);
+    const documentType=String(d.get("documentType")||"OTHER");
+    let fileUrl=String(d.get("fileUrl")||"").trim()||undefined;
+    let fileName=String(d.get("fileName")||"").trim()||undefined;
+    try{
+      if(attachmentFile){
+        const uploaded=await uploadSecureResourceFile({
+          resourceType:"VEHICLE",
+          resourceId:twin.vehicle.id,
+          resourceRole:roleFor(documentType),
+          file:attachmentFile,
+          classification:"RESTRICTED",
+        });
+        fileUrl=uploaded.fileReference;
+        fileName=uploaded.fileName;
+      }
+      if(!fileUrl)throw new Error("Add a secure file attachment or paste a document link.");
+      await mutate(()=>apiClient.fleet.addDocument(twin.vehicle.id,{
+        documentType,
+        documentNumber:String(d.get("documentNumber")||"")||undefined,
+        fileUrl,
+        fileName,
+        expiresAt:String(d.get("expiresAt")||"")||undefined,
+      }));
+      setAttachmentFile(null);form.reset();
+    }catch(e:any){setAttachmentError(e.message||"Document could not be attached.");}
+  }
+
   return <div className="space-y-5"><SectionTitle title="Compliance & documents" subtitle="Fleet attachments, regulatory ComplianceRecords and readiness are shown separately." action={<button className={buttonSecondary} onClick={openCompliance}>Open Compliance<ChevronRight size={15}/></button>}/>
     <div className="rounded-2xl border border-slate-200 p-4"><h4 className="font-semibold text-slate-900">Rental-start readiness</h4>{readiness?<div className="mt-3 grid gap-3 sm:grid-cols-3"><InfoCard label="Ready" value={readiness.ready===true||readiness.isReady===true?"Yes":readiness.ready===false||readiness.isReady===false?"No":"Evaluated"}/><InfoCard label="Blocking issues" value={String((readiness.blockers||readiness.blockingIssues||[]).length)}/><InfoCard label="Warnings" value={String((readiness.warnings||[]).length)}/></div>:<p className="mt-2 text-sm text-slate-500">No readiness result available.</p>}</div>
-    <ListBlock title="Regulatory records" rows={records} render={(r:any)=><div><div className="flex flex-wrap items-center gap-2"><p className="font-semibold">{human(r.requirementCode||r.documentType||"Compliance record")}</p><Badge value={r.status||r.verificationStatus}/></div><p className="text-xs text-slate-500">{r.documentNumber||r.id} · expires {date(r.expiresAt||r.expiryDate)}</p></div>}/>
-    <ListBlock title="Fleet documents" rows={twin.documents||[]} render={(d:any)=><div><div className="flex flex-wrap items-center gap-2"><p className="font-semibold">{human(d.documentType)}</p><Badge value={d.status}/><Badge value={d.verificationStatus}/></div><p className="text-xs text-slate-500">{d.documentNumber||d.fileName||"No reference"} · expires {date(d.expiresAt)}</p></div>}/>
-    {canAttach&&<form onSubmit={attach} className="rounded-2xl border border-slate-200 bg-slate-50 p-4"><h4 className="font-semibold">Attach Fleet document metadata</h4><div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><Field label="Type"><select name="documentType" className={inputClass}>{docTypes.map(t=><option key={t}>{t}</option>)}</select></Field><Field label="Document number"><input name="documentNumber" className={inputClass}/></Field><Field label="File name"><input name="fileName" className={inputClass}/></Field><Field label="File URL/reference"><input name="fileUrl" className={inputClass}/></Field><Field label="Expiry"><input name="expiresAt" type="date" className={inputClass}/></Field></div><button disabled={busy} className={`${buttonPrimary} mt-4`}><ShieldCheck size={16}/>Attach document</button></form>}
+    <ListBlock title="Regulatory records" rows={records} render={(r:any)=><div><div className="flex flex-wrap items-center gap-2"><p className="font-semibold">{human(r.requirementCode||r.documentType||"Compliance record")}</p><Badge value={r.status||r.verificationStatus}/>{(r.documentReference||r.fileId)&&<button type="button" onClick={()=>void openDoc({id:r.id,fileUrl:r.fileId?`file:${r.fileId}`:r.documentReference})} className="text-xs font-semibold text-emerald-700 underline">Open document</button>}</div><p className="text-xs text-slate-500">{r.documentNumber||r.identifierNumber||"Document on file"} · expires {date(r.expiresAt||r.expiryDate)}</p></div>}/>
+    <ListBlock title="Fleet documents" rows={twin.documents||[]} render={(d:any)=><div><div className="flex flex-wrap items-center gap-2"><p className="font-semibold">{human(d.documentType)}</p><Badge value={d.status}/><Badge value={d.verificationStatus}/>{d.fileUrl&&<button type="button" disabled={opening===(d.id||d.fileUrl)} onClick={()=>void openDoc(d)} className="text-xs font-semibold text-emerald-700 underline">{opening===(d.id||d.fileUrl)?"Opening…":"Open document"}</button>}</div><p className="text-xs text-slate-500">{d.documentNumber||d.fileName||"No reference"} · expires {date(d.expiresAt)}</p></div>}/>
+    {canAttach&&<form onSubmit={attach} className="rounded-2xl border border-slate-200 bg-slate-50 p-4"><h4 className="font-semibold">Attach Fleet document</h4><p className="mt-1 text-xs text-slate-500">Use either a secure PDF/image upload or a document link. Uploaded files remain access-controlled by Sage Auto.</p>{attachmentError&&<p role="alert" className="mt-3 rounded-xl bg-rose-50 p-3 text-xs font-medium text-rose-700">{attachmentError}</p>}<div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><Field label="Type"><select name="documentType" className={inputClass}>{docTypes.map(t=><option key={t}>{t}</option>)}</select></Field><Field label="Document number"><input name="documentNumber" className={inputClass}/></Field><Field label="Document link"><input name="fileUrl" type="url" placeholder="https://…" className={inputClass}/></Field><Field label="Or upload PDF / image"><input type="file" accept="application/pdf,image/*" onChange={e=>setAttachmentFile(e.target.files?.[0]||null)} className={inputClass}/></Field><Field label="Display file name"><input name="fileName" placeholder={attachmentFile?.name||"Optional for links"} className={inputClass}/></Field><Field label="Expiry"><input name="expiresAt" type="date" className={inputClass}/></Field></div><button disabled={busy} className={`${buttonPrimary} mt-4`}><ShieldCheck size={16}/>Attach document</button></form>}
   </div>;
 }
 
