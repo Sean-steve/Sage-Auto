@@ -55,6 +55,37 @@ export function globalErrorMiddleware(
     });
   }
 
+  const domainError = err as Error & {
+    statusCode?: unknown;
+    code?: unknown;
+    details?: unknown;
+  };
+  if (
+    typeof domainError.statusCode === "number" &&
+    domainError.statusCode >= 400 &&
+    domainError.statusCode < 600
+  ) {
+    const code =
+      typeof domainError.code === "string" && domainError.code
+        ? domainError.code
+        : "DOMAIN_ERROR";
+    logger.warn(`Domain Error [${code}]: ${domainError.message}`, {
+      requestId,
+      statusCode: domainError.statusCode,
+      path: req.path,
+      details: domainError.details,
+    });
+    return res.status(domainError.statusCode).json({
+      error: {
+        code,
+        message: domainError.message,
+        details: domainError.details,
+        requestId,
+        timestamp: new Date().toISOString(),
+      },
+    });
+  }
+
   logger.error(`Unhandled Exception: ${err.message}`, err.stack, {
     requestId,
     path: req.path,
