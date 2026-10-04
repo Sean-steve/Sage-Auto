@@ -144,7 +144,25 @@ export function createPublicBookingController(
     }
   });
 
-  // 7. Verify Payment & Confirm Booking
+  // 7. Customer booking account lookup. Booking reference + matching email
+  // prevents exposing renter details through a bare public booking identifier.
+  router.post("/account/booking", async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const tenantId=await resolveTenantId(req);
+      const parsed=z.object({
+        bookingReference:z.string().trim().min(5).max(80),
+        email:z.string().trim().email().max(254),
+      }).safeParse(req.body);
+      if(!parsed.success)return res.status(400).json({error:{message:"Enter your booking reference and the email used for the booking."}});
+      const voucher=await publicBookingService.getBookingAccount(tenantId,parsed.data.bookingReference,parsed.data.email);
+      res.json({success:true,data:voucher});
+    } catch(err:any) {
+      if(err instanceof PublicBookingError)return res.status(err.statusCode).json({error:{message:err.message}});
+      next(err);
+    }
+  });
+
+  // 8. Verify Payment & Confirm Booking
   router.post("/verify-payment/:attemptId", async (req: Request, res: Response, next: NextFunction) => {
     try {
       const tenantId = await resolveTenantId(req);
