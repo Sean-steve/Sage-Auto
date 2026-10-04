@@ -51,3 +51,26 @@
 .access-app:not(.tenant-workspace-active) .access-badge{background:#ecfdf3;color:#027a48;font-weight:600}
 .access-app:not(.tenant-workspace-active) .access-error{background:#fff1f3;color:#b42318}
 .access-app:not(.tenant-workspace-active) .access-notice{background:#ecfdf3;color:#027a48}
+
+.renter-bookings{display:grid;gap:18px}
+.renter-booking-card{border:1px solid var(--line);border-radius:16px;overflow:hidden;background:#fff}
+.renter-booking-head{display:flex;justify-content:space-between;gap:24px;padding:22px;border-bottom:1px solid var(--line);background:#101828;color:#fff}
+.renter-booking-head span{display:block;color:#6ce9a6;font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
+.renter-booking-head h2{margin:4px 0 3px!important;font-size:22px!important;color:#fff}
+.renter-booking-head p{margin:0!important;color:#cbd5e1!important;font-size:13px}
+.renter-booking-head>strong{font-size:18px;white-space:nowrap}
+.renter-trip-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;background:var(--line)}
+.renter-trip-grid>div{position:relative;background:#fff;padding:18px 18px 18px 48px;min-height:92px}
+.renter-trip-grid svg{position:absolute;left:18px;top:20px;width:18px;color:var(--brand)}
+.renter-trip-grid small,.renter-trip-grid span{display:block;color:var(--muted);font-size:11px}
+.renter-trip-grid b{display:block;margin:2px 0;font-size:13px}
+.renter-progress,.renter-updates{padding:20px 22px;border-top:1px solid var(--line)}
+.renter-progress-title{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px}
+.renter-progress-title>div{display:flex;align-items:center;gap:8px}.renter-progress-title svg{width:17px;color:var(--brand)}
+.renter-progress-title>span{color:var(--muted);font-size:11px}
+.renter-stage-row{display:grid;grid-template-columns:repeat(8,minmax(95px,1fr));gap:8px;overflow:auto;padding-bottom:4px}
+.renter-stage-row>div{display:grid;gap:7px;color:#98a2b3;font-size:11px;font-weight:650}
+.renter-stage-row i{display:grid;width:26px;height:26px;place-items:center;border:1px solid #d0d5dd;border-radius:50%;font-style:normal;background:#fff}
+.renter-stage-row .done{color:#027a48}.renter-stage-row .done i{background:#ecfdf3;border-color:#6ce9a6}
+.renter-updates>div:last-child{display:grid;gap:8px}.renter-updates article{display:flex;gap:10px;border-radius:10px;background:#f8fafc;padding:12px}.renter-updates article>svg{width:16px;flex:0 0 auto;color:#12b76a;margin-top:2px}.renter-updates article p{margin:2px 0!important;font-size:12px}.renter-updates article small{color:var(--muted);font-size:10px}
+@media(max-width:760px){.renter-booking-head{display:block}.renter-booking-head>strong{display:block;margin-top:12px}.renter-trip-grid{grid-template-columns:1fr}.renter-progress-title{display:block}.renter-progress-title>span{display:block;margin-top:4px}.renter-stage-row{grid-template-columns:repeat(8,110px)}}
