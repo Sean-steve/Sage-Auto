@@ -21,6 +21,8 @@ import {
   CustomerRepository,
   IBookingRepository,
   BookingRepository,
+  IRentalRepository,
+  RentalRepository,
   IAuditRepository,
   AuditRepository,
   IOutboxRepository,
@@ -53,6 +55,7 @@ export class PublicBookingService {
   private readonly categoryRepo: IVehicleCategoryRepository;
   private readonly customerRepo: ICustomerRepository;
   private readonly bookingRepo: IBookingRepository;
+  private readonly rentalRepo: IRentalRepository;
   private readonly mediaRepo: IVehicleMediaRepository;
   private readonly availabilityService: AvailabilityService;
   private readonly pricingService: PricingService;
@@ -68,6 +71,7 @@ export class PublicBookingService {
     categoryRepo?: IVehicleCategoryRepository;
     customerRepo?: ICustomerRepository;
     bookingRepo?: IBookingRepository;
+    rentalRepo?: IRentalRepository;
     mediaRepo?: IVehicleMediaRepository;
     availabilityService?: AvailabilityService;
     pricingService?: PricingService;
@@ -80,6 +84,7 @@ export class PublicBookingService {
     this.categoryRepo = deps.categoryRepo || new VehicleCategoryRepository();
     this.customerRepo = deps.customerRepo || new CustomerRepository();
     this.bookingRepo = deps.bookingRepo || new BookingRepository();
+    this.rentalRepo = deps.rentalRepo || new RentalRepository();
     this.mediaRepo = deps.mediaRepo || new VehicleMediaRepository();
     this.availabilityService = deps.availabilityService || new AvailabilityService();
     this.pricingService = deps.pricingService || new PricingService();
