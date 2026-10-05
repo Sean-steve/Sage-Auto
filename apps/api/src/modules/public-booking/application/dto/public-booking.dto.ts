@@ -123,5 +123,23 @@ export interface PublicBookingVoucherDto {
     title: string;
     message: string;
   }>;
+  activeRental?: {
+    rentalId: string;
+    rentalNumber: string;
+    state: string;
+    actualStart?: string;
+    scheduledEnd: string;
+    checkoutOdometer: number;
+    checkoutFuelLevel: number;
+    timeRemainingMinutes: number;
+    returnStatus: "ON_ROAD" | "RETURN_WITHIN_24H" | "RETURN_WITHIN_3H" | "OVERDUE" | "RETURN_PROCESSING" | "COMPLETED";
+  };
+  renterNotifications?: Array<{
+    id: string;
+    level: "INFO" | "REMINDER" | "URGENT";
+    title: string;
+    message: string;
+    occurredAt: string;
+  }>;
   createdAt: string;
 }
