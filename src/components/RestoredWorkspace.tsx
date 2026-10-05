@@ -42,7 +42,7 @@ const descriptions:Record<string,string>={
   fleet:"Vehicles, ownership, availability and asset truth",
   bookings:"Reservation lifecycle, pricing snapshots and confirmation",
   handover:"Contracts, driver readiness, inspection and key release",
-  availability:"Supporting allocation, hold, block and fleet-calendar control",
+  availability:"Allocations, holds, blocks and fleet calendar",
   customers:"Customers, drivers and corporate relationships",
   rentals:"Active on-road rental operations",
   returns:"Vehicle receipt, inspection and final calculation",
@@ -59,8 +59,7 @@ const descriptions:Record<string,string>={
 };
 const groupDefs=[
   {label:"Command",ids:["overview"]},
-  {label:"Operations",ids:["bookings","handover","rentals","returns"]},
-  {label:"Operations control",ids:["availability"]},
+  {label:"Operations",ids:["bookings","handover","availability","rentals","returns"]},
   {label:"Fleet & people",ids:["fleet","customers","inspections","maintenance","compliance","owners"]},
   {label:"Commercial",ids:["pricing","finance","settlements"]},
   {label:"Workspace",ids:["website","team","settings"]},

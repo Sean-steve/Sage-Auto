@@ -23,7 +23,6 @@ import {
 } from "lucide-react";
 import { useApp } from "../lib/store";
 import { apiClient } from "../lib/api-client";
-import { OperationsLifecycleBar } from "./OperationsLifecycleBar";
 import { Rental, RentalState } from "../types";
 
 type ActionMode = "EXTEND" | "INCIDENT" | "RETURN" | null;
@@ -68,7 +67,7 @@ export const RentalsView: React.FC = () => {
     restoration,
     hasPermission,
     showNotification,
-    navigateSection,
+    setCurrentView,
   } = useApp();
 
   const [rentals, setRentals] = useState<Rental[]>([]);
@@ -287,13 +286,11 @@ export const RentalsView: React.FC = () => {
       });
       if (response.error) throw new Error(response.error.message);
       await refreshOne(selectedRental.id);
-      showNotification("Return scheduled. Continuing to Returns & Final Calculation.");
+      showNotification("Return scheduled. Physical receipt and final calculation continue in the Return experience.");
       setActionMode(null);
       setReturnAt("");
       setReturnLocation("");
       setReturnNotes("");
-      setSelectedRentalId(null);
-      navigateSection("returns");
     } catch (error: any) {
       showNotification(error.message || "Unable to schedule return.", "error");
     } finally {
@@ -328,8 +325,6 @@ export const RentalsView: React.FC = () => {
           Refresh operations
         </button>
       </div>
-
-      <OperationsLifecycleBar current="rentals"/>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-6">
         {[
@@ -644,7 +639,7 @@ export const RentalsView: React.FC = () => {
                       <button
                         onClick={() => {
                           setSelectedRentalId(null);
-                          navigateSection("returns");
+                          setCurrentView("returns");
                         }}
                         className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-blue-700 px-3 py-1.5 text-[11px] font-bold text-white hover:bg-blue-800"
                       >
