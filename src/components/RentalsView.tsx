@@ -70,7 +70,8 @@ export const RentalsView: React.FC = () => {
     setCurrentView,
   } = useApp();
 
-  const [rentals, setRentals] = useState<Rental[]>([]);\n  const [dispatchReady, setDispatchReady] = useState<any[]>([]);
+  const [rentals, setRentals] = useState<Rental[]>([]);
+  const [dispatchReady, setDispatchReady] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [stateFilter, setStateFilter] = useState("ACTIVE");
   const [selectedRentalId, setSelectedRentalId] = useState<string | null>(null);
@@ -193,7 +194,8 @@ export const RentalsView: React.FC = () => {
       });
       if (response.error || !response.data) throw new Error(response.error?.message || "Dispatch failed.");
       const authoritative = response.data as Rental;
-      setRentals((prev) => [authoritative, ...prev.filter((item) => item.bookingId !== rental.bookingId && item.id !== authoritative.id)]);\n      setDispatchReady((prev) => prev.filter((item) => item.bookingId !== rental.bookingId));
+      setRentals((prev) => [authoritative, ...prev.filter((item) => item.bookingId !== rental.bookingId && item.id !== authoritative.id)]);
+      setDispatchReady((prev) => prev.filter((item) => item.bookingId !== rental.bookingId));
       showNotification(`Rental ${authoritative.rentalNumber} is ACTIVE ON ROAD.`);
       setSelectedRentalId(authoritative.id);
     } catch (error: any) {
@@ -326,7 +328,8 @@ export const RentalsView: React.FC = () => {
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-6">
         {[
-          ["Ready to dispatch", dispatchReady.length, KeyRound],\n          ["Active on road", metrics.active, Car],
+          ["Ready to dispatch", dispatchReady.length, KeyRound],
+          ["Active on road", metrics.active, Car],
           ["Overdue", metrics.overdue, AlertTriangle],
           ["Returns <24h", metrics.returnsSoon, CalendarClock],
           ["Extension requests", metrics.extensionRequests, Clock3],
