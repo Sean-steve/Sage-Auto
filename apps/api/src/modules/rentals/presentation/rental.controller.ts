@@ -67,6 +67,23 @@ export function createRentalController(
   );
 
   // --------------------------------------------------------------------------
+  // Dispatch-ready queue (handover complete, Rental not started yet)
+  // --------------------------------------------------------------------------
+  router.get(
+    "/dispatch-ready",
+    guard(TENANT_PERMISSIONS.RENTAL_READ || "rental.read"),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const tenantId = getTenantId(req);
+        const items = await rentalService.listDispatchReady(tenantId);
+        res.json({ success: true, data: items, total: items.length });
+      } catch (err) {
+        next(err);
+      }
+    }
+  );
+
+  // --------------------------------------------------------------------------
   // Start / Dispatch Rental
   // --------------------------------------------------------------------------
   router.post(
