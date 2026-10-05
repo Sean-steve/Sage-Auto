@@ -24,6 +24,8 @@ import {
   ContractRepository,
   IVehicleRepository,
   VehicleRepository,
+  ICustomerRepository,
+  CustomerRepository,
   IInspectionRepository,
   InspectionRepository,
   IInspectionTemplateRepository,
@@ -82,6 +84,7 @@ export class HandoverService {
   private readonly bookingRepo: IBookingRepository;
   private readonly contractRepo: IContractRepository;
   private readonly vehicleRepo: IVehicleRepository;
+  private readonly customerRepo: ICustomerRepository;
   private readonly inspectionRepo: IInspectionRepository;
   private readonly inspectionTemplateRepo: IInspectionTemplateRepository;
   private readonly auditRepo: IAuditRepository;
@@ -99,12 +102,14 @@ export class HandoverService {
     idempotencyRepo?: IIdempotencyRepository,
     inspectionRepo?: IInspectionRepository,
     complianceReadinessService?: any,
-    inspectionTemplateRepo?: IInspectionTemplateRepository
+    inspectionTemplateRepo?: IInspectionTemplateRepository,
+    customerRepo?: ICustomerRepository
   ) {
     this.handoverRepo = handoverRepo || new HandoverRepository();
     this.bookingRepo = bookingRepo || new BookingRepository();
     this.contractRepo = contractRepo || new ContractRepository();
     this.vehicleRepo = vehicleRepo || new VehicleRepository();
+    this.customerRepo = customerRepo || new CustomerRepository();
     this.inspectionRepo = inspectionRepo || new InspectionRepository();
     this.inspectionTemplateRepo = inspectionTemplateRepo || new InspectionTemplateRepository();
     this.auditRepo = auditRepo || new AuditRepository();
