@@ -57,6 +57,8 @@ assert.match(view,/14 days/);
 assert.match(view,/30 days/);
 assert.match(view,/This Workbench result is not a Booking|Opening Bookings does not persist this candidate as a Booking/,'Booking boundary must remain truthful');
 assert.match(view,/Empty calendar space is never treated as proof of availability/,'timeline must not imply availability from visual emptiness');
+assert.match(view,/Operations control layer/,'Availability must be presented as an Operations control layer');
+assert.match(view,/not a mandatory step between operational stages/,'Availability must not be presented as a sequential lifecycle stage');
 assert.match(view,/overflow-x-auto/,'Availability tabs must remain reachable on narrow screens');
 
 console.log('PASS: Availability is server-backed, concurrency-aware, permission-scoped and free of local dispatch simulation.');

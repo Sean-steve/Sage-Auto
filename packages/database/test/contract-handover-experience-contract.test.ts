@@ -42,6 +42,8 @@ assert.doesNotMatch(view,/apiClient\.rentals\.startRental|createRentalFromBookin
 assert.match(view,/Rental creation remains in Rental Operations|does not create a Rental/,'Rental boundary must be explicit');
 assert.match(view,/navigateSection\("rentals"\)/,'completed handover should advance operator into Rental Operations');
 assert.match(view,/Ready to dispatch/,'handover completion should explain the dispatch queue handoff');
+assert.match(view,/Continue to Rental Operations/,'completed handover must expose Rental Operations as the direct next stage');
+assert.match(view,/OperationsLifecycleBar current="handover"/,'Contract & Handover must render the shared Operations lifecycle navigator');
 assert.match(handoverService,/eventType: "rental\.handover\.completed"/,'handover completion must emit the canonical notification event');
 
 

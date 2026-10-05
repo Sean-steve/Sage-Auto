@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { apiClient } from "../lib/api-client";
 import { useApp } from "../lib/store";
+import { OperationsLifecycleBar } from "./OperationsLifecycleBar";
 import type { InspectionComparison, Rental, RentalFinalCalculation, RentalReturnRecord } from "../types";
 
 type ActionMode = "RECEIVE" | "INSPECT" | "CALCULATE" | "COMPLETE" | null;
@@ -437,7 +438,7 @@ export const ReturnFinalCalculationView: React.FC = () => {
       const rental = response.data as Rental;
       setRentals((prev) => [rental, ...prev.filter((item) => item.id !== rental.id)]);
       await loadArtifacts(selectedRental.id);
-      showNotification(`Rental ${rental.rentalNumber} completed. Vehicle disposition: ${releaseStatus}.`);
+      showNotification(`Rental ${rental.rentalNumber} completed. Vehicle disposition: ${releaseStatus}. Availability now reflects the released vehicle state.`);
       setActionMode(null);
     } catch (error: any) {
       showNotification(error.message || "Unable to complete rental.", "error");
@@ -486,6 +487,8 @@ export const ReturnFinalCalculationView: React.FC = () => {
           Refresh returns
         </button>
       </div>
+
+      <OperationsLifecycleBar current="returns"/>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
         {[
