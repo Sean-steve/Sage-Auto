@@ -69,6 +69,14 @@ function handoverCheckpointError(message:string, code="HANDOVER_CHECKPOINT_BLOCK
   return err;
 }
 
+function canInferClearInspectionItem(item:any){
+  if(item?.requiresEvidence)return false;
+  if(item?.itemType==="BOOLEAN")return true;
+  if(item?.itemType==="CONDITION")return Boolean(item?.defaultCondition)||Array.isArray(item?.options);
+  if(item?.itemType==="SELECT")return Boolean(item?.defaultCondition)||(Array.isArray(item?.options)&&item.options.length>0);
+  return false;
+}
+
 export class HandoverService {
   private readonly handoverRepo: IHandoverRepository;
   private readonly bookingRepo: IBookingRepository;
@@ -380,7 +388,13 @@ export class HandoverService {
     const sections = Array.isArray(template?.sections) ? template.sections : [];
     const requiredItems = sections.flatMap((section:any) => Array.isArray(section.items) ? section.items.filter((item:any) => item.required) : []);
     const answeredCodes = new Set((inspection.responses || []).map((response) => response.itemCode));
-    const missingRequired = requiredItems.filter((item) => !answeredCodes.has(item.code));
+    // The inspection experience is defect-oriented: a completed inspection seals the
+    // walkaround, and omitted pass/fail/condition items mean "clear" when the template
+    // defines a safe default and does not require evidence. This preserves legacy
+    // completed inspections while still blocking fields that cannot be inferred.
+    const missingRequired = requiredItems.filter(
+      (item) => !answeredCodes.has(item.code) && !canInferClearInspectionItem(item)
+    );
     if (missingRequired.length > 0) {
       throw handoverCheckpointError(
         `Finish these required inspection checks before handover: ${missingRequired.map((item) => item.label).join(", ")}.`
