@@ -129,6 +129,18 @@ export class NotificationPolicyConsumer implements IEventSubscriber {
 
       case EVENT_TYPES.RENTAL_HANDOVER_COMPLETED: {
         const customerEmail = data.customerEmail || data.email;
+        const customerPhone = data.customerPhone || data.phone;
+        const variables = {
+          customerName: data.customerName || "Customer",
+          vehicleName: data.vehicleName || "Vehicle",
+          registrationPlate: data.registrationPlate || "Vehicle",
+          startOdometer: data.startOdometer || 0,
+          fuelLevel: data.fuelLevel ?? 100,
+          expectedReturnDate: data.expectedReturnDate || new Date().toISOString(),
+          returnLocation: data.returnLocation || "Agreed return location",
+          inspectionUrl: data.inspectionUrl || "",
+          tenantName: data.tenantName || "Sage Auto",
+        };
         if (customerEmail) {
           await this.orchestrator.sendNotificationIntent({
             tenantId,
@@ -136,22 +148,29 @@ export class NotificationPolicyConsumer implements IEventSubscriber {
             category: "TRANSACTIONAL",
             priority: "NORMAL",
             recipient: customerEmail,
-            recipientName: data.customerName || "Customer",
+            recipientName: variables.customerName,
             recipientPartyType: "CUSTOMER",
             recipientPartyId: data.customerId,
             templateKey: "rental.handover.completed",
             correlationId,
             causationEventId,
-            variables: {
-              customerName: data.customerName || "Customer",
-              vehicleName: data.vehicleName || "Vehicle",
-              registrationPlate: data.registrationPlate || "KDA 123A",
-              startOdometer: data.startOdometer || 0,
-              fuelLevel: data.fuelLevel || 100,
-              expectedReturnDate: data.expectedReturnDate || new Date().toISOString().split("T")[0],
-              returnLocation: data.returnLocation || "Main Station",
-              tenantName: data.tenantName || "Auto Spec Sage",
-            },
+            variables,
+          });
+        }
+        if (customerPhone) {
+          await this.orchestrator.sendNotificationIntent({
+            tenantId,
+            channel: "SMS",
+            category: "TRANSACTIONAL",
+            priority: "NORMAL",
+            recipient: customerPhone,
+            recipientName: variables.customerName,
+            recipientPartyType: "CUSTOMER",
+            recipientPartyId: data.customerId,
+            templateKey: "rental.handover.completed",
+            correlationId,
+            causationEventId,
+            variables,
           });
         }
         break;
