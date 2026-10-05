@@ -537,6 +537,49 @@ export class PublicBookingService {
     const vehicle = booking.assignedVehicleId
       ? await this.vehicleRepo.findById(booking.assignedVehicleId, tenantId)
       : null;
+    const rental = await this.rentalRepo.findByBookingId(booking.id, tenantId);
+    const now = Date.now();
+    const rentalEnd = rental?.scheduledEnd ? new Date(rental.scheduledEnd).getTime() : 0;
+    const timeRemainingMinutes = rentalEnd ? Math.ceil((rentalEnd - now) / 60000) : 0;
+    let returnStatus: "ON_ROAD" | "RETURN_WITHIN_24H" | "RETURN_WITHIN_3H" | "OVERDUE" | "RETURN_PROCESSING" | "COMPLETED" = "ON_ROAD";
+    if (rental) {
+      if (["COMPLETED","RETURN_COMPLETED"].includes(rental.state)) returnStatus = "COMPLETED";
+      else if (!["ACTIVE_ON_ROAD","OVERDUE"].includes(rental.state)) returnStatus = "RETURN_PROCESSING";
+      else if (rental.state === "OVERDUE" || timeRemainingMinutes < 0) returnStatus = "OVERDUE";
+      else if (timeRemainingMinutes <= 180) returnStatus = "RETURN_WITHIN_3H";
+      else if (timeRemainingMinutes <= 1440) returnStatus = "RETURN_WITHIN_24H";
+    }
+    const renterNotifications: NonNullable<PublicBookingVoucherDto["renterNotifications"]> = [];
+    if (rental) {
+      renterNotifications.push({
+        id: `rental-started:${rental.id}`,
+        level: "INFO",
+        title: "Vehicle collected — rental active",
+        message: `Your rental ${rental.rentalNumber} is active until ${new Date(rental.scheduledEnd).toLocaleString()}.`,
+        occurredAt: rental.actualStart || rental.createdAt,
+      });
+      if (returnStatus === "RETURN_WITHIN_24H") renterNotifications.push({
+        id: `return-24h:${rental.id}`,
+        level: "REMINDER",
+        title: "Return due within 24 hours",
+        message: `Please plan to return the vehicle by ${new Date(rental.scheduledEnd).toLocaleString()}. Contact the rental team early if you need an extension.`,
+        occurredAt: new Date().toISOString(),
+      });
+      if (returnStatus === "RETURN_WITHIN_3H") renterNotifications.push({
+        id: `return-3h:${rental.id}`,
+        level: "URGENT",
+        title: "Vehicle return due soon",
+        message: `Your scheduled return is ${new Date(rental.scheduledEnd).toLocaleString()}. Allow enough time to reach the agreed return location.`,
+        occurredAt: new Date().toISOString(),
+      });
+      if (returnStatus === "OVERDUE") renterNotifications.push({
+        id: `return-overdue:${rental.id}`,
+        level: "URGENT",
+        title: "Scheduled return time has passed",
+        message: "Please contact the rental team and arrange the vehicle return immediately. Additional charges may apply under your rental terms.",
+        occurredAt: new Date().toISOString(),
+      });
+    }
 
     return {
       bookingId: booking.id,
@@ -574,6 +617,18 @@ export class PublicBookingService {
         isPaid: booking.paymentStatus === "FULLY_PAID",
       },
       timeline: this.toPublicTimeline(booking),
+      activeRental: rental ? {
+        rentalId: rental.id,
+        rentalNumber: rental.rentalNumber,
+        state: rental.state,
+        actualStart: rental.actualStart,
+        scheduledEnd: rental.scheduledEnd,
+        checkoutOdometer: rental.checkoutOdometer,
+        checkoutFuelLevel: rental.checkoutFuelLevel,
+        timeRemainingMinutes,
+        returnStatus,
+      } : undefined,
+      renterNotifications,
       createdAt: booking.createdAt,
     };
   }
