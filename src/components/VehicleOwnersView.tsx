@@ -13,7 +13,8 @@ export const VehicleOwnersView:React.FC=()=>{
   const [ownerships,setOwnerships]=useState<any[]>(vehicleOwnerships);
   const [liveOwners,setLiveOwners]=useState<any[]>([]);
   const [liveVehicles,setLiveVehicles]=useState<any[]>([]);
-  const [managingOwnerId,setManagingOwnerId]=useState<string|null>(null);\n  const [editingOwnerId,setEditingOwnerId]=useState<string|null>(null);
+  const [managingOwnerId,setManagingOwnerId]=useState<string|null>(null);
+  const [editingOwnerId,setEditingOwnerId]=useState<string|null>(null);
 
   useEffect(()=>{
     let cancelled=false;
@@ -74,7 +75,8 @@ export const VehicleOwnersView:React.FC=()=>{
 
     {!tenantOwners.length&&<div className="rounded-3xl border border-dashed bg-white p-12 text-center"><WalletCards className="mx-auto text-slate-300"/><h2 className="mt-3 font-black">No vehicle owners registered</h2><p className="mt-1 text-sm text-slate-500">Add an owner when a vehicle is investor-owned, leased, managed or under a revenue-share agreement.</p></div>}
 
-    {managingOwnerId&&<TermsModal owner={tenantOwners.find(o=>o.id===managingOwnerId)} vehicles={tenantVehicles.filter(v=>aliasIds(tenantOwners.find(o=>o.id===managingOwnerId)||{id:managingOwnerId}).includes(v.ownerId))} ownerships={ownerships} currency={activeTenant.currency||"KES"} onClose={()=>setManagingOwnerId(null)} onSaved={(agreement:any)=>{setOwnerships(prev=>[agreement,...prev.map((o:any)=>o.vehicleId===agreement.vehicleId&&o.id!==agreement.id?{...o,isActive:false}:o)]);showNotification("Owner agreement terms updated.");}}/>}\n    {editingOwnerId&&<EditOwnerModal owner={tenantOwners.find(o=>o.id===editingOwnerId)} vehicles={tenantVehicles.filter(v=>aliasIds(tenantOwners.find(o=>o.id===editingOwnerId)||{id:editingOwnerId}).includes(v.ownerId))} allVehicles={tenantVehicles} onClose={()=>setEditingOwnerId(null)} onSaved={(updated:any)=>{setLiveOwners(prev=>prev.map(o=>o.id===updated.id?updated:o));if(updated._attachedVehicleId)setLiveVehicles(prev=>prev.map(v=>v.id===updated._attachedVehicleId?{...v,ownerId:updated.id,activeOwnershipId:updated._assignment?.id}:v));showNotification(updated._attachedVehicleId?"Owner updated and vehicle attached.":"Vehicle owner details updated.");}}/>}
+    {managingOwnerId&&<TermsModal owner={tenantOwners.find(o=>o.id===managingOwnerId)} vehicles={tenantVehicles.filter(v=>aliasIds(tenantOwners.find(o=>o.id===managingOwnerId)||{id:managingOwnerId}).includes(v.ownerId))} ownerships={ownerships} currency={activeTenant.currency||"KES"} onClose={()=>setManagingOwnerId(null)} onSaved={(agreement:any)=>{setOwnerships(prev=>[agreement,...prev.map((o:any)=>o.vehicleId===agreement.vehicleId&&o.id!==agreement.id?{...o,isActive:false}:o)]);showNotification("Owner agreement terms updated.");}}/>}
+    {editingOwnerId&&<EditOwnerModal owner={tenantOwners.find(o=>o.id===editingOwnerId)} vehicles={tenantVehicles.filter(v=>aliasIds(tenantOwners.find(o=>o.id===editingOwnerId)||{id:editingOwnerId}).includes(v.ownerId))} allVehicles={tenantVehicles} onClose={()=>setEditingOwnerId(null)} onSaved={(updated:any)=>{setLiveOwners(prev=>prev.map(o=>o.id===updated.id?updated:o));if(updated._attachedVehicleId)setLiveVehicles(prev=>prev.map(v=>v.id===updated._attachedVehicleId?{...v,ownerId:updated.id,activeOwnershipId:updated._assignment?.id}:v));showNotification(updated._attachedVehicleId?"Owner updated and vehicle attached.":"Vehicle owner details updated.");}}/>}
   </div>;
 };
 
@@ -86,7 +88,8 @@ function EditOwnerModal({owner,vehicles,allVehicles,onClose,onSaved}:{owner:any;
   const [busy,setBusy]=useState(false),[error,setError]=useState("");
   const [name,setName]=useState(owner?.name||""),[companyName,setCompanyName]=useState(owner?.companyName||""),[email,setEmail]=useState(owner?.email||""),[phone,setPhone]=useState(owner?.phone||"");
   const [idNumber,setIdNumber]=useState(owner?.idOrPassportNumber||""),[taxPin,setTaxPin]=useState(owner?.taxPinNumber||""),[payoutBank,setPayoutBank]=useState(owner?.payoutBank||""),[payoutAccount,setPayoutAccount]=useState(owner?.payoutAccountNumber||""),[payoutMpesa,setPayoutMpesa]=useState(owner?.payoutMpesaNumber||"");
-  const [status,setStatus]=useState(owner?.status||"ACTIVE"),[notes,setNotes]=useState(owner?.notes||"");\n  const [attachVehicleId,setAttachVehicleId]=useState(""),[attachShare,setAttachShare]=useState("75"),[attachType,setAttachType]=useState("THIRD_PARTY_OWNED"),[attachTerms,setAttachTerms]=useState("");
+  const [status,setStatus]=useState(owner?.status||"ACTIVE"),[notes,setNotes]=useState(owner?.notes||"");
+  const [attachVehicleId,setAttachVehicleId]=useState(""),[attachShare,setAttachShare]=useState("75"),[attachType,setAttachType]=useState("THIRD_PARTY_OWNED"),[attachTerms,setAttachTerms]=useState("");
   async function submit(e:React.FormEvent){e.preventDefault();if(!owner)return;setBusy(true);setError("");try{
     const response=await apiClient.vehicleOwners.updateOwner(owner.id,{name:name.trim(),companyName:companyName.trim()||undefined,email:email.trim(),phone:phone.trim(),idOrPassportNumber:idNumber.trim()||undefined,taxPinNumber:taxPin.trim()||undefined,payoutBank:payoutBank.trim()||undefined,payoutAccountNumber:payoutAccount.trim()||undefined,payoutMpesaNumber:payoutMpesa.trim()||undefined,status,notes:notes.trim()||undefined,expectedVersion:owner.version});
     if(response.error)throw new Error(response.error.message);
