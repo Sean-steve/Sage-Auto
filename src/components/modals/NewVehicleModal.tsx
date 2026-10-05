@@ -205,7 +205,7 @@ export const NewVehicleModal: React.FC = () => {
                 <option value="">Internal Fleet Pool (100% Retained)</option>
                 {tenantOwners.map((o) => (
                   <option key={o.id} value={o.id}>
-                    {o.name} ({o.companyName || "Investor"})
+                    {o.name} · {o.companyName || o.email || o.phone || "Investor"}
                   </option>
                 ))}
               </select>
