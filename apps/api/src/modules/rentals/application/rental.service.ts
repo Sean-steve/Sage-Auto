@@ -605,6 +605,58 @@ export class RentalService {
     return this.rentalRepo.findMany(tenantId, query);
   }
 
+  /**
+   * Bookings that have crossed the complete handover boundary but do not yet
+   * have a Rental aggregate. Rental Operations owns the explicit dispatch.
+   */
+  async listDispatchReady(tenantId: string): Promise<any[]> {
+    const result = await this.bookingRepo.findMany(tenantId, {
+      status: "CONFIRMED",
+      limit: 100,
+      sortBy: "pickupAt",
+      sortOrder: "asc",
+    } as any);
+
+    const ready: any[] = [];
+    for (const booking of result.items) {
+      const existingRental = await this.rentalRepo.findByBookingId(booking.id, tenantId);
+      if (existingRental) continue;
+
+      const handovers = await this.handoverRepo.findByBookingId(booking.id, tenantId);
+      const handover = [...handovers]
+        .filter((item) => item.status === "HANDOVER_COMPLETED")
+        .sort((a, b) => new Date(b.completedAt || b.createdAt).getTime() - new Date(a.completedAt || a.createdAt).getTime())[0];
+      if (!handover) continue;
+
+      const readiness = await this.evaluateReadiness(tenantId, booking.id);
+      if (!readiness.isReady) continue;
+
+      const vehicleId = booking.assignedVehicleId || booking.requestedVehicleId || handover.vehicleId;
+      const vehicle = vehicleId ? await this.vehicleRepo.findById(vehicleId, tenantId) : null;
+      ready.push({
+        bookingId: booking.id,
+        bookingNumber: booking.bookingNumber,
+        customerId: booking.customerId,
+        primaryDriverId: booking.primaryDriverId || booking.customerId,
+        vehicleId,
+        vehicle: vehicle ? {
+          registrationPlate: vehicle.registrationPlate,
+          make: vehicle.make,
+          model: vehicle.model,
+        } : null,
+        pickupAt: booking.pickupAt,
+        returnAt: booking.returnAt,
+        handoverId: handover.id,
+        handoverNumber: handover.handoverNumber,
+        handoverCompletedAt: handover.completedAt,
+        checkoutOdometer: handover.checkoutOdometer,
+        checkoutFuelLevel: handover.checkoutFuelLevel,
+        readiness,
+      });
+    }
+    return ready;
+  }
+
   // ==========================================================================
   // SPRINT 16: EXTENSION MANAGEMENT (DOM-003 §19)
   // ==========================================================================
