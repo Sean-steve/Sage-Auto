@@ -54,7 +54,9 @@ assert.doesNotMatch(view,/createRentalFromBooking|setIsMpesaModalOpen|setIsNewBo
 assert.ok(legacy.includes('createRentalFromBooking'),'legacy reference should retain evidence of the direct Booking-to-Rental behavior being replaced');
 assert.match(view,/idempotencyKey/,'Booking creation must be retry-idempotent');
 assert.match(view,/expectedVersion:detail\.version/,'lifecycle commands must carry server version where supported');
-assert.match(view,/This screen does not create a Rental/,'Booking-to-Handover boundary must remain truthful');
+assert.match(view,/Proceed to Contract & Handover/,'confirmed Booking must expose Contract & Handover as the direct next operational step');
+assert.match(view,/Availability remains the supporting allocation authority and is not a separate workflow stop/,'Availability must remain a control layer rather than a sequential Booking step');
+assert.match(view,/OperationsLifecycleBar current="bookings"/,'Booking experience must render the shared Operations lifecycle navigator');
 assert.match(view,/overflow-x-auto|sm:grid-cols|md:grid-cols/,'Booking experience must remain responsive');
 
 for (let i=1;i<=27;i++){const id='BOOKING-'+String(i).padStart(3,'0');assert.ok(contracts.includes(id),'Missing Booking contract '+id);}
