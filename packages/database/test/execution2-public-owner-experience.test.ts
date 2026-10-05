@@ -22,9 +22,9 @@ assert.match(renter,/setInterval\(\(\)=>void load\(bookingReference,email,false\
 assert.match(renter,/Latest notifications/);
 assert.match(renter,/You have the vehicle/);
 assert.match(renter,/timeRemainingMinutes/);
-assert.match(renter,/Return due within 24 hours|RETURN_WITHIN_24H/);
-assert.match(renter,/Vehicle return due soon|RETURN_WITHIN_3H/);
-assert.match(renter,/Scheduled return time has passed|OVERDUE/);
+assert.match(publicService,/Return due within 24 hours|RETURN_WITHIN_24H/);
+assert.match(publicService,/Vehicle return due soon|RETURN_WITHIN_3H/);
+assert.match(publicService,/Scheduled return time has passed|OVERDUE/);
 assert.match(rentalsView,/listDispatchReady/);
 assert.match(rentalsView,/Ready to dispatch/);
 assert.match(rentalsView,/Start rental/);
