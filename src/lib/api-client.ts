@@ -358,6 +358,7 @@ class ApiClient {
     },
     getRental: (id: string) => this.get(`/rentals/${id}`),
     getReadiness: (bookingId: string) => this.get(`/rentals/readiness/${bookingId}`),
+    listDispatchReady: () => this.get<any[]>('/rentals/dispatch-ready'),
     startRental: (dtoOrBookingId: string | {
       bookingId: string;
       contractId?: string;

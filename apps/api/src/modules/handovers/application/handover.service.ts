@@ -24,6 +24,8 @@ import {
   ContractRepository,
   IVehicleRepository,
   VehicleRepository,
+  ICustomerRepository,
+  CustomerRepository,
   IInspectionRepository,
   InspectionRepository,
   IInspectionTemplateRepository,
@@ -82,6 +84,7 @@ export class HandoverService {
   private readonly bookingRepo: IBookingRepository;
   private readonly contractRepo: IContractRepository;
   private readonly vehicleRepo: IVehicleRepository;
+  private readonly customerRepo: ICustomerRepository;
   private readonly inspectionRepo: IInspectionRepository;
   private readonly inspectionTemplateRepo: IInspectionTemplateRepository;
   private readonly auditRepo: IAuditRepository;
@@ -99,12 +102,14 @@ export class HandoverService {
     idempotencyRepo?: IIdempotencyRepository,
     inspectionRepo?: IInspectionRepository,
     complianceReadinessService?: any,
-    inspectionTemplateRepo?: IInspectionTemplateRepository
+    inspectionTemplateRepo?: IInspectionTemplateRepository,
+    customerRepo?: ICustomerRepository
   ) {
     this.handoverRepo = handoverRepo || new HandoverRepository();
     this.bookingRepo = bookingRepo || new BookingRepository();
     this.contractRepo = contractRepo || new ContractRepository();
     this.vehicleRepo = vehicleRepo || new VehicleRepository();
+    this.customerRepo = customerRepo || new CustomerRepository();
     this.inspectionRepo = inspectionRepo || new InspectionRepository();
     this.inspectionTemplateRepo = inspectionTemplateRepo || new InspectionTemplateRepository();
     this.auditRepo = auditRepo || new AuditRepository();
@@ -615,19 +620,37 @@ export class HandoverService {
       occurredAt: completedAt,
     });
 
+    const [booking, vehicle, customer] = await Promise.all([
+      this.bookingRepo.findById(handover.bookingId, tenantId),
+      this.vehicleRepo.findById(handover.vehicleId, tenantId),
+      this.customerRepo.findById(handover.customerId, tenantId),
+    ]);
+
     await this.outboxRepo.record({
       tenantId,
-      eventType: "handover.completed",
+      eventType: "rental.handover.completed",
       aggregateType: "VehicleHandover",
       aggregateId: handover.id,
       payload: {
         handoverId: handover.id,
         handoverNumber: handover.handoverNumber,
         bookingId: handover.bookingId,
+        bookingReference: booking?.bookingNumber,
         contractId: handover.contractId,
         vehicleId: handover.vehicleId,
+        vehicleName: vehicle ? `${vehicle.make} ${vehicle.model}` : "Vehicle",
+        registrationPlate: vehicle?.registrationPlate,
+        customerId: handover.customerId,
+        customerName: customer?.fullName,
+        customerEmail: customer?.email,
+        customerPhone: customer?.phone,
         checkoutOdometer: updated.checkoutOdometer,
+        startOdometer: updated.checkoutOdometer,
         checkoutFuelLevel: updated.checkoutFuelLevel,
+        fuelLevel: updated.checkoutFuelLevel,
+        expectedReturnDate: booking?.returnAt,
+        returnLocation: booking?.returnLocationName || booking?.returnLocation || "Agreed return location",
+        inspectionUrl: updated.inspectionId ? `/account/inspection/${updated.inspectionId}` : "",
         completedAt,
       },
     });

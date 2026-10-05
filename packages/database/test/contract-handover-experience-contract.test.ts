@@ -40,6 +40,10 @@ for (const permission of [
 
 assert.doesNotMatch(view,/apiClient\.rentals\.startRental|createRentalFromBooking|setBookings\(\(prev|setVehicles\(\(prev/,'Contract/Handover UI must not create a Rental or locally transform Booking/Vehicle authority');
 assert.match(view,/Rental creation remains in Rental Operations|does not create a Rental/,'Rental boundary must be explicit');
+assert.match(view,/navigateSection\("rentals"\)/,'completed handover should advance operator into Rental Operations');
+assert.match(view,/Ready to dispatch/,'handover completion should explain the dispatch queue handoff');
+assert.match(handoverService,/eventType: "rental\.handover\.completed"/,'handover completion must emit the canonical notification event');
+
 
 assert.match(contractService,/Claim the aggregate version before writing signature evidence/,'signature flow must claim optimistic version before evidence');
 assert.ok(contractService.indexOf('contractRepo.update(') < contractService.indexOf('contractRepo.addSignature('),'signature evidence must be written only after aggregate version claim');

@@ -195,6 +195,28 @@ export const DEFAULT_NOTIFICATION_TEMPLATES: Omit<
     isActive: true,
     version: 1,
   },
+  {
+    id: "sys-tpl-rental-handover-sms",
+    tenantId: null,
+    key: "rental.handover.completed",
+    name: "Rental Handover Completed (SMS)",
+    category: "TRANSACTIONAL",
+    channel: "SMS",
+    bodyTemplate:
+      "{{tenantName}}: {{vehicleName}} ({{registrationPlate}}) has been handed over. Return by {{expectedReturnDate}}. Start: {{startOdometer}} km, fuel {{fuelLevel}}%. Drive safely.",
+    variablesSchema: [
+      { name: "tenantName", description: "Tenant name", required: true },
+      { name: "vehicleName", description: "Vehicle name", required: true },
+      { name: "registrationPlate", description: "Plate number", required: true },
+      { name: "expectedReturnDate", description: "Expected return", required: true },
+      { name: "startOdometer", description: "Starting km", required: true },
+      { name: "fuelLevel", description: "Starting fuel", required: true },
+    ],
+    description: "SMS confirmation after physical vehicle handover.",
+    isSystemDefault: true,
+    isActive: true,
+    version: 1,
+  },
 
   // 7. Payment Receipt — Email & SMS
   {

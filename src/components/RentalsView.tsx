@@ -71,6 +71,7 @@ export const RentalsView: React.FC = () => {
   } = useApp();
 
   const [rentals, setRentals] = useState<Rental[]>([]);
+  const [dispatchReady, setDispatchReady] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [stateFilter, setStateFilter] = useState("ACTIVE");
   const [selectedRentalId, setSelectedRentalId] = useState<string | null>(null);
@@ -93,12 +94,16 @@ export const RentalsView: React.FC = () => {
 
   const loadRentals = useCallback(async () => {
     setLoading(true);
-    const response = await apiClient.rentals.listRentals();
+    const [response, readyResponse] = await Promise.all([
+      apiClient.rentals.listRentals(),
+      apiClient.rentals.listDispatchReady(),
+    ]);
     if (!response.error && Array.isArray(response.data)) {
       setRentals(response.data as Rental[]);
     } else {
       setRentals(cachedRentals.filter((r) => r.tenantId === activeTenantId));
     }
+    setDispatchReady(!readyResponse.error && Array.isArray(readyResponse.data) ? readyResponse.data : []);
     setLoading(false);
   }, [activeTenantId, cachedRentals]);
 
@@ -174,7 +179,7 @@ export const RentalsView: React.FC = () => {
     return null;
   };
 
-  const handleDispatch = async (rental: Rental) => {
+  const handleDispatch = async (rental: { bookingId: string; id?: string }) => {
     setSubmitting(true);
     try {
       const readiness = await apiClient.rentals.getReadiness(rental.bookingId);
@@ -190,6 +195,7 @@ export const RentalsView: React.FC = () => {
       if (response.error || !response.data) throw new Error(response.error?.message || "Dispatch failed.");
       const authoritative = response.data as Rental;
       setRentals((prev) => [authoritative, ...prev.filter((item) => item.bookingId !== rental.bookingId && item.id !== authoritative.id)]);
+      setDispatchReady((prev) => prev.filter((item) => item.bookingId !== rental.bookingId));
       showNotification(`Rental ${authoritative.rentalNumber} is ACTIVE ON ROAD.`);
       setSelectedRentalId(authoritative.id);
     } catch (error: any) {
@@ -320,8 +326,9 @@ export const RentalsView: React.FC = () => {
         </button>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-6">
         {[
+          ["Ready to dispatch", dispatchReady.length, KeyRound],
           ["Active on road", metrics.active, Car],
           ["Overdue", metrics.overdue, AlertTriangle],
           ["Returns <24h", metrics.returnsSoon, CalendarClock],
@@ -337,6 +344,11 @@ export const RentalsView: React.FC = () => {
           </div>
         ))}
       </div>
+
+      {dispatchReady.length>0&&<section className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 sm:p-5 dark:border-emerald-900 dark:bg-emerald-950/20">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-[10px] font-bold uppercase tracking-[.16em] text-emerald-700">Handover complete</p><h2 className="mt-1 text-lg font-black text-slate-950 dark:text-white">Ready to dispatch</h2><p className="mt-1 text-xs text-slate-600 dark:text-slate-300">These bookings passed contract, inspection, handover and allocation gates. Starting the rental makes the vehicle officially on-road and updates the renter account.</p></div><span className="rounded-full bg-white px-3 py-1 text-xs font-black text-emerald-700 shadow-sm dark:bg-slate-900">{dispatchReady.length} waiting</span></div>
+        <div className="mt-4 grid gap-3 xl:grid-cols-2">{dispatchReady.map((item:any)=>{const customer=customers.find(c=>c.id===item.customerId);const vehicle=vehicles.find(v=>v.id===item.vehicleId);return <div key={item.bookingId} className="rounded-2xl border border-emerald-200 bg-white p-4 shadow-sm dark:border-emerald-900 dark:bg-slate-900"><div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><span className="font-mono text-sm font-black">{item.bookingNumber}</span><span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-black text-emerald-800">HANDOVER COMPLETE</span></div><p className="mt-2 font-semibold text-slate-900 dark:text-white">{item.vehicle?.registrationPlate||vehicle?.registrationPlate||"Vehicle"} · {item.vehicle?.make||vehicle?.make||""} {item.vehicle?.model||vehicle?.model||""}</p><p className="mt-1 text-xs text-slate-500">{customer?.fullName||"Customer"} · Return {formatDateTime(item.returnAt)}</p><p className="mt-1 text-[11px] text-slate-400">Dispatch snapshot: {Number(item.checkoutOdometer||0).toLocaleString()} km · {item.checkoutFuelLevel??0}% fuel</p></div><button disabled={submitting||!hasPermission("rental.start")} onClick={()=>void handleDispatch(item)} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-black text-white disabled:opacity-50"><KeyRound size={15}/>Start rental<ArrowRight size={14}/></button></div></div>;})}</div>
+      </section>}
 
       <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-3 dark:border-slate-800">
         {["ACTIVE", "OVERDUE", "RETURN_SCHEDULED", "FINAL_SETTLEMENT_PENDING", "COMPLETED", "ALL"].map((state) => (

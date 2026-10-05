@@ -3,6 +3,8 @@ import { readFileSync } from "node:fs";
 
 const app=readFileSync("src/App.tsx","utf8");
 const renter=readFileSync("src/components/RenterAccount.tsx","utf8");
+const rentalsView=readFileSync("src/components/RentalsView.tsx","utf8");
+const rentalService=readFileSync("apps/api/src/modules/rentals/application/rental.service.ts","utf8");
 const accessApp=readFileSync("src/components/AccessApp.tsx","utf8");
 const websiteStudio=readFileSync("src/components/PublicWebsiteView.tsx","utf8");
 const publicSite=readFileSync("src/components/TenantPublicSite.tsx","utf8");
@@ -18,6 +20,17 @@ assert.match(renter,/bookingReference/);
 assert.match(renter,/booking\/account\/booking/);
 assert.match(renter,/setInterval\(\(\)=>void load\(bookingReference,email,false\),30000\)/);
 assert.match(renter,/Latest notifications/);
+assert.match(renter,/You have the vehicle/);
+assert.match(renter,/timeRemainingMinutes/);
+assert.match(publicService,/Return due within 24 hours|RETURN_WITHIN_24H/);
+assert.match(publicService,/Vehicle return due soon|RETURN_WITHIN_3H/);
+assert.match(publicService,/Scheduled return time has passed|OVERDUE/);
+assert.match(rentalsView,/listDispatchReady/);
+assert.match(rentalsView,/Ready to dispatch/);
+assert.match(rentalsView,/Start rental/);
+assert.match(rentalService,/listDispatchReady/);
+assert.match(rentalService,/HANDOVER_COMPLETED/);
+
 
 for(const type of ["HERO","FEATURE_GRID","VEHICLE_SHOWCASE","TEXT_IMAGE","TESTIMONIALS","FAQ","CALL_TO_ACTION","CONTACT_INFO"]){
   assert.ok(websiteStudio.includes(type),`Storefront Studio must support ${type}`);
