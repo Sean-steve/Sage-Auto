@@ -58,6 +58,11 @@ assert.match(publicService,/!\["MAINTENANCE","BLOCKED"\]\.includes\(availability
 assert.match(publicService,/publiclyDiscoverable\.has\(candidate\.id\)/);
 
 assert.match(ownerView,/Manage Terms/);
+assert.match(ownerView,/Edit Owner/);
+assert.match(ownerView,/updateOwner/);
+assert.match(ownerView,/Attach an existing fleet vehicle/);
+assert.match(ownerView,/assignOwnership/);
+assert.match(ownerView,/Registration and make\/model are shown so owners with identical names remain distinguishable/);
 assert.match(ownerView,/renegotiateTerms/);
 assert.match(ownerView,/Owner-visible agreement terms/);
 assert.match(ownerService,/dto\.termsSnapshot\?\.trim\(\)/);
