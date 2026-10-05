@@ -49,6 +49,8 @@ assert.match(handoverService,/Final Handover odometer cannot be lower than the v
 assert.match(handoverService,/Final Handover fuel level must be between 0 and 100/);
 assert.match(handoverService,/inspection\.status !== "COMPLETED"/);
 assert.match(handoverService,/inspection\.inspectionType !== "PRE_RENTAL"/);
+assert.match(handoverService,/canInferClearInspectionItem/,"completed defect-oriented inspections must allow safe omitted checklist items to infer clear");
+assert.match(handoverService,/!canInferClearInspectionItem\(item\)/,"handover must only block required inspection items that cannot be safely inferred");
 assert.match(handoverService,/contract\.status !== "SIGNED"/);
 assert.match(handoverService,/signature\.contractVersion === contract\.contractVersion/);
 
