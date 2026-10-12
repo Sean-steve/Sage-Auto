@@ -121,12 +121,22 @@ export class CanonicalScheduler {
     if (this.isRunning) return;
     this.isRunning = true;
 
+    let registeredCount = 0;
     for (const def of definitions) {
       if (def.enabled === false) continue;
       await this.registerSchedule(def);
+      registeredCount++;
     }
 
-    console.log(`[CanonicalScheduler] Registered ${definitions.length} canonical background schedules.`);
+    const localPayment = definitions.find(
+      (def) => def.jobName === SCHEDULED_JOB_NAMES.LOCAL_PAYMENT_SIMULATION
+    );
+    console.log(
+      `[CanonicalScheduler] Registered ${registeredCount}/${definitions.length} enabled canonical background schedules.`
+    );
+    console.log(
+      `[CanonicalScheduler] Local payment simulation: ${localPayment?.enabled === false ? "DISABLED" : "ENABLED"}`
+    );
   }
 
   /**
