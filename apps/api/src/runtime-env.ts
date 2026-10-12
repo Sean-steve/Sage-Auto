@@ -1,3 +1,4 @@
+import "dotenv/config";
 import { resolve } from "node:path";
 
 if (process.env.NODE_ENV !== "test") {
