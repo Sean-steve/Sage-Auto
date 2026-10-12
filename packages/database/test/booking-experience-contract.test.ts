@@ -45,8 +45,11 @@ assert.doesNotMatch(client,/\/bookings\/\$\{id\}\/substitute`/,'nonexistent subs
 
 assert.match(bookingService,/ratePlanId:\s*dto\.ratePlanId \|\| undefined/,'Booking quote bridge must preserve explicit Rate Plan');
 assert.match(bookingService,/selectedFeeCodes:\s*dto\.requestedFeeCodes \|\| undefined/,'Booking quote bridge must preserve requested fee codes');
-assert.match(pricingService,/if \(request\.ratePlanId\)/,'Pricing Engine must honor explicit Rate Plan selection');
+assert.match(pricingService,/if \(normalizedRequest\.ratePlanId\)/,'Pricing Engine must honor explicit Rate Plan selection after category normalization');
 assert.match(pricingService,/getRateForCategoryOrVehicle\(/,'explicit Rate Plan must still resolve a matching rate line');
+assert.match(pricingService,/findByCode\(categoryInput/,'Booking category codes must normalize to canonical Pricing category IDs');
+assert.match(pricingService,/BOOKING_PRICING_RATE_REQUIRED/,'missing booking rates must return an actionable domain error instead of a generic 500');
+assert.match(pricingService,/fleetCategoryCode/,'category-only booking pricing must be able to fall back to a configured fleet vehicle daily rate');
 assert.match(bookingService,/if \(BookingStateMachine\.isTerminal\(booking\.status\)\)/,'Booking substitution must reject every canonical terminal state including NO_SHOW');
 assert.match(stateMachine,/NO_SHOW/);
 
