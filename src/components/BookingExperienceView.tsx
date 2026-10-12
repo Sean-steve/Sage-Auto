@@ -129,6 +129,13 @@ export function BookingExperienceView({portal}:Props){
 
   useEffect(()=>{void loadAux();void loadRegister();return()=>{auxSeq.current++;registerSeq.current++;detailSeq.current++;};},[portal.id]);
   useEffect(()=>{void loadRegister();},[status,source,search]);
+  useEffect(()=>{
+    const timer=window.setInterval(()=>{
+      void loadRegister();
+      if(selectedId)void loadDetail(selectedId);
+    },5000);
+    return()=>window.clearInterval(timer);
+  },[portal.id,status,source,search,selectedId]);
   useEffect(()=>{setSelectedId("");setDetail(null);setReadiness(null);setCreateOpen(false);setEditOpen(false);setQuoteOpen(false);setConfirmOpen(false);setAmendOpen(false);setSubstituteOpen(false);setAction(null);},[portal.id]);
 
   async function refreshAll(){
