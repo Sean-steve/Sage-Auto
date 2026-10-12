@@ -430,17 +430,31 @@ export class PricingService {
   }
 
   async calculatePrice(tenantId: string, request: PricingRequest): Promise<PricingResult> {
+    // Booking/Availability use human vehicle category codes (e.g. "SUV"),
+    // while Pricing rate lines and assignments use canonical category record IDs
+    // (e.g. "cat-suv"). Accept either shape at this boundary.
+    const categoryInput = request.vehicleCategoryId?.trim();
+    const resolvedCategory = categoryInput
+      ? (await this.vehicleCategoryRepo.findById(categoryInput, tenantId)) ||
+        (await this.vehicleCategoryRepo.findByCode(categoryInput, tenantId))
+      : null;
+    const canonicalCategoryId = resolvedCategory?.id || categoryInput;
+    const fleetCategoryCode = resolvedCategory?.code || categoryInput;
+    const normalizedRequest: PricingRequest = canonicalCategoryId
+      ? { ...request, vehicleCategoryId: canonicalCategoryId }
+      : request;
+
     // 1. Resolve explicit or effective rate plan
     let matchedPlan: RatePlan;
     let matchedRate: RatePlanRate;
 
-    if (request.ratePlanId) {
-      const explicitPlan = await this.ratePlanRepo.findById(request.ratePlanId, tenantId);
+    if (normalizedRequest.ratePlanId) {
+      const explicitPlan = await this.ratePlanRepo.findById(normalizedRequest.ratePlanId, tenantId);
       if (!explicitPlan) {
-        throw new Error(`Rate plan '${request.ratePlanId}' was not found for this tenant.`);
+        throw new Error(`Rate plan '${normalizedRequest.ratePlanId}' was not found for this tenant.`);
       }
 
-      const evalTime = new Date(request.pickupDateTime).getTime();
+      const evalTime = new Date(normalizedRequest.pickupDateTime).getTime();
       const effectiveFrom = new Date(explicitPlan.effectiveFrom).getTime();
       const effectiveTo = explicitPlan.effectiveTo ? new Date(explicitPlan.effectiveTo).getTime() : null;
       if (
@@ -454,8 +468,8 @@ export class PricingService {
       const explicitRate = await this.ratePlanRepo.getRateForCategoryOrVehicle(
         explicitPlan.id,
         tenantId,
-        request.vehicleCategoryId,
-        request.vehicleId
+        normalizedRequest.vehicleCategoryId,
+        normalizedRequest.vehicleId
       );
       if (!explicitRate) {
         throw new Error(`Rate plan '${explicitPlan.code}' has no matching Vehicle/Category/general rate for this quote.`);
@@ -464,29 +478,56 @@ export class PricingService {
       matchedRate = explicitRate;
     } else {
       const effectiveMatch = await this.ratePlanRepo.findEffectiveRatePlan(tenantId, {
-        vehicleId: request.vehicleId,
-        vehicleCategoryId: request.vehicleCategoryId,
-        corporateAccountId: request.corporateAccountId,
-        customerId: request.customerId,
-        agentId: request.agentId,
-        dateTime: request.pickupDateTime,
+        vehicleId: normalizedRequest.vehicleId,
+        vehicleCategoryId: normalizedRequest.vehicleCategoryId,
+        corporateAccountId: normalizedRequest.corporateAccountId,
+        customerId: normalizedRequest.customerId,
+        agentId: normalizedRequest.agentId,
+        dateTime: normalizedRequest.pickupDateTime,
       });
 
       if (effectiveMatch) {
         matchedPlan = effectiveMatch.plan;
         matchedRate = effectiveMatch.matchedRate;
       } else {
-      const vehicle = request.vehicleId ? await new VehicleRepository().findById(request.vehicleId, tenantId) : null;
-      if (!vehicle || !Number.isFinite(vehicle.dailyRate) || vehicle.dailyRate <= 0) throw new Error("Configure a vehicle daily rate or a matching rate plan before booking.");
+      let vehicle = normalizedRequest.vehicleId
+        ? await new VehicleRepository().findById(normalizedRequest.vehicleId, tenantId)
+        : null;
+
+      if (!vehicle) {
+        const fleetResult = await new VehicleRepository().findAll(tenantId, {
+          category: fleetCategoryCode,
+          limit: 1000,
+        });
+        vehicle =
+          fleetResult.vehicles.find(
+            (candidate) =>
+              ["ACTIVE", "OPERATIONAL"].includes(candidate.lifecycleStatus) &&
+              Number.isFinite(candidate.dailyRate) &&
+              candidate.dailyRate > 0
+          ) || null;
+      }
+
+      if (!vehicle || !Number.isFinite(vehicle.dailyRate) || vehicle.dailyRate <= 0) {
+        const err: any = new Error(
+          fleetCategoryCode
+            ? `No usable daily rate is configured for the ${fleetCategoryCode} category. Add a category rate plan or set a positive daily rate on an active vehicle.`
+            : "No usable booking rate is configured. Add a default rate plan, choose a vehicle category, or set a positive daily rate on an active vehicle."
+        );
+        err.statusCode = 422;
+        err.code = "BOOKING_PRICING_RATE_REQUIRED";
+        throw err;
+      }
+
       const settings = await this.tenantSettingsRepo.findByTenantId(tenantId);
-      // Use the saved vehicle price when no separate rate plan is configured.
+      // Use a saved fleet vehicle rate when no separate rate plan is configured.
       matchedPlan = {
         id: `rp-default-${tenantId}`,
         tenantId,
         code: "STANDARD_DEFAULT",
         name: "Standard Default Rate Plan",
         status: "ACTIVE",
-        currency: request.currency || "KES",
+        currency: normalizedRequest.currency || "KES",
         priority: 1,
         isDefault: true,
         effectiveFrom: new Date("2026-01-01").toISOString(),
@@ -501,8 +542,8 @@ export class PricingService {
         id: `rpr-default-${tenantId}`,
         tenantId,
         ratePlanId: matchedPlan.id,
-        vehicleCategoryId: request.vehicleCategoryId || null,
-        vehicleId: request.vehicleId || null,
+        vehicleCategoryId: normalizedRequest.vehicleCategoryId || null,
+        vehicleId: normalizedRequest.vehicleId || null,
         dailyRate: vehicle.dailyRate,
         weeklyDailyRate: vehicle.dailyRate,
         monthlyDailyRate: vehicle.dailyRate,
@@ -520,9 +561,9 @@ export class PricingService {
 
     // 2. Resolve Corporate Account discount if specified
     let corporateDiscountPercent = 0;
-    if (request.corporateAccountId) {
+    if (normalizedRequest.corporateAccountId) {
       const corpAccount = await this.corporateAccountRepo.findById(
-        request.corporateAccountId,
+        normalizedRequest.corporateAccountId,
         tenantId
       );
       if (corpAccount && corpAccount.discountRatePercent) {
@@ -537,8 +578,8 @@ export class PricingService {
 
     // 4. Resolve Promo Code
     let promoCode: PromoCode | null = null;
-    if (request.promoCode) {
-      promoCode = await this.promoRepo.findByCode(request.promoCode, tenantId);
+    if (normalizedRequest.promoCode) {
+      promoCode = await this.promoRepo.findByCode(normalizedRequest.promoCode, tenantId);
     }
 
     // 5. Resolve Tax Rate
@@ -547,7 +588,7 @@ export class PricingService {
 
     // 6. Execute pure calculation
     const result = RateCalculator.calculate({
-      request,
+      request: normalizedRequest,
       ratePlan: matchedPlan,
       rateLine: matchedRate,
       seasonalRules,
