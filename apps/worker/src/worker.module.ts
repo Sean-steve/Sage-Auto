@@ -18,6 +18,7 @@ import { BullMqEventTransport } from "./infrastructure/transport/bullmq-event-tr
 // Command Handlers
 import { handleProcessOutboxCommand } from "./jobs/outbox-relay.job";
 import { handleExpireBookingsCommand } from "./jobs/booking-expiry.job";
+import { handleSimulateLocalPaymentsCommand } from "./jobs/local-payment-simulation.job";
 import { handleScanComplianceCommand } from "./jobs/compliance-check.job";
 import { handleCheckMaintenanceCommand } from "./jobs/maintenance-check.job";
 import { handleBillSubscriptionsCommand } from "./jobs/subscription-billing.job";
@@ -63,6 +64,10 @@ export class WorkerManager {
     this.workerRegistry.registerCommandHandler(
       COMMAND_JOB_NAMES.EXPIRE_BOOKINGS,
       handleExpireBookingsCommand
+    );
+    this.workerRegistry.registerCommandHandler(
+      COMMAND_JOB_NAMES.SIMULATE_LOCAL_PAYMENTS,
+      handleSimulateLocalPaymentsCommand
     );
     this.workerRegistry.registerCommandHandler(
       COMMAND_JOB_NAMES.SCAN_COMPLIANCE,
