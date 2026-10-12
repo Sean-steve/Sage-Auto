@@ -10,6 +10,9 @@ const bookingService=readFileSync('apps/api/src/modules/bookings/application/boo
 const pricingService=readFileSync('apps/api/src/modules/pricing/application/pricing.service.ts','utf8');
 const stateMachine=readFileSync('apps/api/src/modules/bookings/domain/booking-state-machine.ts','utf8');
 const contracts=readFileSync('docs/BOOKING_EXPERIENCE_CONTRACTS.md','utf8');
+const runtimeEnv=readFileSync('apps/api/src/runtime-env.ts','utf8');
+const localPaymentJob=readFileSync('apps/worker/src/jobs/local-payment-simulation.job.ts','utf8');
+const scheduler=readFileSync('apps/worker/src/infrastructure/scheduler/canonical-scheduler.ts','utf8');
 
 assert.equal(RESTORATION_SCREEN_CONNECTIONS.bookings.status,'PARTIAL');
 assert.equal(RESTORATION_SCREEN_CONNECTIONS.bookings.mutationsEnabled,true);
@@ -59,6 +62,12 @@ assert.match(view,/idempotencyKey/,'Booking creation must be retry-idempotent');
 assert.match(view,/expectedVersion:detail\.version/,'lifecycle commands must carry server version where supported');
 assert.match(view,/This screen does not create a Rental/,'Booking-to-Handover boundary must remain truthful');
 assert.match(view,/overflow-x-auto|sm:grid-cols|md:grid-cols/,'Booking experience must remain responsive');
+
+assert.match(runtimeEnv,/dotenv\/config/,'API and worker runtime must load root .env before evaluating local worker flags');
+assert.match(scheduler,/LOCAL_PAYMENT_WORKER_ENABLED === "true"/,'local payment schedule must remain explicitly opt-in');
+assert.match(localPaymentJob,/paymentStatus !== "FULLY_PAID"/,'local worker must project payment before confirmation');
+assert.match(localPaymentJob,/confirmBooking\(/,'local worker must use the canonical Booking confirmation command');
+assert.match(view,/window\.setInterval/,'Bookings screen must refresh background worker payment/status changes automatically');
 
 for (let i=1;i<=27;i++){const id='BOOKING-'+String(i).padStart(3,'0');assert.ok(contracts.includes(id),'Missing Booking contract '+id);}
 
