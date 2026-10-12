@@ -331,6 +331,15 @@ export class WorkerRegistry {
         commandData = { gracePeriodMinutes: 30 };
         break;
 
+      case SCHEDULED_JOB_NAMES.LOCAL_PAYMENT_SIMULATION:
+        commandName = COMMAND_JOB_NAMES.SIMULATE_LOCAL_PAYMENTS;
+        commandData = {
+          autoConfirm: process.env.LOCAL_PAYMENT_WORKER_AUTO_CONFIRM !== "false",
+          settleDeposit: process.env.LOCAL_PAYMENT_WORKER_SETTLE_DEPOSIT !== "false",
+          maxBookings: Number(process.env.LOCAL_PAYMENT_WORKER_BATCH_SIZE || 25),
+        };
+        break;
+
       case SCHEDULED_JOB_NAMES.COMPLIANCE_CHECK:
         commandName = COMMAND_JOB_NAMES.SCAN_COMPLIANCE;
         commandData = { daysThreshold: 14 };

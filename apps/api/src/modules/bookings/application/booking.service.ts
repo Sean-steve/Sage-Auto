@@ -1476,16 +1476,30 @@ export class BookingService {
       throw new BookingNotFoundError(bookingId);
     }
 
-    const newAmountPaid = (booking.amountPaid || 0) + dto.amount;
-    const isFullyPaid = newAmountPaid >= (booking.grossTotal || 0);
+    if (!Number.isFinite(dto.amount) || dto.amount < 0) {
+      throw new Error("Simulated payment amount must be a non-negative number.");
+    }
 
-    const updates: Partial<Booking> = {
-      amountPaid: newAmountPaid,
-      paymentStatus: isFullyPaid ? "FULLY_PAID" : "PARTIALLY_PAID",
-    };
+    const updates: Partial<Booking> = {};
 
-    if (dto.paymentType === "SECURITY_DEPOSIT") {
-      updates.depositStatus = "HELD";
+    if (dto.paymentType === "RENTAL_CHARGE") {
+      if (dto.amount <= 0) {
+        throw new Error("Rental-charge simulation amount must be greater than zero.");
+      }
+      const newAmountPaid = (booking.amountPaid || 0) + dto.amount;
+      const isFullyPaid = newAmountPaid + 0.0001 >= (booking.grossTotal || 0);
+      updates.amountPaid = newAmountPaid;
+      updates.paymentStatus = isFullyPaid ? "FULLY_PAID" : "PARTIALLY_PAID";
+    } else {
+      const requiredDeposit = Number(booking.depositRequired || 0);
+      if (requiredDeposit > 0 && dto.amount + 0.0001 < requiredDeposit) {
+        throw new Error(
+          `Security-deposit simulation must cover the required deposit of ${booking.currency} ${requiredDeposit}.`
+        );
+      }
+      // Security deposits are collateral, not rental revenue. They must never
+      // inflate Booking.amountPaid.
+      updates.depositStatus = requiredDeposit > 0 ? "HELD" : "NOT_REQUIRED";
     }
 
     const updated = await this.bookingRepo.update(bookingId, tenantId, updates, booking.version);
@@ -1502,6 +1516,24 @@ export class BookingService {
         paymentType: dto.paymentType,
         paymentMethod: dto.paymentMethod,
         ref: dto.transactionReference,
+        localSimulation: true,
+      },
+    });
+
+    await this.outboxRepo.record({
+      tenantId,
+      aggregateType: "Booking",
+      aggregateId: bookingId,
+      eventType: "BookingPaymentSimulated",
+      payload: {
+        bookingId,
+        bookingNumber: booking.bookingNumber,
+        amount: dto.amount,
+        paymentType: dto.paymentType,
+        paymentMethod: dto.paymentMethod,
+        paymentStatus: updated.paymentStatus,
+        depositStatus: updated.depositStatus,
+        transactionReference: dto.transactionReference,
       },
     });
 

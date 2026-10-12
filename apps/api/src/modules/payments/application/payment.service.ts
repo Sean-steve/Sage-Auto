@@ -81,6 +81,76 @@ export class PaymentService {
     private readonly bookingRepo?: IBookingRepository
   ) {}
 
+  /**
+   * Public checkout currently targets the Booking aggregate directly before a
+   * finance invoice exists. Project verified money onto that Booking when the
+   * targetId resolves to a Booking; otherwise normal invoice/deposit allocation
+   * remains authoritative.
+   */
+  private async projectVerifiedPaymentToBooking(
+    tenantId: string,
+    targetId: string | undefined,
+    purpose: string | undefined,
+    amount: string | number,
+    paymentId: string
+  ): Promise<boolean> {
+    if (!targetId || !this.bookingRepo) return false;
+    const booking = await this.bookingRepo.findById(targetId, tenantId);
+    if (!booking) return false;
+
+    const numericAmount = Number(amount || 0);
+    if (!Number.isFinite(numericAmount) || numericAmount < 0) return false;
+
+    if (purpose === "CUSTOMER_INVOICE") {
+      const grossTotal = Number(booking.grossTotal || 0);
+      const existingPaid = Number(booking.amountPaid || 0);
+      const uncappedPaid = existingPaid + numericAmount;
+      const newAmountPaid = grossTotal > 0 ? Math.min(grossTotal, uncappedPaid) : uncappedPaid;
+      const paymentStatus = newAmountPaid + 0.0001 >= grossTotal ? "FULLY_PAID" : "PARTIALLY_PAID";
+
+      await this.bookingRepo.update(
+        booking.id,
+        tenantId,
+        {
+          amountPaid: newAmountPaid,
+          paymentStatus,
+        },
+        booking.version
+      );
+
+      await this.outboxRepo?.publish({
+        tenantId,
+        eventType: "payment.applied.booking",
+        aggregateType: "Booking",
+        aggregateId: booking.id,
+        payload: {
+          bookingId: booking.id,
+          bookingNumber: booking.bookingNumber,
+          paymentId,
+          amount: numericAmount,
+          amountPaid: newAmountPaid,
+          grossTotal,
+          paymentStatus,
+        },
+      });
+      return true;
+    }
+
+    if (purpose === "RENTAL_DEPOSIT") {
+      const required = Number(booking.depositRequired || 0);
+      const depositStatus = required <= 0 || numericAmount + 0.0001 >= required ? "HELD" : "REQUESTED";
+      await this.bookingRepo.update(
+        booking.id,
+        tenantId,
+        { depositStatus },
+        booking.version
+      );
+      return true;
+    }
+
+    return false;
+  }
+
   // --------------------------------------------------------------------------
   // 1. PAYMENT ATTEMPTS (Lifecycle & Provider Initialization)
   // --------------------------------------------------------------------------
@@ -286,10 +356,18 @@ export class PaymentService {
       payload: { paymentId: payment.id, providerTx: payment.providerTransactionId },
     });
 
-    // Auto-allocate if targetId was specified
+    // Project public-checkout payments onto a Booking when targetId is a
+    // Booking ID. Otherwise preserve the normal finance allocation path.
     if (attempt.targetId) {
       try {
-        if (attempt.purpose === "CUSTOMER_INVOICE") {
+        const projectedToBooking = await this.projectVerifiedPaymentToBooking(
+          tenantId,
+          attempt.targetId,
+          attempt.purpose,
+          payment.amount,
+          payment.id
+        );
+        if (!projectedToBooking && attempt.purpose === "CUSTOMER_INVOICE") {
           await this.allocatePayment(
             tenantId,
             {
@@ -300,7 +378,7 @@ export class PaymentService {
             },
             actor
           );
-        } else if (attempt.purpose === "RENTAL_DEPOSIT") {
+        } else if (!projectedToBooking && attempt.purpose === "RENTAL_DEPOSIT") {
           await this.allocatePayment(
             tenantId,
             {
@@ -313,8 +391,8 @@ export class PaymentService {
           );
         }
       } catch (allocErr) {
-        // Log error but payment remains safely recorded as verified and unallocated
-        console.error("Auto-allocation failed; payment remains unallocated:", allocErr);
+        // Money remains verified even if its downstream obligation projection fails.
+        console.error("Payment projection/allocation failed; payment remains recorded:", allocErr);
       }
     }
 
@@ -485,11 +563,19 @@ export class PaymentService {
       if (rec) await this.webhookRepo.markProcessed(rec.id);
     }
 
-    // Auto-allocate if target was specified
+    // Project onto Booking when checkout used a Booking target; otherwise
+    // allocate against the canonical finance obligation.
     if (attempt.targetId) {
       try {
         const actor: PaymentActor = { userId: "WEBHOOK_PROCESSOR", tenantId };
-        if (attempt.purpose === "CUSTOMER_INVOICE") {
+        const projectedToBooking = await this.projectVerifiedPaymentToBooking(
+          tenantId,
+          attempt.targetId,
+          attempt.purpose,
+          payment.amount,
+          payment.id
+        );
+        if (!projectedToBooking && attempt.purpose === "CUSTOMER_INVOICE") {
           await this.allocatePayment(
             tenantId,
             {
@@ -500,7 +586,7 @@ export class PaymentService {
             },
             actor
           );
-        } else if (attempt.purpose === "RENTAL_DEPOSIT") {
+        } else if (!projectedToBooking && attempt.purpose === "RENTAL_DEPOSIT") {
           await this.allocatePayment(
             tenantId,
             {
@@ -513,7 +599,7 @@ export class PaymentService {
           );
         }
       } catch (err) {
-        console.error("Webhook auto-allocation failed; payment remains unallocated:", err);
+        console.error("Webhook payment projection/allocation failed; payment remains recorded:", err);
       }
     }
 
@@ -576,7 +662,14 @@ export class PaymentService {
 
     if (dto.targetId) {
       try {
-        if (dto.purpose === "CUSTOMER_INVOICE") {
+        const projectedToBooking = await this.projectVerifiedPaymentToBooking(
+          tenantId,
+          dto.targetId,
+          dto.purpose,
+          payment.amount,
+          payment.id
+        );
+        if (!projectedToBooking && dto.purpose === "CUSTOMER_INVOICE") {
           await this.allocatePayment(
             tenantId,
             {
@@ -587,7 +680,7 @@ export class PaymentService {
             },
             actor
           );
-        } else if (dto.purpose === "RENTAL_DEPOSIT") {
+        } else if (!projectedToBooking && dto.purpose === "RENTAL_DEPOSIT") {
           await this.allocatePayment(
             tenantId,
             {
@@ -602,7 +695,7 @@ export class PaymentService {
       } catch (allocationError) {
         // Money was genuinely recorded. Never roll the Payment fact back because
         // an obligation binding failed; reconciliation can safely resolve it.
-        console.error("Manual payment recorded but auto-allocation failed:", allocationError);
+        console.error("Manual payment recorded but projection/allocation failed:", allocationError);
       }
     }
 

@@ -22,6 +22,7 @@ export enum QueueName {
 export const SCHEDULED_JOB_NAMES = {
   OUTBOX_RELAY: "sched.outbox-relay",
   BOOKING_EXPIRY: "sched.booking-expiry",
+  LOCAL_PAYMENT_SIMULATION: "sched.local-payment-simulation",
   COMPLIANCE_CHECK: "sched.compliance-check",
   MAINTENANCE_CHECK: "sched.maintenance-check",
   SUBSCRIPTION_BILLING: "sched.subscription-billing",
@@ -41,6 +42,7 @@ export type ScheduledJobName = typeof SCHEDULED_JOB_NAMES[keyof typeof SCHEDULED
 export const COMMAND_JOB_NAMES = {
   PROCESS_OUTBOX: "cmd.process-outbox",
   EXPIRE_BOOKINGS: "cmd.expire-bookings",
+  SIMULATE_LOCAL_PAYMENTS: "cmd.simulate-local-payments",
   SCAN_COMPLIANCE: "cmd.scan-compliance",
   CHECK_MAINTENANCE: "cmd.check-maintenance",
   BILL_SUBSCRIPTIONS: "cmd.bill-subscriptions",

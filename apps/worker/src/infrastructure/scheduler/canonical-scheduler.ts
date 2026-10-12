@@ -36,6 +36,15 @@ export const CANONICAL_SCHEDULE_DEFINITIONS: ScheduledTaskDefinition[] = [
     enabled: true,
   },
   {
+    jobName: SCHEDULED_JOB_NAMES.LOCAL_PAYMENT_SIMULATION,
+    cronPattern: "*/5 * * * * *", // every 5 seconds in local development
+    intervalMs: Math.max(1000, Number(process.env.LOCAL_PAYMENT_WORKER_INTERVAL_MS || 5000)),
+    description: "Development-only local payment simulation and booking confirmation",
+    enabled:
+      !["production", "staging"].includes((process.env.APP_ENV || process.env.NODE_ENV || "development").toLowerCase()) &&
+      process.env.LOCAL_PAYMENT_WORKER_ENABLED === "true",
+  },
+  {
     jobName: SCHEDULED_JOB_NAMES.COMPLIANCE_CHECK,
     cronPattern: "0 0 * * *", // daily at 00:00 UTC
     intervalMs: 86400000,
