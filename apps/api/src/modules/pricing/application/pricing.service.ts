@@ -451,7 +451,10 @@ export class PricingService {
     if (normalizedRequest.ratePlanId) {
       const explicitPlan = await this.ratePlanRepo.findById(normalizedRequest.ratePlanId, tenantId);
       if (!explicitPlan) {
-        throw new Error(`Rate plan '${normalizedRequest.ratePlanId}' was not found for this tenant.`);
+        const err: any = new Error(`The selected rate plan is no longer available. Refresh the booking form and choose an active plan.`);
+        err.statusCode = 422;
+        err.code = "BOOKING_RATE_PLAN_NOT_FOUND";
+        throw err;
       }
 
       const evalTime = new Date(normalizedRequest.pickupDateTime).getTime();
@@ -462,7 +465,10 @@ export class PricingService {
         evalTime < effectiveFrom ||
         (effectiveTo !== null && evalTime > effectiveTo)
       ) {
-        throw new Error(`Rate plan '${explicitPlan.code}' is not active/effective for the requested pickup time.`);
+        const err: any = new Error(`Rate plan '${explicitPlan.code}' is not active for the requested pickup time. Choose another plan or use automatic pricing.`);
+        err.statusCode = 422;
+        err.code = "BOOKING_RATE_PLAN_NOT_EFFECTIVE";
+        throw err;
       }
 
       const explicitRate = await this.ratePlanRepo.getRateForCategoryOrVehicle(
@@ -472,7 +478,10 @@ export class PricingService {
         normalizedRequest.vehicleId
       );
       if (!explicitRate) {
-        throw new Error(`Rate plan '${explicitPlan.code}' has no matching Vehicle/Category/general rate for this quote.`);
+        const err: any = new Error(`Rate plan '${explicitPlan.code}' has no rate configured for the selected vehicle category. Add a matching rate line or use automatic pricing.`);
+        err.statusCode = 422;
+        err.code = "BOOKING_RATE_LINE_NOT_FOUND";
+        throw err;
       }
       matchedPlan = explicitPlan;
       matchedRate = explicitRate;
@@ -496,7 +505,7 @@ export class PricingService {
 
       if (!vehicle) {
         const fleetResult = await new VehicleRepository().findAll(tenantId, {
-          category: fleetCategoryCode,
+          category: fleetCategoryCode as any,
           limit: 1000,
         });
         vehicle =
