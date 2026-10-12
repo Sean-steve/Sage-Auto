@@ -33,7 +33,10 @@ export const EnvSchema = z.object({
   POSTMARK_SERVER_TOKEN: z.string().optional(),
   POSTMARK_FROM: z.string().optional(),
   POSTMARK_MESSAGE_STREAM: z.string().default("outbound"),
-  APP_PUBLIC_URL: z.string().url().optional(),
+  APP_PUBLIC_URL: z.preprocess(
+    (value) => typeof value === "string" && value.trim() === "" ? undefined : value,
+    z.string().url().default("http://localhost:3000")
+  ),
   DEV_AUTO_VERIFY_EMAILS: z.string().optional(),
   AWS_ACCESS_KEY_ID: z.string().optional(),
   AWS_SECRET_ACCESS_KEY: z.string().optional(),
