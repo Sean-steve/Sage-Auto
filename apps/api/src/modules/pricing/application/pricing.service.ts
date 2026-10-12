@@ -435,7 +435,7 @@ export class PricingService {
     // (e.g. "cat-suv"). Accept either shape at this boundary.
     const categoryInput = request.vehicleCategoryId?.trim();
     const resolvedCategory = categoryInput
-      ? (await this.vehicleCategoryRepo.findById(categoryInput, tenantId)) ||
+      ? (await this.vehicleCategoryRepo.findById(categoryInput)) ||
         (await this.vehicleCategoryRepo.findByCode(categoryInput, tenantId))
       : null;
     const canonicalCategoryId = resolvedCategory?.id || categoryInput;
