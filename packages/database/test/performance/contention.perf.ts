@@ -123,12 +123,14 @@ export async function runContentionPerformanceSuite(): Promise<MetricSummary[]> 
       race001Winners++;
     } catch (err: any) {
       if (
-        err.name === "AvailabilityConflictError" ||
-        err.message.includes("overlapping") ||
-        err.message.includes("allocation")
+        err instanceof AvailabilityConflictError &&
+        err.code === "AVAILABILITY_CONFLICT" &&
+        err.statusCode === 409
       ) {
         race001Conflicts++;
       } else {
+        // A transaction error or unrelated exception is a failed benchmark,
+        // not a correctly rejected conflicting booking.
         throw err;
       }
     }
