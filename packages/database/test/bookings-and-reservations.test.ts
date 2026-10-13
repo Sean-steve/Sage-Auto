@@ -199,6 +199,9 @@ export async function runBookingsAndReservationsTests() {
       currency: "KES",
       isDefault: true,
       priority: 10,
+      // The fixture's rental begins on 1 October: the saved rate must be
+      // effective at that time, not implicitly start at test execution time.
+      effectiveFrom: "2026-01-01T00:00:00.000Z",
     },
     "admin_usr"
   );
