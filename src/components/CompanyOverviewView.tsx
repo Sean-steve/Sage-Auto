@@ -4,6 +4,7 @@ import {
   Clock3, RefreshCw, ShieldCheck, Sparkles, TrendingUp, WalletCards
 } from "lucide-react";
 import { apiClient } from "../lib/api-client";
+import { DepartureBoard } from "../experience/DepartureBoard";
 import type { AccessPortal } from "../lib/access-context";
 
 const activeRentalStates=new Set(["ACTIVE_ON_ROAD","OVERDUE","RETURN_SCHEDULED","VEHICLE_RECEIVED","RETURN_INSPECTION_PENDING","INSPECTION","DAMAGE_ASSESSMENT","FINAL_CALCULATION","FINAL_SETTLEMENT_PENDING","DEPOSIT_PROCESSING"]);
@@ -45,7 +46,7 @@ export function CompanyOverviewView({portal}:{portal:AccessPortal}) {
         collected:Number(financeData.totalCollected||0),
         receivables:Number(financeData.totalReceivables||financeData.outstandingAmount||0),
         currency:financeData.currency||"KES",
-        bookings:bookingRows.slice(0,5),
+        bookings:bookingRows.slice(0,8),
         rentals:rentalRows.filter((r:any)=>activeRentalStates.has(r.state)).slice(0,5),
       });
     } catch(e:any){setError(e.message||"Unable to load company command center.");}
@@ -94,16 +95,7 @@ export function CompanyOverviewView({portal}:{portal:AccessPortal}) {
     </section>
 
     <div className="grid gap-6 xl:grid-cols-[1.35fr_.9fr]">
-      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-        <div className="flex items-center justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-[.18em] text-emerald-600">Reservations</p><h2 className="mt-1 text-xl font-black tracking-tight text-slate-950">Recent bookings</h2></div>{hasSection("bookings")&&<button onClick={()=>go("bookings")} className="text-sm font-bold text-emerald-700">View all</button>}</div>
-        <div className="mt-5 divide-y divide-slate-100">
-          {loading?<div className="py-10 text-sm text-slate-400">Loading live bookings…</div>:!state.bookings.length?<div className="py-10 text-sm text-slate-400">No booking records yet.</div>:state.bookings.map((b:any)=><button key={b.id} onClick={()=>go("bookings")} className="grid w-full gap-2 py-4 text-left sm:grid-cols-[1.1fr_1fr_auto] sm:items-center">
-            <div><div className="font-mono text-xs font-bold text-slate-900">{b.bookingNumber||b.id}</div><div className="mt-1 text-xs text-slate-500">{b.customerName||b.customerId||"Customer"}</div></div>
-            <div className="text-xs text-slate-500">{b.pickupAt?new Date(b.pickupAt).toLocaleString():"Pickup pending"}</div>
-            <span className="w-fit rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-600">{human(b.status)}</span>
-          </button>)}
-        </div>
-      </section>
+      <DepartureBoard bookings={state.bookings} loading={loading} error={error} canOpen={hasSection("bookings")} onOpen={()=>go("bookings")}/>
 
       <div className="space-y-6">
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
