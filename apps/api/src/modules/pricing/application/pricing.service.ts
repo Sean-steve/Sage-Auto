@@ -471,12 +471,22 @@ export class PricingService {
         throw err;
       }
 
-      const explicitRate = await this.ratePlanRepo.getRateForCategoryOrVehicle(
+      let explicitRate = await this.ratePlanRepo.getRateForCategoryOrVehicle(
         explicitPlan.id,
         tenantId,
         normalizedRequest.vehicleCategoryId,
         normalizedRequest.vehicleId
       );
+      // A legacy persisted rate line may use category CODE instead of its ID.
+      // Reuse only a rate line within the same selected, effective tenant plan.
+      if (!explicitRate && fleetCategoryCode && fleetCategoryCode !== normalizedRequest.vehicleCategoryId) {
+        explicitRate = await this.ratePlanRepo.getRateForCategoryOrVehicle(
+          explicitPlan.id,
+          tenantId,
+          fleetCategoryCode,
+          normalizedRequest.vehicleId
+        );
+      }
       if (!explicitRate) {
         const err: any = new Error(`Rate plan '${explicitPlan.code}' has no rate configured for the selected vehicle category. Add a matching rate line or use automatic pricing.`);
         err.statusCode = 422;
