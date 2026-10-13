@@ -287,7 +287,7 @@ export class FinanceService {
     ]);
     if (!invoiceEligibleStates.has(rental.state)) {
       throw new Error(
-        `Rental ${rental.rentalNumber} must have an authoritative final calculation before invoicing (current state: ${rental.state}).`
+        `Rental ${rental.rentalNumber} must complete the Return & Final Calculation lifecycle and have an authoritative final calculation before invoicing (current state: ${rental.state}).`
       );
     }
 

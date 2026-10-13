@@ -517,16 +517,24 @@ async function runSprint26TestSuite() {
       calculatedAt: new Date().toISOString(),
     });
 
+    // Period-based settlement workers must never promote an unrelated draft
+    // to a payable event without an approved accounting period AND verified
+    // paid/settled tenant-finance revenue. This fixture deliberately has none.
     const result = await processSettlementBatch({ tenantId });
-    assert.equal(result.settlementsProcessed, 1);
+    assert.equal(result.settlementsProcessed, 0);
+    assert.equal(result.periodsProcessed, 0);
 
     const pendingOutbox = await outboxRepo.fetchPendingBatch(50);
-    const stlEvent = pendingOutbox.find(
+    const phantomEvent = pendingOutbox.find(
       (e) => e.eventType === EVENT_TYPES.SETTLEMENT_BATCH_CALCULATED && e.aggregateId === settlement.id
     );
-    assert.ok(stlEvent, "Settlement batch calculated event must be recorded in outbox");
+    assert.equal(phantomEvent, undefined, "Never emit a settlement-calculated event for unverified draft revenue");
+    const stillDraft = await settlementRepo.findById(settlement.id, tenantId);
+    assert.equal(stillDraft?.status, "DRAFT", "Unapproved settlement must remain unchanged");
+    const replay = await processSettlementBatch({ tenantId });
+    assert.equal(replay.settlementsProcessed, 0, "Repeated empty batch does not invent owner payouts");
 
-    console.log("  ✓ Owner settlement batch processed and outbox event dispatched");
+    console.log("  ✓ Period-based batch refuses unverified legacy draft, preserves state, avoids phantom events");
   }
 
   // ============================================================================

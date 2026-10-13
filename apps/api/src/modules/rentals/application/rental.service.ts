@@ -1308,16 +1308,17 @@ export class RentalService {
       throw new RentalNotFoundError(rentalId);
     }
 
+    // Reading an already sealed calculation is idempotent and must not mutate
+    // a terminal rental. Only a NEW calculation is forbidden after completion.
+    const existingCalculation = await this.rentalRepo.getFinalCalculation(rentalId, tenantId);
+    if (existingCalculation?.isImmutable) {
+      return { calculation: existingCalculation, rental };
+    }
     if (RentalStateMachine.TERMINAL_STATES.has(rental.state)) {
       throw new RentalAlreadyCompletedError(rentalId);
     }
     if (!rental.returnInspectionId) {
       throw new Error("Final calculation requires a completed return inspection.");
-    }
-
-    const existingCalculation = await this.rentalRepo.getFinalCalculation(rentalId, tenantId);
-    if (existingCalculation?.isImmutable) {
-      return { calculation: existingCalculation, rental };
     }
     if (rental.state !== "DAMAGE_ASSESSMENT" && rental.state !== "FINAL_CALCULATION") {
       throw new Error(`Final calculation cannot run while rental is in state '${rental.state}'. Complete vehicle receipt and return inspection first.`);
@@ -1889,6 +1890,12 @@ export class RentalService {
       throw new Error("Rental completion requires a sealed final calculation and completed deposit settlement.");
     }
 
+    // Validate disposition BEFORE writing rental, booking or contract state.
+    // An invalid completion request must leave the rental fully retryable.
+    if (!dto.releaseVehicleToStatus) {
+      throw new Error("Rental completion requires an explicit vehicle disposition.");
+    }
+
     const now = new Date().toISOString();
 
     // 1. Update Rental Aggregate to COMPLETED
@@ -1948,9 +1955,6 @@ export class RentalService {
     }
 
     // 5. Update Vehicle Mileage, Fuel, and Availability Status
-    if (!dto.releaseVehicleToStatus) {
-      throw new Error("Rental completion requires an explicit vehicle disposition.");
-    }
     const targetVehicleStatus = dto.releaseVehicleToStatus as any;
     try {
       const vehicle = await this.vehicleRepo.findById(rental.vehicleId, tenantId);

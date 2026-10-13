@@ -199,6 +199,8 @@ export async function runBookingsAndReservationsTests() {
       currency: "KES",
       isDefault: true,
       priority: 10,
+      // Quote fixture pickup is 2026-10-01; plan must predate pickup.
+      effectiveFrom: "2026-01-01T00:00:00.000Z",
     },
     "admin_usr"
   );
