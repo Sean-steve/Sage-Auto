@@ -1,0 +1,17 @@
+import assert from "node:assert/strict";
+import { MODULES, mayOpen, navigation, commands } from "../../src/experience/registry";
+import { laneOf, labelStatus, sortedBookings } from "../../src/experience/booking-queue";
+const portal={sections:[{id:"overview",label:"Overview"},{id:"bookings",label:"Bookings"},{id:"original-only",label:"Original-only"}]};
+assert.equal(MODULES.length,18);
+assert.equal(mayOpen(portal,"finance"),false);
+assert.equal(mayOpen(portal,"bookings"),true);
+assert.deepEqual(navigation(portal).at(-1),{label:"Additional modules",ids:["original-only"]});
+assert.equal(commands(portal,"original").length,1);
+assert.equal(commands(portal,"finance").length,0);
+assert.equal(laneOf("AWAITING_PAYMENT"),"review");
+assert.equal(labelStatus("PENDING_CONFIRMATION"),"Pending Confirmation");
+const bookings=[{id:"b1",status:"CONFIRMED",pickupAt:"2026-10-16T14:00:00Z"},{id:"b2",status:"AWAITING_PAYMENT",pickupAt:"2026-10-16T09:00:00Z"}];
+assert.equal(sortedBookings(bookings)[0].id,"b2");
+assert.equal(sortedBookings(bookings,"pickup").length,1);
+assert.equal(bookings[0].id,"b1","Projection never mutates API records");
+console.log("Phase 4.3 navigation and workboard contract: PASS");
