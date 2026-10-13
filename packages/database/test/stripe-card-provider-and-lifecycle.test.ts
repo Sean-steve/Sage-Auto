@@ -579,6 +579,22 @@ async function runStripeCardSuite() {
   // TEST 11: Vehicle Owner Settlement Payout via Stripe Adapter
   // --------------------------------------------------------------------------
   console.log("TEST 11: Vehicle Owner Settlement Payout Execution");
+  // The payout must point at an approved, tenant-owned settlement. Creating a
+  // payable without its settlement must fail closed, never bypass the guard.
+  await settlementRepo.create({
+    id: "settlement_001",
+    tenantId,
+    ownerId: "owner_investor_corp",
+    periodStart: "2026-08-01",
+    periodEnd: "2026-08-31",
+    currency: "USD",
+    grossRevenue: "1300.0000",
+    totalDeductions: "50.0000",
+    netPayoutAmount: "1250.0000",
+    status: "APPROVED",
+    approvedBy: "independent_settlement_reviewer",
+    approvedAt: "2026-09-02T09:00:00.000Z",
+  } as any);
   const payable = await settlementRepo.createPayable({
     tenantId,
     payableNumber: "PAY-2026-0001",
