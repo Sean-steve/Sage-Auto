@@ -471,12 +471,18 @@ export class PricingService {
         throw err;
       }
 
-      const explicitRate = await this.ratePlanRepo.getRateForCategoryOrVehicle(
-        explicitPlan.id,
-        tenantId,
-        normalizedRequest.vehicleCategoryId,
-        normalizedRequest.vehicleId
-      );
+      // Rate lines may still reference the human category code (SUV) while
+      // the fleet now exposes a canonical category record ID. Both identify
+      // the same tenant-scoped category; never fall back to an unrelated rate.
+      const explicitRate =
+        (await this.ratePlanRepo.getRateForCategoryOrVehicle(
+          explicitPlan.id, tenantId, normalizedRequest.vehicleCategoryId, normalizedRequest.vehicleId
+        )) ||
+        (fleetCategoryCode && fleetCategoryCode !== normalizedRequest.vehicleCategoryId
+          ? await this.ratePlanRepo.getRateForCategoryOrVehicle(
+              explicitPlan.id, tenantId, fleetCategoryCode, normalizedRequest.vehicleId
+            )
+          : null);
       if (!explicitRate) {
         const err: any = new Error(`Rate plan '${explicitPlan.code}' has no rate configured for the selected vehicle category. Add a matching rate line or use automatic pricing.`);
         err.statusCode = 422;
@@ -486,14 +492,22 @@ export class PricingService {
       matchedPlan = explicitPlan;
       matchedRate = explicitRate;
     } else {
-      const effectiveMatch = await this.ratePlanRepo.findEffectiveRatePlan(tenantId, {
+      const effectiveParams = {
         vehicleId: normalizedRequest.vehicleId,
         vehicleCategoryId: normalizedRequest.vehicleCategoryId,
         corporateAccountId: normalizedRequest.corporateAccountId,
         customerId: normalizedRequest.customerId,
         agentId: normalizedRequest.agentId,
         dateTime: normalizedRequest.pickupDateTime,
-      });
+      };
+      const effectiveMatch =
+        (await this.ratePlanRepo.findEffectiveRatePlan(tenantId, effectiveParams)) ||
+        (fleetCategoryCode && fleetCategoryCode !== normalizedRequest.vehicleCategoryId
+          ? await this.ratePlanRepo.findEffectiveRatePlan(tenantId, {
+              ...effectiveParams,
+              vehicleCategoryId: fleetCategoryCode,
+            })
+          : null);
 
       if (effectiveMatch) {
         matchedPlan = effectiveMatch.plan;

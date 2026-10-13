@@ -104,6 +104,9 @@ export class AvailabilityConflictError extends DatabaseError {
     cause?: unknown
   ) {
     super(message, cause);
+    // Domain consumers and API clients must identify this as a conflict,
+    // independent of the human-readable (and localized) message text.
+    this.name = "AvailabilityConflictError";
     this.vehicleId = vehicleId;
     this.conflictingInterval = conflictingInterval;
   }

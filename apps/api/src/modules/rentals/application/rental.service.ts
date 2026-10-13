@@ -1889,6 +1889,13 @@ export class RentalService {
       throw new Error("Rental completion requires a sealed final calculation and completed deposit settlement.");
     }
 
+    // Validate the fleet disposition before changing ANY rental, booking,
+    // contract or allocation state. A rejected completion must be atomic
+    // from the caller's perspective, not leave a half-closed rental behind.
+    if (!dto?.releaseVehicleToStatus) {
+      throw new Error("Rental completion requires an explicit vehicle disposition.");
+    }
+
     const now = new Date().toISOString();
 
     // 1. Update Rental Aggregate to COMPLETED
