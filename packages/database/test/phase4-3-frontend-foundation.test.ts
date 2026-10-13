@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
-import { MODULES, mayOpen, navigation, commands } from "../../src/experience/registry";
-import { laneOf, labelStatus, sortedBookings } from "../../src/experience/booking-queue";
+import { MODULES, mayOpen, navigation, commands } from "../../../src/experience/registry";
+import { laneOf, labelStatus, sortedBookings } from "../../../src/experience/booking-queue";
 const portal={sections:[{id:"overview",label:"Overview"},{id:"bookings",label:"Bookings"},{id:"original-only",label:"Original-only"}]};
 assert.equal(MODULES.length,18);
 assert.equal(mayOpen(portal,"finance"),false);
