@@ -517,16 +517,22 @@ async function runSprint26TestSuite() {
       calculatedAt: new Date().toISOString(),
     });
 
+    // The worker intentionally reads authorized settlement PERIODS, not old
+    // detached DRAFT headers. A standalone draft is neither approved revenue
+    // nor permission to issue a payout or settlement event.
     const result = await processSettlementBatch({ tenantId });
-    assert.equal(result.settlementsProcessed, 1);
+    assert.equal(result.settlementsProcessed, 0);
+    assert.equal(result.periodsProcessed, 0);
 
     const pendingOutbox = await outboxRepo.fetchPendingBatch(50);
-    const stlEvent = pendingOutbox.find(
+    const unsafeEvent = pendingOutbox.find(
       (e) => e.eventType === EVENT_TYPES.SETTLEMENT_BATCH_CALCULATED && e.aggregateId === settlement.id
     );
-    assert.ok(stlEvent, "Settlement batch calculated event must be recorded in outbox");
+    assert.equal(unsafeEvent, undefined, "Orphan DRAFT must not emit a payable settlement event");
+    const stillDraft = await settlementRepo.findById(settlement.id, tenantId);
+    assert.equal(stillDraft?.status, "DRAFT", "Worker must not mutate unsupported legacy draft");
 
-    console.log("  ✓ Owner settlement batch processed and outbox event dispatched");
+    console.log("  ✓ Orphan draft safely excluded: no period, no paid revenue, no payout event");
   }
 
   // ============================================================================
