@@ -23,6 +23,7 @@ Object.defineProperty(globalThis,"localStorage",{configurable:true,value:{
  removeItem:(k:string)=>{tokens.delete(k);},
  clear:()=>tokens.clear(),
 }});
+async function runTenantContract(){
 const {apiClient}=await import("../../../src/lib/api-client");
 const {requireWorkspace,workspaceRead,workspaceCommand}=await import("../../../src/experience/gateway");
 const tenant={id:"tenant-portal",kind:"tenant",tenantId:"company-1",permissions:["booking.read"],roles:["BOOKING_AGENT"],name:"Company",sections:[{id:"bookings",label:"Bookings"}]};
@@ -52,3 +53,6 @@ try{
  assert.equal(result.data?.[0].bookingNumber,"SAGE-001");
 }finally{globalThis.fetch=originalFetch;apiClient.setToken(null);apiClient.clearTenantId();}
 console.log("Phase 4.3 tenant/permission boundaries and request headers: PASS");
+
+}
+void runTenantContract().catch(e=>{console.error(e);process.exitCode=1;});
