@@ -579,10 +579,25 @@ async function runStripeCardSuite() {
   // TEST 11: Vehicle Owner Settlement Payout via Stripe Adapter
   // --------------------------------------------------------------------------
   console.log("TEST 11: Vehicle Owner Settlement Payout Execution");
+  // A payout cannot legally execute without an approved authoritative
+  // settlement. Seed that required obligation instead of bypassing the guard.
+  const approvedSettlement = await settlementRepo.create({
+    tenantId,
+    ownerId: "owner_investor_corp",
+    periodStart: "2026-08-01",
+    periodEnd: "2026-08-31",
+    currency: "USD",
+    grossRevenue: "1300.0000",
+    totalDeductions: "50.0000",
+    netPayoutAmount: "1250.0000",
+    status: "APPROVED",
+    approvedBy: "user_independent_settlement_approver",
+    calculatedAt: new Date().toISOString(),
+  } as any);
   const payable = await settlementRepo.createPayable({
     tenantId,
     payableNumber: "PAY-2026-0001",
-    settlementId: "settlement_001",
+    settlementId: approvedSettlement.id,
     ownerId: "owner_investor_corp",
     recipientName: "Investor Corp",
     destinationAccount: "acct_stripe_connect_123",
