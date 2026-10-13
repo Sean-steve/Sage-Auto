@@ -1,0 +1,32 @@
+name: Phase 4.4 · Operational and Settlement Acceptance
+on:
+  push:
+    branches: [feat/phase4-4-operational-sync-settlement-acceptance]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  acceptance:
+    name: Typecheck · Build · Positive settlement worker · Full regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 9.15.9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Strict typecheck
+        run: pnpm typecheck
+      - name: React production build
+        run: pnpm build
+      - name: Positive settlement worker acceptance
+        run: pnpm exec tsx packages/database/test/owner-settlement-worker-positive.test.ts
+      - name: Unified frontend permission contracts
+        run: pnpm test:frontend-foundation
+      - name: Full backend regression matrix
+        run: pnpm test:all
