@@ -1890,6 +1890,12 @@ export class RentalService {
       throw new Error("Rental completion requires a sealed final calculation and completed deposit settlement.");
     }
 
+    // Validate disposition BEFORE writing rental, booking or contract state.
+    // An invalid completion request must leave the rental fully retryable.
+    if (!dto.releaseVehicleToStatus) {
+      throw new Error("Rental completion requires an explicit vehicle disposition.");
+    }
+
     const now = new Date().toISOString();
 
     // 1. Update Rental Aggregate to COMPLETED
@@ -1949,9 +1955,6 @@ export class RentalService {
     }
 
     // 5. Update Vehicle Mileage, Fuel, and Availability Status
-    if (!dto.releaseVehicleToStatus) {
-      throw new Error("Rental completion requires an explicit vehicle disposition.");
-    }
     const targetVehicleStatus = dto.releaseVehicleToStatus as any;
     try {
       const vehicle = await this.vehicleRepo.findById(rental.vehicleId, tenantId);
