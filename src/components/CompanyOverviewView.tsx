@@ -4,6 +4,7 @@ import {
   Clock3, RefreshCw, ShieldCheck, Sparkles, TrendingUp, WalletCards
 } from "lucide-react";
 import { apiClient } from "../lib/api-client";
+import { DepartureBoard } from "../experience/DepartureBoard";
 import type { AccessPortal } from "../lib/access-context";
 
 const activeRentalStates=new Set(["ACTIVE_ON_ROAD","OVERDUE","RETURN_SCHEDULED","VEHICLE_RECEIVED","RETURN_INSPECTION_PENDING","INSPECTION","DAMAGE_ASSESSMENT","FINAL_CALCULATION","FINAL_SETTLEMENT_PENDING","DEPOSIT_PROCESSING"]);
@@ -13,6 +14,7 @@ const human=(value:any)=>String(value||"—").replaceAll("_"," ").toLowerCase().
 export function CompanyOverviewView({portal}:{portal:AccessPortal}) {
   const [loading,setLoading]=useState(true);
   const [error,setError]=useState("");
+  const [bookingError,setBookingError]=useState("");
   const [state,setState]=useState<any>({
     fleetTotal:0,available:0,bookingsTotal:0,activeRentals:0,overdue:0,
     collected:0,receivables:0,currency:"KES",bookings:[],rentals:[]
@@ -20,37 +22,51 @@ export function CompanyOverviewView({portal}:{portal:AccessPortal}) {
   const can=(p:string)=>portal.permissions.includes("*")||portal.permissions.includes(p);
   const hasSection=(id:string)=>portal.sections.some(s=>s.id===id);
 
+  // Each signal is independently permission-gated: no forbidden requests or invented zero totals.
+  const readFleet=hasSection("fleet")&&can("vehicle.read");
+  const readBookings=hasSection("bookings")&&can("booking.read");
+  const readRentals=hasSection("rentals")&&can("rental.read");
+  const readFinance=hasSection("finance")&&can("finance.read");
+
   const load=useCallback(async()=>{
-    setLoading(true);setError("");
+    setLoading(true);setError("");setBookingError("");
     try {
-      const jobs:any[]=[
-        apiClient.fleet.listVehicles({page:1,limit:1}),
-        apiClient.fleet.listVehicles({availabilityStatus:"AVAILABLE",page:1,limit:1}),
-        apiClient.bookings.listBookings({page:1,limit:8}),
-        apiClient.rentals.listRentals({limit:100}),
-        can("finance.read")||can("invoice.read")?apiClient.finance.getSummary():Promise.resolve({data:null}),
-      ];
-      const [fleet,available,bookings,rentals,finance]=await Promise.all(jobs);
-      const firstError=[fleet,available,bookings,rentals,finance].find((r:any)=>r?.error)?.error;
-      if(firstError) throw new Error(firstError.message||"The command center could not be loaded.");
-      const bookingRows=Array.isArray(bookings.data)?bookings.data:[];
-      const rentalRows=Array.isArray(rentals.data)?rentals.data:[];
-      const financeData=finance.data||{};
+      const skipped={data:null};
+      const [fleet,available,bookings,rentals,finance]:any[]=await Promise.all([
+        readFleet?apiClient.fleet.listVehicles({page:1,limit:1}):Promise.resolve(skipped),
+        readFleet?apiClient.fleet.listVehicles({availabilityStatus:"AVAILABLE",page:1,limit:1}):Promise.resolve(skipped),
+        readBookings?apiClient.bookings.listBookings({page:1,limit:8}):Promise.resolve(skipped),
+        readRentals?apiClient.rentals.listRentals({limit:100}):Promise.resolve(skipped),
+        readFinance?apiClient.finance.getSummary():Promise.resolve(skipped)
+      ]);
+      const failures=[fleet,available,bookings,rentals,finance].filter(r=>r?.error);
+      if(failures.length)setError("Some permitted modules could not be synchronized. Their metrics are withheld until refreshed.");
+      if(bookings?.error)setBookingError(bookings.error.message||"The reservation service is unavailable.");
+      const haveFleet=readFleet&&!fleet?.error&&!available?.error;
+      const haveBookings=readBookings&&!bookings?.error;
+      const haveRentals=readRentals&&!rentals?.error;
+      const haveFinance=readFinance&&!finance?.error;
+      const bookingRows=haveBookings&&Array.isArray(bookings.data)?bookings.data:[];
+      const rentalRows=haveRentals&&Array.isArray(rentals.data)?rentals.data:[];
+      const financeData=haveFinance?finance.data||{}:{};
       setState({
-        fleetTotal:fleet.meta?.total??(Array.isArray(fleet.data)?fleet.data.length:0),
-        available:available.meta?.total??(Array.isArray(available.data)?available.data.length:0),
-        bookingsTotal:bookings.meta?.total??bookingRows.length,
-        activeRentals:rentalRows.filter((r:any)=>activeRentalStates.has(r.state)).length,
-        overdue:rentalRows.filter((r:any)=>r.state==="OVERDUE").length,
-        collected:Number(financeData.totalCollected||0),
-        receivables:Number(financeData.totalReceivables||financeData.outstandingAmount||0),
+        fleetTotal:haveFleet?(fleet.meta?.total??(Array.isArray(fleet.data)?fleet.data.length:0)):null,
+        available:haveFleet?(available.meta?.total??(Array.isArray(available.data)?available.data.length:0)):null,
+        bookingsTotal:haveBookings?(bookings.meta?.total??bookingRows.length):null,
+        activeRentals:haveRentals?rentalRows.filter((r:any)=>activeRentalStates.has(r.state)).length:null,
+        overdue:haveRentals?rentalRows.filter((r:any)=>r.state==="OVERDUE").length:null,
+        collected:haveFinance?Number(financeData.totalCollected||0):null,
+        receivables:haveFinance?Number(financeData.totalReceivables||financeData.outstandingAmount||0):null,
         currency:financeData.currency||"KES",
-        bookings:bookingRows.slice(0,5),
-        rentals:rentalRows.filter((r:any)=>activeRentalStates.has(r.state)).slice(0,5),
+        bookings:bookingRows.slice(0,8),
+        rentals:rentalRows.filter((r:any)=>activeRentalStates.has(r.state)).slice(0,5)
       });
-    } catch(e:any){setError(e.message||"Unable to load company command center.");}
-    finally{setLoading(false);}
-  },[portal.id,portal.permissions.join("|")]);
+    }catch(e:any){
+      setError("The operational snapshot could not be loaded. Refresh to retry.");
+      setBookingError(e.message||"Booking data unavailable.");
+      setState((prev:any)=>({...prev,fleetTotal:null,available:null,bookingsTotal:null,activeRentals:null,overdue:null,collected:null,receivables:null,bookings:[],rentals:[]}));
+    }finally{setLoading(false);}
+  },[portal.id,portal.tenantId,portal.permissions.join("|"),portal.sections.map(s=>s.id).join("|")]);
 
   useEffect(()=>{void load();},[load]);
 
@@ -81,35 +97,28 @@ export function CompanyOverviewView({portal}:{portal:AccessPortal}) {
 
     <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
       {[
-        {label:"Fleet",value:state.fleetTotal,sub:`${state.available} available now`,icon:CarFront,section:"fleet"},
+        {label:"Fleet",value:state.fleetTotal,sub:state.available===null?"Not synchronized":`${state.available} available now`,icon:CarFront,section:"fleet"},
         {label:"Bookings",value:state.bookingsTotal,sub:"Reservation dossiers",icon:CalendarCheck2,section:"bookings"},
-        {label:"Active rentals",value:state.activeRentals,sub:state.overdue?`${state.overdue} overdue`:"No overdue rentals",icon:Clock3,section:"rentals"},
-        {label:"Collected",value:money(state.collected,state.currency),sub:`${money(state.receivables,state.currency)} receivable`,icon:CircleDollarSign,section:"finance"},
-      ].map(item=>{const Icon=item.icon;return <button key={item.label} onClick={()=>go(item.section)} disabled={!hasSection(item.section)} className="group rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:border-slate-300 hover:bg-slate-50/60 disabled:cursor-default">
+        {label:"Active rentals",value:state.activeRentals,sub:state.overdue===null?"Not synchronized":state.overdue?`${state.overdue} overdue`:"No overdue rentals",icon:Clock3,section:"rentals"},
+        {label:"Collected",value:state.collected===null?null:money(state.collected,state.currency),sub:state.receivables===null?"Not synchronized":`${money(state.receivables,state.currency)} receivable`,icon:CircleDollarSign,section:"finance"},
+      ].filter(item=>hasSection(item.section)&&(
+        item.section==="fleet"?readFleet:item.section==="bookings"?readBookings:item.section==="rentals"?readRentals:readFinance
+      )).map(item=>{const Icon=item.icon;return <button key={item.label} onClick={()=>go(item.section)} disabled={!hasSection(item.section)} className="group rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:border-slate-300 hover:bg-slate-50/60 disabled:cursor-default">
         <div className="flex items-start justify-between"><span className="text-slate-400 group-hover:text-emerald-700"><Icon size={19}/></span><ArrowRight size={16} className="text-slate-300 group-hover:text-emerald-600"/></div>
-        <div className="mt-5 text-2xl font-black tracking-tight text-slate-950">{loading?"—":item.value}</div>
+        <div className="mt-5 text-2xl font-black tracking-tight text-slate-950">{loading||item.value===null?"—":item.value}</div>
         <div className="mt-1 text-sm font-semibold text-slate-600">{item.label}</div>
         <div className="mt-1 text-xs text-slate-400">{item.sub}</div>
       </button>})}
     </section>
 
     <div className="grid gap-6 xl:grid-cols-[1.35fr_.9fr]">
-      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-        <div className="flex items-center justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-[.18em] text-emerald-600">Reservations</p><h2 className="mt-1 text-xl font-black tracking-tight text-slate-950">Recent bookings</h2></div>{hasSection("bookings")&&<button onClick={()=>go("bookings")} className="text-sm font-bold text-emerald-700">View all</button>}</div>
-        <div className="mt-5 divide-y divide-slate-100">
-          {loading?<div className="py-10 text-sm text-slate-400">Loading live bookings…</div>:!state.bookings.length?<div className="py-10 text-sm text-slate-400">No booking records yet.</div>:state.bookings.map((b:any)=><button key={b.id} onClick={()=>go("bookings")} className="grid w-full gap-2 py-4 text-left sm:grid-cols-[1.1fr_1fr_auto] sm:items-center">
-            <div><div className="font-mono text-xs font-bold text-slate-900">{b.bookingNumber||b.id}</div><div className="mt-1 text-xs text-slate-500">{b.customerName||b.customerId||"Customer"}</div></div>
-            <div className="text-xs text-slate-500">{b.pickupAt?new Date(b.pickupAt).toLocaleString():"Pickup pending"}</div>
-            <span className="w-fit rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-600">{human(b.status)}</span>
-          </button>)}
-        </div>
-      </section>
+      {readBookings?<DepartureBoard bookings={state.bookings} loading={loading} error={bookingError} canOpen onOpen={()=>go("bookings")}/>:<section className="sage-departure-board p-6"><h2 className="text-lg font-semibold">Your work modules</h2><p className="mt-2 text-sm">The reservation board requires Booking read access. Use your permitted modules from the navigation.</p></section>}
 
       <div className="space-y-6">
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
           <div className="flex items-center gap-2"><ShieldCheck size={18} className="text-emerald-600"/><h2 className="text-lg font-black text-slate-950">Needs attention</h2></div>
           <div className="mt-4 space-y-3">
-            {!attention.length?<div className="flex gap-3 rounded-xl bg-emerald-50 p-4 text-sm text-emerald-800"><CheckCircle2 size={18}/><div><strong>Operations look clear.</strong><p className="mt-1 text-xs text-emerald-700">No overdue rentals or visible finance exceptions in the current snapshot.</p></div></div>:attention.map((a:any)=><button key={a.title} onClick={()=>go(a.section)} className="w-full rounded-xl border border-slate-200 p-4 text-left hover:border-amber-300"><div className="font-bold text-slate-900">{a.title}</div><div className="mt-1 text-xs leading-5 text-slate-500">{a.detail}</div></button>)}
+            {!attention.length?<div className="flex gap-3 rounded-xl bg-slate-50 p-4 text-sm text-slate-700"><CheckCircle2 size={18}/><div><strong>{error?"Snapshot incomplete":"No actionable exceptions in visible signals"}</strong><p className="mt-1 text-xs">This view only checks permitted, loaded records. It does not certify that all operations are clear.</p></div></div>:attention.map((a:any)=><button key={a.title} onClick={()=>go(a.section)} className="w-full rounded-xl border border-slate-200 p-4 text-left hover:border-amber-300"><div className="font-bold text-slate-900">{a.title}</div><div className="mt-1 text-xs leading-5 text-slate-500">{a.detail}</div></button>)}
           </div>
         </section>
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
