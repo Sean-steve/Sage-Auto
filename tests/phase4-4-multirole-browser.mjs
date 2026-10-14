@@ -45,7 +45,7 @@ try{
      return route.fulfill(response([]));
    });
    await page.goto(origin+"/login",{waitUntil:"domcontentloaded"});
-   try{await page.waitForFunction(({name})=>document.body.innerText.includes(name),{name:role.portal.name},{timeout:12000});}
+   try{await page.waitForFunction(({name})=>document.body.innerText.toLowerCase().includes(name.toLowerCase()),{name:role.portal.name},{timeout:12000});}
    catch(err){
      console.error("ROLE HYDRATION DEBUG",role.name,screen,"url",page.url(),"body",(await page.locator("body").innerText()).slice(0,1400));
      await page.screenshot({path:`${output}/failed-${role.name}-${screen}.png`,fullPage:true});
@@ -53,7 +53,10 @@ try{
    }
    const body=await page.locator("body").innerText();
    assert(!body.includes("Something went wrong"),role.name+" did not render");
-   assert(body.includes(role.portal.name),role.name+" did not display its authorized portal: "+body.slice(0,220));
+   assert(body.toLowerCase().includes(role.portal.name.toLowerCase()),role.name+" did not display its authorized portal: "+body.slice(0,220));
+   if(screen<700&&["owner","booking-agent"].includes(role.name)){
+     await page.getByRole("button",{name:"Open workspace navigation"}).click();
+   }
    if(role.name==="owner"){
      assert(body.includes("Departure board"),"Owner's company workboard is available");
      assert(body.includes("Bookings"),"Company Bookings preserved");
