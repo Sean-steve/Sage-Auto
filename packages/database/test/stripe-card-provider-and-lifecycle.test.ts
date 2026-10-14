@@ -579,6 +579,50 @@ async function runStripeCardSuite() {
   // TEST 11: Vehicle Owner Settlement Payout via Stripe Adapter
   // --------------------------------------------------------------------------
   console.log("TEST 11: Vehicle Owner Settlement Payout Execution");
+  // A payable without a backing approved settlement is not permission to move
+  // funds. The provider must never be called for a dangling obligation.
+  const orphanPayable = await settlementRepo.createPayable({
+    tenantId,
+    payableNumber: "PAY-2026-ORPHAN",
+    settlementId: "missing-settlement",
+    ownerId: "owner_investor_corp",
+    recipientName: "Investor Corp",
+    destinationAccount: "acct_stripe_connect_123",
+    amount: "1300.0000",
+    taxWithholdingAmount: "50.0000",
+    netDisbursementAmount: "1250.0000",
+    currency: "USD",
+    payoutMethod: "BANK_TRANSFER",
+    status: "PENDING",
+    createdBy: actor.userId,
+    retryCount: 0,
+  });
+  await assert.rejects(
+    paymentService.executeOwnerPayout(
+      tenantId,
+      { settlementPayableId: orphanPayable.id, provider: "STRIPE_CARD" },
+      actor
+    ),
+    /backing payable .* was not found/,
+    "Payout must reject a payable whose approved settlement is missing"
+  );
+  assert.strictEqual((await settlementRepo.findPayableById(orphanPayable.id, tenantId))?.status, "PENDING");
+
+  const approvedSettlement = await settlementRepo.create({
+    id: "settlement_001",
+    tenantId,
+    ownerId: "owner_investor_corp",
+    periodStart: "2026-08-01",
+    periodEnd: "2026-08-31",
+    currency: "USD",
+    grossRevenue: "1300.0000",
+    totalDeductions: "50.0000",
+    netPayoutAmount: "1250.0000",
+    status: "APPROVED",
+    calculatedAt: new Date().toISOString(),
+    approvedAt: new Date().toISOString(),
+    approvedBy: "different_authorized_approver",
+  });
   const payable = await settlementRepo.createPayable({
     tenantId,
     payableNumber: "PAY-2026-0001",
@@ -596,6 +640,16 @@ async function runStripeCardSuite() {
     retryCount: 0,
   });
 
+  await assert.rejects(
+    paymentService.executeOwnerPayout(
+      tenantId,
+      { settlementPayableId: payable.id, provider: "STRIPE_CARD" },
+      { ...actor, userId: "different_authorized_approver" }
+    ),
+    /different authorized user/,
+    "Payout executor cannot be the settlement approver"
+  );
+  assert.strictEqual((await settlementRepo.findPayableById(payable.id, tenantId))?.status, "PENDING");
   const payoutResult = await paymentService.executeOwnerPayout(
     tenantId,
     {
@@ -606,6 +660,7 @@ async function runStripeCardSuite() {
     actor
   );
 
+  assert.strictEqual((await settlementRepo.findById(approvedSettlement.id, tenantId))?.status, "PAID");
   assert.strictEqual(payoutResult.payable.status, "PAID");
   assert.strictEqual(payoutResult.payment.status, "ALLOCATED");
   assert.strictEqual(payoutResult.payment.amount, "1250.0000");
