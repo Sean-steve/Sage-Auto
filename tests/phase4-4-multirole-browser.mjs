@@ -45,7 +45,7 @@ try{
      return route.fulfill(response([]));
    });
    await page.goto(origin+"/login",{waitUntil:"domcontentloaded"});
-   await page.waitForTimeout(900);
+   await page.waitForFunction(({name})=>{const content=document.body.innerText;return content.includes(name)||content.includes("Sage Auto");},{name:role.portal.name},{timeout:15000});
    const body=await page.locator("body").innerText();
    assert(!body.includes("Something went wrong"),role.name+" did not render");
    assert(body.includes(role.portal.name)||body.includes("Sage Auto"),role.name+" displayed a shell");
