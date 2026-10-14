@@ -8,6 +8,8 @@ on:
       - 'scripts/stage4-live-closure-acceptance.ts'
       - 'scripts/stage5-browser-journey.mjs'
       - 'scripts/stage6-cross-workflow.ts'
+      - 'packages/database/test/stage6-http-boundary.test.ts'
+      - 'apps/api/src/common/filters/http-exception.filter.ts'
       - 'scripts/release-preflight.mjs'
       - 'scripts/release-preflight.test.mjs'
       - '.github/workflows/ci.yml'
@@ -40,6 +42,8 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Verify staging, production, and rollback cannot silently succeed
         run: node scripts/release-preflight.test.mjs
+      - name: Validate canonical cross-domain HTTP failure responses
+        run: pnpm exec tsx packages/database/test/stage6-http-boundary.test.ts
       - name: Locate installed Chromium
         run: |
           which google-chrome || which google-chrome-stable || which chromium || which chromium-browser
