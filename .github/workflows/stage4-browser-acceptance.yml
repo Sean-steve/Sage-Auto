@@ -1,4 +1,4 @@
-name: Stage 4 & 5 Authenticated Browser Acceptance
+name: Stage 4–6 Cross-Workflow Integration Acceptance
 
 on:
   pull_request:
@@ -7,6 +7,7 @@ on:
       - 'scripts/stage4-browser-acceptance.mjs'
       - 'scripts/stage4-live-closure-acceptance.ts'
       - 'scripts/stage5-browser-journey.mjs'
+      - 'scripts/stage6-cross-workflow.ts'
       - 'scripts/release-preflight.mjs'
       - 'scripts/release-preflight.test.mjs'
       - '.github/workflows/ci.yml'
@@ -23,7 +24,7 @@ permissions:
 
 jobs:
   browser-review:
-    name: Six-role browser and real cross-role settlement completion
+    name: Six-role browser and full booking-to-release API integration
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -84,6 +85,16 @@ jobs:
       - name: Browser-driven multi-actor Return to Finance to fleet release
         run: node scripts/stage5-browser-journey.mjs
       - name: Read-only integrity scan after browser-driven closure
+        env:
+          SQLITE_PATH: .review/access/review.sqlite
+        run: pnpm audit:closure -- --all-tenants
+      - name: Stage 6 authenticated Booking to Contract to Handover to Rental to Finance integration
+        env:
+          NODE_ENV: test
+          APP_ENV: test
+          SQLITE_PATH: .review/access/review.sqlite
+        run: pnpm exec tsx scripts/stage6-cross-workflow.ts
+      - name: Read-only integrity audit after Stage 6 integration scenario
         env:
           SQLITE_PATH: .review/access/review.sqlite
         run: pnpm audit:closure -- --all-tenants
