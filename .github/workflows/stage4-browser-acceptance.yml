@@ -1,0 +1,72 @@
+name: Stage 4 Authenticated Browser Acceptance
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'scripts/stage4-browser-acceptance.mjs'
+      - 'scripts/access-review.ts'
+      - 'src/**'
+      - 'apps/api/**'
+      - 'packages/database/src/**'
+      - '.github/workflows/stage4-browser-acceptance.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  browser-review:
+    name: Six real authenticated roles in isolated Chromium
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 9.15.9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install exact project dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Locate installed Chromium
+        run: |
+          which google-chrome || which google-chrome-stable || which chromium || which chromium-browser
+      - name: Start isolated review API and provision 20 unique roles
+        run: |
+          rm -rf .review/access
+          (pnpm review:api > /tmp/sage-stage4-api.log 2>&1 & echo $! > /tmp/sage-stage4-api.pid)
+          for i in $(seq 1 120); do
+            if grep -q 'READY: 20 role accounts' /tmp/sage-stage4-api.log; then exit 0; fi
+            if grep -qE 'Error:|Fatal|Unhandled|ELIFECYCLE' /tmp/sage-stage4-api.log; then
+              echo 'Review API setup failed'; tail -n 15 /tmp/sage-stage4-api.log; exit 1
+            fi
+            sleep 1
+          done
+          echo 'Review API startup timed out'; tail -n 20 /tmp/sage-stage4-api.log; exit 1
+      - name: Start real web application with isolated API proxy
+        run: |
+          (pnpm review:web > /tmp/sage-stage4-web.log 2>&1 & echo $! > /tmp/sage-stage4-web.pid)
+          for i in $(seq 1 90); do
+            if curl -fsS http://127.0.0.1:3510/ >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          echo 'Review Vite startup timed out'; tail -n 20 /tmp/sage-stage4-web.log; exit 1
+      - name: Authenticated six-role browser and server RBAC acceptance
+        run: node scripts/stage4-browser-acceptance.mjs
+      - name: Safe diagnostic tails on failure
+        if: failure()
+        run: |
+          echo '=== API service logs (last 30) ==='
+          tail -n 30 /tmp/sage-stage4-api.log 2>/dev/null || true
+          echo '=== Web service logs (last 20) ==='
+          tail -n 20 /tmp/sage-stage4-web.log 2>/dev/null || true
+      - name: Stop isolated services and remove temporary credentials
+        if: always()
+        run: |
+          for pidfile in /tmp/sage-stage4-api.pid /tmp/sage-stage4-web.pid; do
+            if test -f "$pidfile"; then kill "$(cat "$pidfile")" 2>/dev/null || true; fi
+          done
+          rm -rf .review/access
