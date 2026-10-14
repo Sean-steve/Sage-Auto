@@ -94,7 +94,7 @@ class Cdp {
     const expr=`(()=>{const labels=document.querySelectorAll('button.sage-nav-item, nav[aria-label="Workspace navigation"] button');
       const button=[...labels].find(node=>node.textContent.trim()===${JSON.stringify(label)});
       if(!button)return false;button.click();return true;})()`;
-    assert.equal(await this.evaluate(expr),true,'Navigation item not found: '+label);
+    await waitFor(()=>this.evaluate(expr),'Navigation item '+label+' rendered and clickable',20000);
     await waitFor(()=>this.evaluate(`(()=>{const sidebar=[...document.querySelectorAll('button.sage-nav-item, nav[aria-label="Workspace navigation"] button')];
       return sidebar.some(button=>button.textContent.trim()===${JSON.stringify(label)} && button.getAttribute('aria-current')==='page')
     })()`),'active section '+label);
@@ -193,6 +193,9 @@ try {
     const shellClass=['DRIVER','VEHICLE_OWNER','RENTER'].includes(spec.role)?'.access-workspace':'.saas-workspace';
     await waitFor(()=>cdp.evaluate(`Boolean(document.querySelector(${JSON.stringify(shellClass)}))`),
       spec.role+' authenticated workspace',35000);
+    await waitFor(()=>cdp.evaluate(`([...document.querySelectorAll('button.sage-nav-item, nav[aria-label="Workspace navigation"] button')]
+      .some(n=>n.textContent.trim()===${JSON.stringify(portal.sections[0]?.label||'')}))`),
+      spec.role+' own permission-scoped sidebar',35000);
     const allowed=new Set(portal.sections.map(item=>item.label));
     const uiLabels=await cdp.evaluate(`([...document.querySelectorAll('button.sage-nav-item, nav[aria-label="Workspace navigation"] button')].map(n=>n.textContent.trim()))`);
     for(const sectionLabel of uiLabels) {
