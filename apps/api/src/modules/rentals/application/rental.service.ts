@@ -1002,7 +1002,7 @@ export class RentalService {
     if (dto.idempotencyKey) {
       const cached = await this.idempotencyRepo.findByKey(tenantId, dto.idempotencyKey);
       if (cached?.responseBody) {
-        if (cached.resourceId !== rentalId || cached.operationScope !== "RentalCompletion") {
+        if ((cached.resourceId || (cached.responseBody as any)?.id) !== rentalId || cached.operationScope !== "RentalCompletion") {
           throw new Error("This completion idempotency key is already assigned to another operation.");
         }
         return cached.responseBody as unknown as Rental;
