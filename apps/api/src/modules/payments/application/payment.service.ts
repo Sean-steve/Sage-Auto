@@ -998,6 +998,27 @@ export class PaymentService {
 
     // Reserve ALL outstanding refund obligations, not only money already
     // disbursed. Multiple pending requests must never overbook one payment.
+    // A rental-deposit refund must be supported by THIS payment's allocation
+    // to THIS tenant's real deposit liability, not an arbitrary client-supplied
+    // source ID. A mismatch must never trigger a provider disbursement.
+    if (dto.sourceObligationType === "RENTAL_DEPOSIT") {
+      if (!this.depositPositionRepo || !dto.sourceObligationId) {
+        throw new Error("Rental-deposit refunds require a linked deposit position.");
+      }
+      const deposit =
+        await this.depositPositionRepo.findById(dto.sourceObligationId, tenantId) ||
+        await this.depositPositionRepo.findByRentalId(dto.sourceObligationId, tenantId) ||
+        await this.depositPositionRepo.findByBookingId(dto.sourceObligationId, tenantId);
+      const lines = await this.allocationRepo.findByPaymentId(payment.id, tenantId);
+      if (!deposit || payment.purpose !== "RENTAL_DEPOSIT" ||
+          deposit.currency !== payment.currency ||
+          !lines.some((line) => line.sourceType === "RENTAL_DEPOSIT" &&
+            line.sourceId === deposit.id && Number(line.amount) > 0) ||
+          Number(dto.amount) > Number(deposit.heldAmount) + 0.0001) {
+        throw new Error("Refund must be backed by this payment's held rental-deposit allocation.");
+      }
+    }
+
     const outstanding = await this.refundRepo.findByOriginalPaymentId(payment.id, tenantId);
     const outstandingAmount = outstanding
       .filter((r) => ["PENDING", "APPROVED", "PROCESSING"].includes(r.status))
