@@ -193,6 +193,13 @@ export const FinanceView: React.FC = () => {
     r.status === "COMPLETED" && r.sourceObligationType === "RENTAL_DEPOSIT" &&
     [focusedRentalId, heldDeposit?.id].includes(r.sourceObligationId || "")
   );
+  const depositPaymentSources = payments.filter((payment) =>
+    payment.purpose === "RENTAL_DEPOSIT" &&
+    payment.direction === "INBOUND" &&
+    payment.sourceContext?.rentalId === focusedRentalId &&
+    payment.status !== "VOIDED" &&
+    money(payment.amount) - money(payment.refundedAmount) > 0
+  );
   const requiredSettlementStatus = focusedCalculation
     ? money(focusedCalculation.depositRefundDue) > 0 ? "REFUNDED"
       : money(focusedCalculation.depositAdditionalPaymentDue) > 0 ? "CHARGED"
@@ -447,11 +454,15 @@ export const FinanceView: React.FC = () => {
     if (!selectedPayment) return;
     setSubmitting(true);
     try {
+      const isDepositRefund =
+        selectedPayment.purpose === "RENTAL_DEPOSIT" &&
+        selectedPayment.sourceContext?.rentalId === focusedRentalId;
       const response = await apiClient.payments.requestRefund({
         paymentId: selectedPayment.id,
         amount: paymentAmount,
         reason: refundReason.trim(),
-        sourceObligationType: "CUSTOMER_INVOICE",
+        sourceObligationType: isDepositRefund ? "RENTAL_DEPOSIT" : "CUSTOMER_INVOICE",
+        sourceObligationId: isDepositRefund ? (heldDeposit?.id || focusedRentalId) : undefined,
       });
       if (response.error) throw new Error(response.error.message);
       showNotification("Refund request created. A user with refund approval authority must execute it.");
@@ -653,6 +664,18 @@ export const FinanceView: React.FC = () => {
                 <div><span className="text-slate-500">Settlement</span><p className="font-bold">{focusedCalculation.isImmutable ? label(focusedCalculation.depositSettlementStatus) : "Awaiting finalization"}</p></div>
               </div>
               <div className="flex flex-wrap items-center gap-2 text-xs">
+                {!focusedCalculation.isImmutable && requiredSettlementStatus === "REFUNDED" &&
+                  completedDepositRefunds.length === 0 && depositPaymentSources.length > 0 &&
+                  hasPermission("refund.request") && (
+                    <button disabled={submitting || restoration} onClick={() => {
+                      setSelectedPayment(depositPaymentSources[0]);
+                      setPaymentAmount(String(money(focusedCalculation.depositRefundDue)));
+                      setRefundReason(`Return deposit refund for ${focusedRental.rentalNumber}`);
+                      setActionMode("REFUND");
+                    }} className="rounded-lg border border-rose-200 px-3 py-2 font-semibold text-rose-700 disabled:opacity-50">
+                      Request deposit refund
+                    </button>
+                  )}
                 <span className="text-slate-500">{rentalInvoice ? `Invoice ${rentalInvoice.invoiceNumber}: ${label(rentalInvoice.status)}` : "No rental invoice recorded"}</span>
                 {!rentalInvoice && invoiceEligibleRentals.some((r) => r.id === focusedRentalId) && hasPermission("invoice.create") &&
                   <button disabled={submitting || restoration} onClick={() => {setRentalId(focusedRentalId); setActionMode("GENERATE_INVOICE");}}
