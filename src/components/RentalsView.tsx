@@ -75,6 +75,8 @@ export const RentalsView: React.FC = () => {
   const [dispatchError, setDispatchError] = useState("");
   const [loading, setLoading] = useState(true);
   const [stateFilter, setStateFilter] = useState("ACTIVE");
+  const [fleetCategory, setFleetCategory] = useState("ALL");
+  const [showAllFleet, setShowAllFleet] = useState(false);
   const [selectedRentalId, setSelectedRentalId] = useState<string | null>(null);
   const [startSnapshot, setStartSnapshot] = useState<any>(null);
   const [actionMode, setActionMode] = useState<ActionMode>(null);
@@ -148,6 +150,45 @@ export const RentalsView: React.FC = () => {
         .some((value) => String(value).toLowerCase().includes(q));
     });
   }, [activeTenantId, customers, drivers, rentals, searchQuery, stateFilter, vehicles]);
+
+  // Fleet inventory is a distinct domain from a Rental. Show persisted cars
+  // here without fabricating bookings, handovers, live rentals or earnings.
+  const tenantFleet = useMemo(
+    () => vehicles.filter(v => v.tenantId === activeTenantId && v.lifecycleStatus === "ACTIVE"),
+    [activeTenantId, vehicles]
+  );
+  const fleetCategories = useMemo(
+    () => Array.from(new Set(tenantFleet.map(v => v.category))).sort(),
+    [tenantFleet]
+  );
+  const fleetInventory = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    const selected = tenantFleet.filter(v =>
+      (fleetCategory === "ALL" || v.category === fleetCategory) &&
+      (!query || [
+        v.make, v.model, v.registrationPlate, v.category, v.currentLocation,
+      ].some(value => String(value || "").toLowerCase().includes(query)))
+    );
+    // Interleave categories so the first row shows a useful variety, rather
+    // than only compact vehicles because they were registered first.
+    const groups = new Map<string, typeof selected>();
+    for (const vehicle of selected) {
+      if (!groups.has(vehicle.category)) groups.set(vehicle.category, []);
+      groups.get(vehicle.category)!.push(vehicle);
+    }
+    const ordered = Array.from(groups.keys()).sort((a,b) =>
+      ["SUV","Hatchback","Sedan","4x4 Offroad","Luxury","Van/Bus"].indexOf(a) -
+      ["SUV","Hatchback","Sedan","4x4 Offroad","Luxury","Van/Bus"].indexOf(b)
+    );
+    const result: typeof selected = [];
+    while (ordered.some(category => groups.get(category)!.length)) {
+      for (const category of ordered) {
+        const next = groups.get(category)!.shift();
+        if (next) result.push(next);
+      }
+    }
+    return result;
+  }, [fleetCategory, searchQuery, tenantFleet]);
 
   const metrics = useMemo(() => {
     const tenantRentals = rentals.filter((r) => r.tenantId === activeTenantId);
@@ -346,6 +387,109 @@ export const RentalsView: React.FC = () => {
           </div>
         ))}
       </div>
+
+      {hasPermission("vehicle.read") && (
+        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900" aria-label="Fleet cars for rentals">
+          <div className="flex flex-col gap-4 border-b border-slate-100 p-5 dark:border-slate-800 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[.16em] text-emerald-700">Fleet inventory</p>
+              <h2 className="mt-1 text-lg font-black text-slate-950 dark:text-white">Explore cars in your rental fleet</h2>
+              <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">
+                {tenantFleet.length} registered active vehicles · {tenantFleet.filter(v=>v.availabilityStatus==="AVAILABLE").length} currently marked available.
+                Booking still checks dates, compliance and actual allocations.
+              </p>
+            </div>
+            <button
+              type="button" onClick={() => setCurrentView("fleet")}
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-bold text-slate-700 hover:border-emerald-400 dark:border-slate-700 dark:text-slate-200">
+              Manage fleet <ArrowRight size={14}/>
+            </button>
+          </div>
+          {fleetCategories.length > 1 && (
+            <div className="flex flex-wrap gap-2 px-5 pt-4" aria-label="Car category filters">
+              {["ALL",...fleetCategories].map(category => (
+                <button type="button" key={category} onClick={() => {setFleetCategory(category);setShowAllFleet(false);}}
+                  aria-pressed={fleetCategory===category}
+                  className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${fleetCategory===category
+                    ? "border-emerald-700 bg-emerald-700 text-white"
+                    : "border-slate-200 text-slate-600 hover:border-emerald-400 dark:border-slate-700 dark:text-slate-300"}`}>
+                  {category==="ALL"?"All classes":category}
+                </button>
+              ))}
+            </div>
+          )}
+          {fleetInventory.length===0 ? (
+            <div className="p-10 text-center text-sm text-slate-500">
+              No saved fleet vehicles match this search. You can register vehicles in Fleet.
+            </div>
+          ) : (
+            <>
+              <div className="grid gap-4 p-5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+                {(showAllFleet?fleetInventory:fleetInventory.slice(0,12)).map(vehicle => {
+                  const isAvailable = vehicle.availabilityStatus === "AVAILABLE";
+                  const visual = vehicle.category==="4x4 Offroad"?"from-amber-950 to-amber-700"
+                    : vehicle.category==="Luxury"?"from-slate-950 to-slate-600"
+                    : vehicle.category==="SUV"?"from-teal-950 to-emerald-700"
+                    : vehicle.category==="Van/Bus"?"from-indigo-950 to-blue-700"
+                    : vehicle.category==="Hatchback"?"from-sky-950 to-sky-600"
+                    : "from-violet-950 to-violet-600";
+                  return (
+                    <article key={vehicle.id} data-testid="rental-fleet-card"
+                      className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:shadow-md dark:border-slate-700 dark:bg-slate-950">
+                      <div className={`relative flex h-32 items-center justify-center overflow-hidden bg-gradient-to-br ${visual}`}>
+                        {vehicle.imageUrl ? <img src={vehicle.imageUrl}
+                            alt={`${vehicle.make} ${vehicle.model}`} loading="lazy"
+                            className="h-full w-full object-cover"
+                            onError={event => {event.currentTarget.style.display="none";}}
+                          /> : <Car className="h-16 w-16 text-white/65" strokeWidth={1.1}/>}
+                        <span className="absolute left-3 top-3 rounded-md bg-black/40 px-2 py-1 text-[10px] font-black tracking-wide text-white">
+                          {vehicle.category}
+                        </span>
+                        <span className={`absolute bottom-3 right-3 rounded-full px-2.5 py-1 text-[10px] font-bold ${isAvailable
+                          ?"bg-emerald-100 text-emerald-900":"bg-amber-100 text-amber-900"}`}>
+                          {stateLabel(vehicle.availabilityStatus)}
+                        </span>
+                      </div>
+                      <div className="space-y-3 p-4">
+                        <div>
+                          <h3 className="truncate font-bold text-slate-900 dark:text-white">{vehicle.make} {vehicle.model}</h3>
+                          <p className="mt-1 text-xs text-slate-500">{vehicle.year} · {vehicle.registrationPlate}</p>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-500">
+                          <span className="flex items-center gap-1"><User size={13}/>{vehicle.seats} seats</span>
+                          <span className="flex items-center gap-1"><Fuel size={13}/>{vehicle.fuelType}</span>
+                          <span className="flex items-center gap-1"><Gauge size={13}/>{vehicle.transmission}</span>
+                          <span className="flex min-w-0 items-center gap-1 truncate"><MapPin size={13}/>{vehicle.currentLocation||"Location not set"}</span>
+                        </div>
+                        <div className="flex items-end justify-between gap-2 border-t border-slate-100 pt-3 dark:border-slate-800">
+                          <div><p className="text-[10px] text-slate-400">Illustrative base rate</p>
+                            <p className="text-base font-black text-slate-950 dark:text-white">
+                              {new Intl.NumberFormat("en-KE",{style:"currency",currency:"KES",maximumFractionDigits:0}).format(vehicle.dailyRate)}
+                              <span className="text-[10px] font-medium text-slate-400"> / day</span>
+                            </p>
+                          </div>
+                          {hasPermission("booking.create")&&(
+                            <button type="button" onClick={() => setCurrentView("bookings")}
+                              className="inline-flex items-center gap-1 rounded-lg bg-emerald-700 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-800">
+                              Bookings <ArrowRight size={13}/>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+              {fleetInventory.length>12 && <div className="flex justify-center border-t border-slate-100 p-4 dark:border-slate-800">
+                <button type="button" onClick={() => setShowAllFleet(v=>!v)}
+                  className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-700 dark:border-slate-700 dark:text-slate-200">
+                  {showAllFleet?"Show fewer vehicles":`Show all ${fleetInventory.length} vehicles`}
+                </button>
+              </div>}
+            </>
+          )}
+        </section>
+      )}
 
       {dispatchError&&<p role="alert" className="rounded-xl bg-amber-50 p-4 text-sm text-amber-900">{dispatchError}</p>}
       {dispatchReady.length>0&&<section className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 sm:p-5 dark:border-emerald-900 dark:bg-emerald-950/20">

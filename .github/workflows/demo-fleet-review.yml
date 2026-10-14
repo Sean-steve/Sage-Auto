@@ -1,0 +1,63 @@
+name: Demo Rental Fleet Acceptance
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'scripts/demo-fleet.ts'
+      - 'scripts/seed-demo-fleet.ts'
+      - 'scripts/test-demo-fleet-review.ts'
+      - 'scripts/access-review.ts'
+      - 'packages/database/test/demo-fleet-rental-workspace.test.ts'
+      - 'src/components/RentalsView.tsx'
+      - 'package.json'
+      - '.github/workflows/demo-fleet-review.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fleet:
+    name: Demo inventory, TypeScript, UI build and review API
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 9.15.9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Unit and tenant isolation
+        run: pnpm test:demo-fleet
+      - name: Strict TypeScript
+        run: pnpm typecheck
+      - name: Production frontend build
+        run: pnpm build
+      - name: Start isolated review API with canonical Fleet seed
+        run: |
+          (pnpm review:api > /tmp/sage-demo-fleet.log 2>&1 & echo $! > /tmp/sage-demo-fleet.pid)
+          for i in $(seq 1 120); do
+            if grep -q 'READY: 20 role accounts' /tmp/sage-demo-fleet.log; then exit 0; fi
+            if grep -qE 'Error:|Fatal|Unhandled|ELIFECYCLE|Demo seed failed' /tmp/sage-demo-fleet.log; then
+              tail -n 30 /tmp/sage-demo-fleet.log
+              exit 1
+            fi
+            sleep 1
+          done
+          tail -n 30 /tmp/sage-demo-fleet.log
+          exit 1
+      - name: Check authenticated server-backed fleet and truthful rental state
+        run: pnpm exec tsx scripts/test-demo-fleet-review.ts
+      - name: Diagnostic output on failure
+        if: failure()
+        run: tail -n 40 /tmp/sage-demo-fleet.log || true
+      - name: Remove disposable review credentials and database
+        if: always()
+        run: |
+          if test -f /tmp/sage-demo-fleet.pid; then kill "$(cat /tmp/sage-demo-fleet.pid)" 2>/dev/null || true; fi
+          rm -rf .review/access
