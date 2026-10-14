@@ -757,10 +757,10 @@ async function runTests() {
       contractId: `CTR-SETTLEMENT-${suffix}`,
       handoverId: `HND-SETTLEMENT-${suffix}`,
       customerId: rental.customerId,
-      primaryDriverId: rental.primaryDriverId,
+      primaryDriverId: "drv-16-vip",
       vehicleId: rental.vehicleId,
       status: "FINAL_CALCULATION",
-      pricingSnapshot: rental.pricingSnapshot,
+      pricingSnapshot: (await rentalRepo.getStartSnapshot(rental.id, tenantId))!.pricingSnapshot,
     });
     await rentalRepo.saveFinalCalculation(tenantId, {
       ...sourceCalculation,
