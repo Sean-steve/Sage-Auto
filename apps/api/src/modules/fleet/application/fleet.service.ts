@@ -28,10 +28,7 @@ import {
   IAuditRepository,
   IOutboxRepository,
   IRentalRepository,
-  FleetRegistrationEntryRepository,
-  withRecordTransaction,
 } from "@carhire/database";
-import type { FleetRegistrationEntry } from "@carhire/database";
 import { EntitlementService } from "../../entitlements/application/entitlement.service";
 import { VehicleAggregate } from "../domain/vehicle.aggregate";
 import {
@@ -51,44 +48,6 @@ export class FleetService {
     private readonly entitlementService?: EntitlementService,
     private readonly rentalRepository?: IRentalRepository
   ) {}
-
-  private readonly registrationEntries = new FleetRegistrationEntryRepository();
-
-  async listRegistrationEntries(tenantId:string): Promise<FleetRegistrationEntry[]> {
-    return this.registrationEntries.list(tenantId);
-  }
-
-  async reserveRegistrationEntries(
-    tenantId:string,count:number,batchKey:string,actorId:string
-  ): Promise<FleetRegistrationEntry[]> {
-    return withRecordTransaction(async () => {
-      const entries=await this.registrationEntries.createBatch(tenantId,count,batchKey,actorId);
-      // No vehicle.create event is emitted until the actual vehicle is registered.
-      return entries;
-    });
-  }
-
-  async registerFromEntry(
-    tenantId:string,entryId:string,dto:CreateVehicleDto,actorId:string,actorName:string
-  ): Promise<Vehicle> {
-    if(!dto || !dto.registrationPlate?.trim() || !dto.make?.trim() ||
-       !dto.model?.trim() || !Number.isInteger(dto.year) || dto.year<1900 ||
-       !dto.category || !Number.isFinite(dto.dailyRate) || dto.dailyRate<0) {
-      throw Object.assign(new Error("Registration plate, make, model, year, category and a valid daily rate are required."),{statusCode:400});
-    }
-    return withRecordTransaction(async () => {
-      const entry=await this.registrationEntries.get(tenantId,entryId);
-      if(!entry)throw Object.assign(new Error("Fleet registration entry not found."),{statusCode:404});
-      if(entry.status!=="UNREGISTERED")
-        throw Object.assign(new Error("Fleet entry is already registered."),{statusCode:409});
-      // Creating an actual vehicle goes through exactly the same canonical
-      // registration, entitlement, audit and outbox checks as normal Fleet.
-      // A draft never auto-publishes a car to the public website.
-      const vehicle=await this.createVehicle(tenantId,{...dto,isPublishedToWebsite:false},actorId,actorName);
-      await this.registrationEntries.markRegistered(tenantId,entry.id,vehicle.id);
-      return vehicle;
-    });
-  }
 
   async createVehicle(
     tenantId: string,
