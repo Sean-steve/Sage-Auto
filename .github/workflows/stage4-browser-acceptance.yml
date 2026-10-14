@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'scripts/stage4-browser-acceptance.mjs'
+      - 'scripts/stage4-live-closure-acceptance.ts'
       - 'scripts/access-review.ts'
       - 'src/**'
       - 'apps/api/**'
@@ -54,6 +55,16 @@ jobs:
             sleep 1
           done
           echo 'Review Vite startup timed out'; tail -n 20 /tmp/sage-stage4-web.log; exit 1
+      - name: Live authenticated zero-balance rental closure across Finance and Operations
+        env:
+          NODE_ENV: test
+          APP_ENV: test
+          SQLITE_PATH: .review/access/review.sqlite
+        run: pnpm exec tsx scripts/stage4-live-closure-acceptance.ts
+      - name: Read-only integrity scan of the completed isolated scenario
+        env:
+          SQLITE_PATH: .review/access/review.sqlite
+        run: pnpm audit:closure -- --all-tenants
       - name: Authenticated six-role browser and server RBAC acceptance
         run: node scripts/stage4-browser-acceptance.mjs
       - name: Safe diagnostic tails on failure
