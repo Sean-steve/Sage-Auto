@@ -642,6 +642,53 @@ async function runTests() {
   console.log("✓ Deposit settlement sealed as immutable; recalculation cannot rewrite it.");
 
   // --------------------------------------------------------------------------
+  // CLOSURE FAULT INJECTION: no partial success from any dependent write.
+  // --------------------------------------------------------------------------
+  const failurePoints = [
+    "booking", "contract", "vehicle", "allocation", "audit", "outbox", "idempotency",
+  ] as const;
+  const failAt = <T extends object>(repository: T, method: string, enabled: boolean): T =>
+    enabled
+      ? new Proxy(repository, {
+          get(target, key, receiver) {
+            if (key === method) return async () => { throw new Error("injected closure failure"); };
+            return Reflect.get(target, key, receiver);
+          },
+        })
+      : repository;
+
+  for (const failure of failurePoints) {
+    const failingService = new RentalService(
+      rentalRepo,
+      failAt(bookingRepo, "update", failure === "booking"),
+      failAt(contractRepo, "update", failure === "contract"),
+      handoverRepo,
+      failAt(vehicleRepo, "update", failure === "vehicle"),
+      failAt(allocationRepo, "releaseAllocation", failure === "allocation"),
+      failAt(auditRepo, "record", failure === "audit"),
+      failAt(outboxRepo, "enqueue", failure === "outbox"),
+      failAt(idempotencyRepo, "record", failure === "idempotency"),
+      inspectionRepo,
+      damageRepo
+    );
+    const key = `return-complete-fault-${failure}`;
+    await assert.rejects(
+      failingService.completeRental(tenantId, rental.id, {
+        releaseVehicleToStatus: "AVAILABLE", idempotencyKey: key,
+      }, actor),
+      /injected closure failure/
+    );
+    assert.equal((await rentalRepo.findById(rental.id, tenantId))?.state, "DEPOSIT_PROCESSING");
+    assert.notEqual((await bookingRepo.findById(booking.id, tenantId))?.status, "COMPLETED");
+    assert.notEqual((await contractRepo.findById(contract.id, tenantId))?.status, "COMPLETED");
+    assert.equal((await vehicleRepo.findById(vehicle.id, tenantId))?.availabilityStatus, "ON_RENT");
+    assert.equal((await vehicleRepo.findById(vehicle.id, tenantId))?.odometer, 45000);
+    assert.notEqual((await allocationRepo.findById(allocation.id, tenantId))?.status, "RELEASED");
+    assert.equal(await idempotencyRepo.findByKey(tenantId, key), null);
+  }
+  console.log("✓ Closure rejects seven dependent-write failures without partial completion or cached success.");
+
+  // --------------------------------------------------------------------------
   // TEST 9: Complete Rental, Booking, Contract & Release Fleet
   // --------------------------------------------------------------------------
   console.log("\n[TEST 9] Completing Rental & Releasing Vehicle to Fleet...");
