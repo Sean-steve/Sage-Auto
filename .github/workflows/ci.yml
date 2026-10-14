@@ -168,21 +168,17 @@ jobs:
     runs-on: ubuntu-latest
     environment: staging
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Execute Pre-Deployment Migration Job
-        run: |
-          echo "==> Running transactional database migrations in Staging..."
-          pnpm db:migrate
-
-      - name: Deploy API and Worker Services
-        run: |
-          echo "==> Deploying immutable release ${{ needs.build-and-package.outputs.release_id }} to Staging..."
-
-      - name: Execute Automated Post-Deploy Smoke Tests
-        run: |
-          echo "==> Validating Staging liveness, readiness and business invariants..."
+      - uses: actions/checkout@v4
+      - name: Fail closed unless staging deployment and verification are configured
+        run: node scripts/release-preflight.mjs staging
+      - name: Execute reviewed staging migrations
+        run: ./infrastructure/deployment/adapters/staging.sh migrate
+      - name: Deploy staging API and worker (actual adapter)
+        env:
+          SAGE_RELEASE_ID: ${{ needs.build-and-package.outputs.release_id }}
+        run: ./infrastructure/deployment/adapters/staging.sh deploy
+      - name: Verify staging liveness, readiness and business invariants
+        run: ./infrastructure/deployment/adapters/staging.sh verify
 
   promote-production:
     name: Promote to Production Environment
@@ -191,18 +187,14 @@ jobs:
     runs-on: ubuntu-latest
     environment: production
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Execute Pre-Deployment Migration Job
-        run: |
-          echo "==> Running transactional database migrations in Production..."
-          pnpm db:migrate
-
-      - name: Rolling Deployment (Zero Downtime)
-        run: |
-          echo "==> Orchestrating zero-downtime rolling update for Production..."
-
-      - name: Post-Deploy Health Check & Synthetic Transaction Verification
-        run: |
-          echo "==> Running production synthetic checks..."
+      - uses: actions/checkout@v4
+      - name: Fail closed unless actual production rollout is configured
+        run: node scripts/release-preflight.mjs production
+      - name: Execute approved production migrations
+        run: ./infrastructure/deployment/adapters/production.sh migrate
+      - name: Perform actual production rolling deployment
+        env:
+          SAGE_RELEASE_ID: ${{ needs.build-and-package.outputs.release_id }}
+        run: ./infrastructure/deployment/adapters/production.sh deploy
+      - name: Verify production health and financial safeguards
+        run: ./infrastructure/deployment/adapters/production.sh verify

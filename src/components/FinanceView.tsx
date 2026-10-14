@@ -28,6 +28,7 @@ import type {
   PaymentReconciliationIssue,
   Refund,
   RefundObligation,
+  RentalFinalCalculation,
   Rental,
 } from "../types";
 
@@ -40,6 +41,7 @@ type ActionMode =
   | "REFUND"
   | "APPLY_DEPOSIT"
   | "CREATE_EXPENSE"
+  | "FINALIZE_SETTLEMENT"
   | null;
 
 const money = (value: string | number | undefined) => Number(value || 0);
@@ -63,11 +65,11 @@ export const FinanceView: React.FC = () => {
   const {
     activeTenant,
     activeTenantId,
-    rentals,
     customers,
     restoration,
     hasPermission,
     showNotification,
+    setCurrentView,
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<FinanceTab>("INVOICES");
@@ -84,6 +86,16 @@ export const FinanceView: React.FC = () => {
   const [ledgerAccounts, setLedgerAccounts] = useState<any[]>([]);
   const [journals, setJournals] = useState<any[]>([]);
 
+  const [financeRentals, setFinanceRentals] = useState<Rental[]>([]);
+  const [focusedRentalId, setFocusedRentalId] = useState(
+    () => window.sessionStorage.getItem(`sage:return-finance:${activeTenantId}`) || ""
+  );
+  const [focusedCalculation, setFocusedCalculation] = useState<RentalFinalCalculation | null>(null);
+  const [settlementError, setSettlementError] = useState("");
+  const [settlementInvoiceId, setSettlementInvoiceId] = useState("");
+  const [settlementRefundId, setSettlementRefundId] = useState("");
+  const [waiveSettlement, setWaiveSettlement] = useState(false);
+  const [settlementNotes, setSettlementNotes] = useState("");
   const [actionMode, setActionMode] = useState<ActionMode>(null);
   const [selectedInvoice, setSelectedInvoice] = useState<OperationalInvoice | null>(null);
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
@@ -119,6 +131,7 @@ export const FinanceView: React.FC = () => {
       hasPermission("payment.reconciliation.read") ? apiClient.payments.listReconciliationIssues(false) : Promise.resolve({}),
       hasPermission("ledger.account.read") ? apiClient.finance.getLedgerAccounts() : Promise.resolve({}),
       hasPermission("ledger.read") ? apiClient.finance.getLedgerTransactions() : Promise.resolve({}),
+      hasPermission("rental.read") ? apiClient.rentals.listRentals() : Promise.resolve({}),
     ];
 
     const [
@@ -133,6 +146,7 @@ export const FinanceView: React.FC = () => {
       reconRes,
       accountsRes,
       journalsRes,
+      rentalsRes,
     ] = await Promise.all(jobs);
 
     if (!summaryRes.error && summaryRes.data) setSummary(summaryRes.data);
@@ -146,6 +160,7 @@ export const FinanceView: React.FC = () => {
     if (!reconRes.error && Array.isArray(reconRes.data)) setReconciliation(reconRes.data);
     if (!accountsRes.error && Array.isArray(accountsRes.data)) setLedgerAccounts(accountsRes.data);
     if (!journalsRes.error && Array.isArray(journalsRes.data)) setJournals(journalsRes.data);
+    if (!rentalsRes.error && Array.isArray(rentalsRes.data)) setFinanceRentals(rentalsRes.data);
     setLoading(false);
   }, [hasPermission]);
 
@@ -153,16 +168,65 @@ export const FinanceView: React.FC = () => {
     void loadAll();
   }, [activeTenantId, loadAll]);
 
-  const completedRentals = useMemo(
-    () =>
-      rentals.filter(
-        (r: Rental) =>
-          r.tenantId === activeTenantId &&
-          ["COMPLETED", "RETURN_COMPLETED"].includes(r.state) &&
-          !invoices.some((invoice) => invoice.rentalId === r.id)
-      ),
-    [activeTenantId, invoices, rentals]
+  // Invoice creation is allowed before terminal closure. Only server-loaded
+  // rentals are offered; a stale workspace cache is not an eligibility signal.
+  const invoiceEligibleRentals = useMemo(
+    () => financeRentals.filter(
+      (r) => r.tenantId === activeTenantId &&
+        ["FINAL_CALCULATION", "FINAL_SETTLEMENT_PENDING", "DEPOSIT_PROCESSING", "COMPLETED", "RETURN_COMPLETED"].includes(r.state) &&
+        !invoices.some((invoice) => invoice.rentalId === r.id)
+    ), [activeTenantId, financeRentals, invoices]
   );
+  const settlementRentals = useMemo(
+    () => financeRentals.filter((r) =>
+      r.tenantId === activeTenantId &&
+      ["FINAL_CALCULATION", "FINAL_SETTLEMENT_PENDING", "DEPOSIT_PROCESSING"].includes(r.state)
+    ), [activeTenantId, financeRentals]
+  );
+  const focusedRental = financeRentals.find((r) => r.id === focusedRentalId && r.tenantId === activeTenantId);
+  const rentalInvoice = invoices.find((i) => i.rentalId === focusedRentalId && i.status !== "VOIDED");
+  const heldDeposit = deposits.find((d) => d.rentalId === focusedRentalId);
+  const paidSettlementInvoices = invoices.filter((i) =>
+    i.rentalId === focusedRentalId && i.status === "PAID" && money(i.amountOutstanding) <= 0.0001
+  );
+  const completedDepositRefunds = refunds.filter((r) =>
+    r.status === "COMPLETED" && r.sourceObligationType === "RENTAL_DEPOSIT" &&
+    [focusedRentalId, heldDeposit?.id].includes(r.sourceObligationId || "")
+  );
+  const depositPaymentSources = payments.filter((payment) =>
+    payment.purpose === "RENTAL_DEPOSIT" &&
+    payment.direction === "INBOUND" &&
+    payment.sourceContext?.rentalId === focusedRentalId &&
+    payment.status !== "VOIDED" &&
+    money(payment.amount) - money(payment.refundedAmount) > 0
+  );
+  const requiredSettlementStatus = focusedCalculation
+    ? money(focusedCalculation.depositRefundDue) > 0 ? "REFUNDED"
+      : money(focusedCalculation.depositAdditionalPaymentDue) > 0 ? "CHARGED"
+      : "SETTLED"
+    : "SETTLED";
+
+  useEffect(() => {
+    setFocusedRentalId(window.sessionStorage.getItem(`sage:return-finance:${activeTenantId}`) || "");
+  }, [activeTenantId]);
+
+  useEffect(() => {
+    let active = true;
+    setFocusedCalculation(null);
+    setSettlementError("");
+    if (focusedRentalId) {
+      window.sessionStorage.setItem(`sage:return-finance:${activeTenantId}`, focusedRentalId);
+      void apiClient.rentals.getFinalCalculation(focusedRentalId).then((response) => {
+        if (!active) return;
+        if (response.error || !response.data) {
+          setSettlementError(response.error?.message || "Final calculation is not available.");
+        } else {
+          setFocusedCalculation(response.data as RentalFinalCalculation);
+        }
+      });
+    }
+    return () => { active = false; };
+  }, [activeTenantId, focusedRentalId]);
 
   const metrics = useMemo(() => {
     const verifiedInbound = payments
@@ -195,6 +259,10 @@ export const FinanceView: React.FC = () => {
     setSelectedDeposit(null);
     setRentalId("");
     setDueDate("");
+    setSettlementInvoiceId("");
+    setSettlementRefundId("");
+    setWaiveSettlement(false);
+    setSettlementNotes("");
     setPaymentAmount("");
     setPaymentReference("");
     setPayerReference("");
@@ -226,11 +294,47 @@ export const FinanceView: React.FC = () => {
         applyDepositDeduction: true,
       });
       if (response.error) throw new Error(response.error.message);
-      showNotification("Authoritative rental invoice generated from the completed Return record.");
+      showNotification("Authoritative invoice generated from the saved final Return calculation.");
       resetModal();
       await loadAll();
     } catch (error: any) {
       showNotification(error.message || "Unable to generate rental invoice.", "error");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleFinalizeSettlement = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!focusedRentalId || !focusedCalculation || !hasPermission("rental.final_settle")) return;
+    const status = waiveSettlement ? "WAIVED" : requiredSettlementStatus;
+    if (status === "WAIVED" && !settlementNotes.trim()) {
+      showNotification("A documented waiver reason is required.", "error");
+      return;
+    }
+    if (status === "CHARGED" && !paidSettlementInvoices.some((i) => i.id === settlementInvoiceId)) {
+      showNotification("Select a fully paid invoice belonging to this rental.", "error");
+      return;
+    }
+    if (status === "REFUNDED" && !completedDepositRefunds.some((r) => r.id === settlementRefundId)) {
+      showNotification("Select a completed refund tied to this rental deposit.", "error");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const response = await apiClient.rentals.processDepositSettlement(focusedRentalId, {
+        settlementStatus: status,
+        invoiceId: status === "CHARGED" ? settlementInvoiceId : undefined,
+        refundId: status === "REFUNDED" ? settlementRefundId : undefined,
+        notes: settlementNotes.trim() || "Reconciled against authoritative Finance records.",
+      });
+      if (response.error || !response.data) throw new Error(response.error?.message || "Settlement finalization failed.");
+      setFocusedCalculation(response.data as RentalFinalCalculation);
+      resetModal();
+      await loadAll();
+      showNotification("Final settlement sealed. Return to Returns & Final Calculation to complete and release the vehicle.");
+    } catch (error: any) {
+      showNotification(error.message || "Settlement could not be finalized.", "error");
     } finally {
       setSubmitting(false);
     }
@@ -350,11 +454,15 @@ export const FinanceView: React.FC = () => {
     if (!selectedPayment) return;
     setSubmitting(true);
     try {
+      const isDepositRefund =
+        selectedPayment.purpose === "RENTAL_DEPOSIT" &&
+        selectedPayment.sourceContext?.rentalId === focusedRentalId;
       const response = await apiClient.payments.requestRefund({
         paymentId: selectedPayment.id,
         amount: paymentAmount,
         reason: refundReason.trim(),
-        sourceObligationType: "CUSTOMER_INVOICE",
+        sourceObligationType: isDepositRefund ? "RENTAL_DEPOSIT" : "CUSTOMER_INVOICE",
+        sourceObligationId: isDepositRefund ? (heldDeposit?.id || focusedRentalId) : undefined,
       });
       if (response.error) throw new Error(response.error.message);
       showNotification("Refund request created. A user with refund approval authority must execute it.");
@@ -510,7 +618,7 @@ export const FinanceView: React.FC = () => {
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
-          {hasPermission("invoice.create") && completedRentals.length > 0 && (
+          {hasPermission("invoice.create") && invoiceEligibleRentals.length > 0 && (
             <button
               onClick={() => setActionMode("GENERATE_INVOICE")}
               className="inline-flex items-center gap-2 rounded-xl bg-slate-950 px-3 py-2 text-xs font-bold text-white dark:bg-white dark:text-slate-950"
@@ -526,6 +634,68 @@ export const FinanceView: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {hasPermission("rental.read") && (
+        <section className="rounded-2xl border border-fuchsia-200 bg-white p-4 dark:border-fuchsia-900 dark:bg-slate-900" aria-label="Return settlement handoff">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-bold text-slate-950 dark:text-white">Return settlement & closure</h2>
+              <p className="mt-1 text-xs text-slate-500">Review authoritative charges and proof of payment/refund before sealing the return.</p>
+            </div>
+            <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Rental awaiting settlement
+              <select value={focusedRentalId} onChange={(e) => setFocusedRentalId(e.target.value)}
+                className="mt-1 block w-full min-w-64 rounded-xl border border-slate-200 bg-white p-2.5 dark:border-slate-700 dark:bg-slate-950">
+                <option value="">Select a return</option>
+                {settlementRentals.map((r) => <option key={r.id} value={r.id}>{r.rentalNumber} · {label(r.state)}</option>)}
+                {focusedRental && !settlementRentals.some((r) => r.id === focusedRental.id) &&
+                  <option value={focusedRental.id}>{focusedRental.rentalNumber} · {label(focusedRental.state)}</option>}
+              </select>
+            </label>
+          </div>
+          {focusedRentalId && settlementError && (
+            <p role="alert" className="mt-3 text-xs font-semibold text-rose-700">{settlementError}</p>
+          )}
+          {focusedRental && focusedCalculation && (
+            <div className="mt-4 space-y-3">
+              <div className="grid grid-cols-2 gap-3 rounded-xl bg-slate-50 p-3 text-xs dark:bg-slate-950/60 lg:grid-cols-4">
+                <div><span className="text-slate-500">Rental</span><p className="font-bold">{focusedRental.rentalNumber}</p></div>
+                <div><span className="text-slate-500">Customer balance to collect</span><p className="font-bold">{formatMoney(focusedCalculation.depositAdditionalPaymentDue)}</p></div>
+                <div><span className="text-slate-500">Deposit refund due</span><p className="font-bold">{formatMoney(focusedCalculation.depositRefundDue)}</p></div>
+                <div><span className="text-slate-500">Settlement</span><p className="font-bold">{focusedCalculation.isImmutable ? label(focusedCalculation.depositSettlementStatus) : "Awaiting finalization"}</p></div>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 text-xs">
+                {!focusedCalculation.isImmutable && requiredSettlementStatus === "REFUNDED" &&
+                  completedDepositRefunds.length === 0 && depositPaymentSources.length > 0 &&
+                  hasPermission("refund.request") && (
+                    <button disabled={submitting || restoration} onClick={() => {
+                      setSelectedPayment(depositPaymentSources[0]);
+                      setPaymentAmount(String(money(focusedCalculation.depositRefundDue)));
+                      setRefundReason(`Return deposit refund for ${focusedRental.rentalNumber}`);
+                      setActionMode("REFUND");
+                    }} className="rounded-lg border border-rose-200 px-3 py-2 font-semibold text-rose-700 disabled:opacity-50">
+                      Request deposit refund
+                    </button>
+                  )}
+                <span className="text-slate-500">{rentalInvoice ? `Invoice ${rentalInvoice.invoiceNumber}: ${label(rentalInvoice.status)}` : "No rental invoice recorded"}</span>
+                {!rentalInvoice && invoiceEligibleRentals.some((r) => r.id === focusedRentalId) && hasPermission("invoice.create") &&
+                  <button disabled={submitting || restoration} onClick={() => {setRentalId(focusedRentalId); setActionMode("GENERATE_INVOICE");}}
+                    className="rounded-lg border border-slate-300 px-3 py-2 font-semibold disabled:opacity-50 dark:border-slate-700">Generate invoice</button>}
+                {!focusedCalculation.isImmutable &&
+                  ["FINAL_CALCULATION", "FINAL_SETTLEMENT_PENDING"].includes(focusedRental.state) &&
+                  hasPermission("rental.final_settle") && (
+                    <button disabled={submitting || restoration} onClick={() => setActionMode("FINALIZE_SETTLEMENT")}
+                      className="rounded-lg bg-fuchsia-700 px-3 py-2 font-bold text-white disabled:opacity-50">Review & finalize settlement</button>
+                  )}
+                {(focusedRental.state === "DEPOSIT_PROCESSING" || focusedCalculation.isImmutable) && (
+                  <button onClick={() => setCurrentView("returns")} className="rounded-lg bg-emerald-700 px-3 py-2 font-bold text-white">
+                    Return to rental completion
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+        </section>
+      )}
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 xl:grid-cols-8">
         {[
@@ -574,13 +744,13 @@ export const FinanceView: React.FC = () => {
 
       {activeTab === "INVOICES" && (
         <div className="space-y-3">
-          {completedRentals.length > 0 && hasPermission("invoice.create") && (
+          {invoiceEligibleRentals.length > 0 && hasPermission("invoice.create") && (
             <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4 text-xs dark:border-blue-900 dark:bg-blue-950/20">
               <div className="flex items-start gap-3">
                 <FileCheck2 className="mt-0.5 h-5 w-5 text-blue-600" />
                 <div>
-                  <p className="font-bold text-blue-900 dark:text-blue-200">{completedRentals.length} completed rental(s) are not yet invoiced</p>
-                  <p className="mt-1 text-blue-700 dark:text-blue-300">Finance may generate an invoice only after Return & Final Calculation is complete.</p>
+                  <p className="font-bold text-blue-900 dark:text-blue-200">{invoiceEligibleRentals.length} rental(s) with final calculations are not yet invoiced</p>
+                  <p className="mt-1 text-blue-700 dark:text-blue-300">Invoices can be generated from a saved final calculation, before settlement and fleet release.</p>
                 </div>
               </div>
             </div>
@@ -836,10 +1006,10 @@ export const FinanceView: React.FC = () => {
 
             {actionMode === "GENERATE_INVOICE" && (
               <form onSubmit={handleGenerateInvoice} className="space-y-4">
-                <label className="block text-xs font-semibold">Completed rental
+                <label className="block text-xs font-semibold">Rental with final calculation
                   <select required value={rentalId} onChange={(e) => setRentalId(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 dark:border-slate-700 dark:bg-slate-950">
                     <option value="">Select rental</option>
-                    {completedRentals.map((r: Rental) => <option key={r.id} value={r.id}>{r.rentalNumber} · {customers.find((c) => c.id === r.customerId)?.fullName || r.customerId}</option>)}
+                    {invoiceEligibleRentals.map((r: Rental) => <option key={r.id} value={r.id}>{r.rentalNumber} · {customers.find((c) => c.id === r.customerId)?.fullName || r.customerId}</option>)}
                   </select>
                 </label>
                 <label className="block text-xs font-semibold">Due date
@@ -847,6 +1017,48 @@ export const FinanceView: React.FC = () => {
                 </label>
                 <p className="rounded-xl bg-blue-50 p-3 text-[11px] text-blue-800 dark:bg-blue-950/30 dark:text-blue-300">Only an actually recorded held deposit can be applied. A deposit requirement alone is never treated as money received.</p>
                 <SubmitButton busy={submitting} text="Generate authoritative invoice" />
+              </form>
+            )}
+
+            {actionMode === "FINALIZE_SETTLEMENT" && focusedRental && focusedCalculation && !focusedCalculation.isImmutable && (
+              <form onSubmit={handleFinalizeSettlement} className="space-y-4 text-xs">
+                <div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-950/60">
+                  <strong>{focusedRental.rentalNumber} · {label(focusedRental.state)}</strong>
+                  <p className="mt-2">Final rental total: {formatMoney(focusedCalculation.grossFinalTotal)}</p>
+                  <p>Additional customer payment: {formatMoney(focusedCalculation.depositAdditionalPaymentDue)}</p>
+                  <p>Deposit refund due: {formatMoney(focusedCalculation.depositRefundDue)}</p>
+                  <p className="mt-2 font-semibold">Required outcome: {label(waiveSettlement ? "WAIVED" : requiredSettlementStatus)}</p>
+                </div>
+                {!waiveSettlement && requiredSettlementStatus === "CHARGED" && (
+                  <label className="block font-semibold">Fully paid rental invoice
+                    <select required value={settlementInvoiceId} onChange={(e) => setSettlementInvoiceId(e.target.value)}
+                      className="mt-1 w-full rounded-xl border border-slate-200 p-2.5 dark:border-slate-700 dark:bg-slate-950">
+                      <option value="">Select verified paid invoice</option>
+                      {paidSettlementInvoices.map((i) => <option key={i.id} value={i.id}>{i.invoiceNumber} · {formatMoney(i.total, i.currency)}</option>)}
+                    </select>
+                    {paidSettlementInvoices.length === 0 && <span className="mt-2 block font-normal text-amber-700">Issue and fully settle the rental invoice before finalization.</span>}
+                  </label>
+                )}
+                {!waiveSettlement && requiredSettlementStatus === "REFUNDED" && (
+                  <label className="block font-semibold">Completed deposit refund
+                    <select required value={settlementRefundId} onChange={(e) => setSettlementRefundId(e.target.value)}
+                      className="mt-1 w-full rounded-xl border border-slate-200 p-2.5 dark:border-slate-700 dark:bg-slate-950">
+                      <option value="">Select provider-completed refund</option>
+                      {completedDepositRefunds.map((r) => <option key={r.id} value={r.id}>{r.refundNumber} · {formatMoney(r.amount, r.currency)}</option>)}
+                    </select>
+                    {completedDepositRefunds.length === 0 && <span className="mt-2 block font-normal text-amber-700">The deposit refund must be completed through Payments before finalization. An invoice refund is not sufficient.</span>}
+                  </label>
+                )}
+                <label className="flex items-start gap-2 font-semibold">
+                  <input type="checkbox" checked={waiveSettlement} onChange={(e) => setWaiveSettlement(e.target.checked)} />
+                  Record an explicitly authorized waiver instead of payment/refund (reason required)
+                </label>
+                <label className="block font-semibold">Settlement notes / waiver reason
+                  <textarea rows={3} required={waiveSettlement} value={settlementNotes} onChange={(e) => setSettlementNotes(e.target.value)}
+                    className="mt-1 w-full rounded-xl border border-slate-200 p-2.5 dark:border-slate-700 dark:bg-slate-950" />
+                </label>
+                <p className="rounded-xl bg-amber-50 p-3 text-amber-800 dark:bg-amber-950/30 dark:text-amber-200">This seals the immutable settlement after server-side proof checks. It does not itself disburse money or release the vehicle.</p>
+                <SubmitButton busy={submitting || restoration} text="Seal final settlement" />
               </form>
             )}
 

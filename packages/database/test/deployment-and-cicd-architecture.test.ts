@@ -223,13 +223,24 @@ async function runSprint41DeploymentTests() {
   assert.ok(ciWorkflow.includes("pnpm test:all"), "CI must enforce Sprint 39 test matrix");
   assert.ok(ciWorkflow.includes("pnpm perf:baseline"), "CI must enforce Sprint 40 baseline");
   assert.ok(ciWorkflow.includes("docker/build-push-action"), "CI must build container images");
-  assert.ok(ciWorkflow.includes("pnpm db:migrate"), "CI must run transactional database migrations");
-  console.log("  ✔ CI workflow (.github/workflows/ci.yml) enforces all 5 sequential stages.");
+  assert.ok(ciWorkflow.includes("adapters/staging.sh migrate") &&
+    ciWorkflow.includes("adapters/production.sh migrate"),
+    "CI must invoke actual environment-specific transactional migration adapters");
+  assert.ok(ciWorkflow.includes("scripts/release-preflight.mjs staging") &&
+    ciWorkflow.includes("scripts/release-preflight.mjs production"),
+    "Deployment must fail closed until verified adapters exist");
+  assert.ok(!ciWorkflow.includes("==> Orchestrating zero-downtime rolling update"),
+    "A deployment echo must never count as actual production promotion");
+  console.log("  ✔ CI workflow enforces test, capacity, images, real migration adapters and fail-closed promotion.");
 
   const rollbackWorkflow = fs.readFileSync(path.resolve(process.cwd(), ".github/workflows/rollback.yml"), "utf-8");
   assert.ok(rollbackWorkflow.includes("target_release_id"), "Rollback workflow requires target release ID");
   assert.ok(rollbackWorkflow.includes("skip_db_check"), "Rollback workflow accounts for forward-compatible DB schema");
-  console.log("  ✔ Rollback workflow (.github/workflows/rollback.yml) validated.");
+  assert.ok(rollbackWorkflow.includes("scripts/release-preflight.mjs rollback") &&
+    ["validate", "traffic", "workers", "verify"].every(action=>
+      rollbackWorkflow.includes("adapters/rollback.sh "+action)),
+    "Rollback must fail closed and require real artifact/traffic/worker/health operations");
+  console.log("  ✔ Rollback workflow requires actual operations and rejects placeholder-only success.");
 
   console.log("\n======================================================================");
   console.log("🎉 ALL SPRINT 41 DEPLOYMENT & CI/CD VERIFICATIONS PASSED CLEANLY!");

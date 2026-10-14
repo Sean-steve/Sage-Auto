@@ -261,6 +261,7 @@ export class RentalRepository implements IRentalRepository {
       checkoutOdometer: data.checkoutOdometer || 0,
       checkoutFuelLevel: data.checkoutFuelLevel || 100,
       contractId: data.contractId,
+      handoverId: data.handoverId,
       handoverInspectionId: data.preRentalInspectionId || undefined,
       extensions: [],
       incidents: [],

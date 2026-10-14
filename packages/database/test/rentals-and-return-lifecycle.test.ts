@@ -6,6 +6,7 @@
 import assert from "node:assert/strict";
 import {
   RentalRepository,
+  RefundRepository,
   BookingRepository,
   ContractRepository,
   HandoverRepository,
@@ -642,6 +643,53 @@ async function runTests() {
   console.log("✓ Deposit settlement sealed as immutable; recalculation cannot rewrite it.");
 
   // --------------------------------------------------------------------------
+  // CLOSURE FAULT INJECTION: no partial success from any dependent write.
+  // --------------------------------------------------------------------------
+  const failurePoints = [
+    "booking", "contract", "vehicle", "allocation", "audit", "outbox", "idempotency",
+  ] as const;
+  const failAt = <T extends object>(repository: T, method: string, enabled: boolean): T =>
+    enabled
+      ? new Proxy(repository, {
+          get(target, key, receiver) {
+            if (key === method) return async () => { throw new Error("injected closure failure"); };
+            return Reflect.get(target, key, receiver);
+          },
+        })
+      : repository;
+
+  for (const failure of failurePoints) {
+    const failingService = new RentalService(
+      rentalRepo,
+      failAt(bookingRepo, "update", failure === "booking"),
+      failAt(contractRepo, "update", failure === "contract"),
+      handoverRepo,
+      failAt(vehicleRepo, "update", failure === "vehicle"),
+      failAt(allocationRepo, "releaseAllocation", failure === "allocation"),
+      failAt(auditRepo, "record", failure === "audit"),
+      failAt(outboxRepo, "enqueue", failure === "outbox"),
+      failAt(idempotencyRepo, "record", failure === "idempotency"),
+      inspectionRepo,
+      damageRepo
+    );
+    const key = `return-complete-fault-${failure}`;
+    await assert.rejects(
+      failingService.completeRental(tenantId, rental.id, {
+        releaseVehicleToStatus: "AVAILABLE", idempotencyKey: key,
+      }, actor),
+      /injected closure failure/
+    );
+    assert.equal((await rentalRepo.findById(rental.id, tenantId))?.state, "DEPOSIT_PROCESSING");
+    assert.notEqual((await bookingRepo.findById(booking.id, tenantId))?.status, "COMPLETED");
+    assert.notEqual((await contractRepo.findById(contract.id, tenantId))?.status, "COMPLETED");
+    assert.equal((await vehicleRepo.findById(vehicle.id, tenantId))?.availabilityStatus, "ON_RENT");
+    assert.equal((await vehicleRepo.findById(vehicle.id, tenantId))?.odometer, 45000);
+    assert.notEqual((await allocationRepo.findById(allocation.id, tenantId))?.status, "RELEASED");
+    assert.equal(await idempotencyRepo.findByKey(tenantId, key), null);
+  }
+  console.log("✓ Closure rejects seven dependent-write failures without partial completion or cached success.");
+
+  // --------------------------------------------------------------------------
   // TEST 9: Complete Rental, Booking, Contract & Release Fleet
   // --------------------------------------------------------------------------
   console.log("\n[TEST 9] Completing Rental & Releasing Vehicle to Fleet...");
@@ -694,6 +742,93 @@ async function runTests() {
   assert.equal(finalReturnRecord?.returnInspectionId, returnInspection.id);
 
   console.log("✓ Rental, Booking, Contract completed; ReturnRecord history preserved and Vehicle allocation released.");
+
+  // --------------------------------------------------------------------------
+  // SETTLEMENT PROOF VARIANTS: zero balance, provider refund, authorized waiver.
+  // These variants use isolated Rental records and do not send funds to a provider.
+  // --------------------------------------------------------------------------
+  const sealedSource = await rentalRepo.getFinalCalculation(rental.id, tenantId);
+  assert.ok(sealedSource);
+  const { id: _sourceCalcId, calculatedAt: _sourceCalcAt, ...sourceCalculation } = sealedSource;
+  const makeSettlementRental = async (suffix: string, refundDue: number, extraDue: number) => {
+    const variant = await rentalRepo.create(tenantId, {
+      rentalNumber: `RNT-SETTLEMENT-${suffix}`,
+      bookingId: `BKG-SETTLEMENT-${suffix}`,
+      contractId: `CTR-SETTLEMENT-${suffix}`,
+      handoverId: `HND-SETTLEMENT-${suffix}`,
+      customerId: rental.customerId,
+      primaryDriverId: "drv-16-vip",
+      vehicleId: rental.vehicleId,
+      status: "FINAL_CALCULATION",
+      pricingSnapshot: (await rentalRepo.getStartSnapshot(rental.id, tenantId))!.pricingSnapshot,
+    });
+    await rentalRepo.saveFinalCalculation(tenantId, {
+      ...sourceCalculation,
+      rentalId: variant.id,
+      bookingId: variant.bookingId,
+      isImmutable: false,
+      sealedAt: undefined,
+      sealedBy: undefined,
+      depositRefundDue: refundDue,
+      depositAdditionalPaymentDue: extraDue,
+    });
+    return variant;
+  };
+
+  const zeroBalanceRental = await makeSettlementRental("ZERO", 0, 0);
+  const zeroSealed = await service.processDepositSettlement(
+    tenantId, zeroBalanceRental.id, { settlementStatus: "SETTLED" }, actor
+  );
+  assert.equal(zeroSealed.isImmutable, true);
+  assert.equal(zeroSealed.depositSettlementStatus, "SETTLED");
+  assert.equal((await rentalRepo.findById(zeroBalanceRental.id, tenantId))?.state, "DEPOSIT_PROCESSING");
+
+  const refundRental = await makeSettlementRental("REFUND", 1250, 0);
+  await assert.rejects(
+    service.processDepositSettlement(
+      tenantId, refundRental.id, { settlementStatus: "REFUNDED" }, actor
+    ), /completed provider Refund/
+  );
+  assert.equal((await rentalRepo.findById(refundRental.id, tenantId))?.state, "FINAL_CALCULATION");
+  const refundRepo = new RefundRepository();
+  const completedRefund = await refundRepo.create({
+    tenantId,
+    originalPaymentId: "verified-deposit-payment-for-refund-variant",
+    sourceObligationType: "RENTAL_DEPOSIT",
+    sourceObligationId: refundRental.id,
+    amount: "1250.0000",
+    currency: "KES",
+    status: "COMPLETED",
+    reason: "Verified renter deposit balance returned.",
+    requestedAt: new Date().toISOString(),
+    postedToLedger: false,
+  });
+  const refunded = await service.processDepositSettlement(
+    tenantId, refundRental.id, {
+      settlementStatus: "REFUNDED",
+      refundId: completedRefund.id,
+      refundAmount: 1250,
+    }, actor
+  );
+  assert.equal(refunded.depositSettlementStatus, "REFUNDED");
+  assert.equal(refunded.isImmutable, true);
+
+  const waivedRental = await makeSettlementRental("WAIVED", 0, 200);
+  await assert.rejects(
+    service.processDepositSettlement(
+      tenantId, waivedRental.id, { settlementStatus: "WAIVED" }, actor
+    ), /documented reason/
+  );
+  assert.equal((await rentalRepo.findById(waivedRental.id, tenantId))?.state, "FINAL_CALCULATION");
+  const waived = await service.processDepositSettlement(
+    tenantId, waivedRental.id, {
+      settlementStatus: "WAIVED",
+      notes: "Approved commercial write-off recorded by authorized finance operator.",
+    }, actor
+  );
+  assert.equal(waived.depositSettlementStatus, "WAIVED");
+  assert.equal(waived.isImmutable, true);
+  console.log("✓ Zero, completed deposit refund, and documented waiver seal correctly without fabricated payment proof.");
 
   // --------------------------------------------------------------------------
   // TEST 10: Terminal State Invariants

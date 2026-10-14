@@ -21,6 +21,7 @@ import {
   SubscriptionRepository,
   SaasBillingInvoiceRepository,
   OwnerSettlementRepository,
+  OwnerSettlementPeriodRepository,
 } from "@carhire/database";
 import {
   RedisConnectionManager,
@@ -517,16 +518,36 @@ async function runSprint26TestSuite() {
       calculatedAt: new Date().toISOString(),
     });
 
-    const result = await processSettlementBatch({ tenantId });
-    assert.equal(result.settlementsProcessed, 1);
+    // A legacy DRAFT settlement does not authorize worker calculation or
+    // payment. Without an eligible period this tenant is safely skipped.
+    const noPeriod = await processSettlementBatch({ tenantId });
+    assert.equal(noPeriod.settlementsProcessed, 0);
+    assert.equal(noPeriod.status, "completed");
+
+    // Even with a legitimate closed month, the worker must not invent
+    // payables/revenue from a DRAFT. The authoritative Finance engine rejects
+    // the empty eligible revenue set and restores the period to OPEN.
+    const periodRepo = new OwnerSettlementPeriodRepository();
+    const period = await periodRepo.create({
+      tenantId,
+      periodType: "MONTHLY",
+      startDate: "2026-08-01",
+      endDate: "2026-08-31",
+      status: "OPEN",
+    } as any);
+    await assert.rejects(
+      processSettlementBatch({ tenantId, periodId: period.id, now: "2026-09-02T00:00:00Z" }),
+      /No eligible paid\/settled owner revenue exists/i
+    );
+    assert.equal((await periodRepo.findById(period.id, tenantId))?.status, "OPEN");
+    assert.equal((await settlementRepo.findById(settlement.id, tenantId))?.status, "DRAFT");
 
     const pendingOutbox = await outboxRepo.fetchPendingBatch(50);
-    const stlEvent = pendingOutbox.find(
+    const phantomEvent = pendingOutbox.find(
       (e) => e.eventType === EVENT_TYPES.SETTLEMENT_BATCH_CALCULATED && e.aggregateId === settlement.id
     );
-    assert.ok(stlEvent, "Settlement batch calculated event must be recorded in outbox");
-
-    console.log("  ✓ Owner settlement batch processed and outbox event dispatched");
+    assert.equal(phantomEvent, undefined, "A draft settlement must not yield a calculated/payout event");
+    console.log("  ✓ Owner settlement worker rejects phantom revenue, retains draft and rolls period back to OPEN");
   }
 
   // ============================================================================

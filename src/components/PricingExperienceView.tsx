@@ -142,7 +142,7 @@ export function PricingExperienceView({portal}:Props){
 
   return <div className="mx-auto max-w-[1500px] space-y-6 p-4 sm:p-6 lg:p-8">
     <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-      <div><p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-600">Commercial engine</p><h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">Pricing & Rate Engine</h1><p className="mt-2 max-w-3xl text-sm text-slate-500">Configure commercial rules once; verify the exact server-calculated price before Booking uses it.</p></div>
+      <div><p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-600">Commercial engine</p><h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">Pricing & Rate Engine</h1><p className="mt-2 max-w-3xl text-sm text-slate-500">Configure commercial rules once; verify the exact server-calculated price before Booking uses it. The browser sends inputs; Sage-Auto's Pricing Engine returns the authoritative result.</p></div>
       <div className="flex flex-wrap gap-2"><button onClick={()=>void loadCore(selectedPlanId)} className={secondary}><RefreshCw size={16}/>Refresh</button>{can("pricing.calculate")&&<button onClick={()=>setTab("quote")} className={primary}><Calculator size={16}/>Instant quote</button>}</div>
     </header>
 

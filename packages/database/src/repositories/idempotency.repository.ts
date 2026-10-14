@@ -12,6 +12,7 @@ export interface IdempotencyRecord {
   idempotencyKey: string;
   operationScope: string;
   requestHash: string;
+  resourceId?: string;
   responseStatus?: number;
   responseBody?: Record<string, unknown>;
   status: "PENDING" | "COMPLETED" | "FAILED";
@@ -65,6 +66,7 @@ export class IdempotencyRepository implements IIdempotencyRepository {
       idempotencyKey: data.idempotencyKey,
       operationScope: scope,
       requestHash: "hash",
+      resourceId: data.resourceId,
       status: "COMPLETED",
       responseStatus: data.responseStatus,
       responseBody: body,

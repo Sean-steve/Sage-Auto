@@ -302,8 +302,18 @@ export class PaymentService {
       return dupPayment;
     }
 
+    // Provider evidence must match the original authoritative attempt exactly.
+    // Never mint funds from an under/over-paid or wrong-currency callback.
+    if (
+      !Number.isFinite(Number(verifyResult.amount)) ||
+      Math.abs(Number(verifyResult.amount) - Number(attempt.amount)) > 0.0001 ||
+      !verifyResult.currency ||
+      verifyResult.currency.toUpperCase() !== attempt.currency.toUpperCase()
+    ) {
+      throw new PaymentVerificationFailedError("Provider verified amount/currency does not match the payment attempt.");
+    }
     const now = new Date().toISOString();
-    const verifiedAmount = to4Dec(verifyResult.amount || attempt.amount);
+    const verifiedAmount = to4Dec(verifyResult.amount);
 
     const payment = await this.paymentRepo.create({
       tenantId,
@@ -504,7 +514,15 @@ export class PaymentService {
       return { status: "ATTEMPT_FAILED", attempt: updated };
     }
 
-    // 6. Handle Success Callback -> Create Authoritative Payment
+    // 6. Strictly reconcile provider-reported money to the original intent.
+    // This also protects the BOOKING auto-projection path, which otherwise
+    // could mark a partial/incorrect callback as an authoritative payment.
+    if (!parsed.amount || !Number.isFinite(Number(parsed.amount)) ||
+        Math.abs(Number(parsed.amount) - Number(attempt.amount)) > 0.0001 ||
+        !parsed.currency || parsed.currency.toUpperCase() !== attempt.currency.toUpperCase()) {
+      throw new PaymentVerificationFailedError("Webhook amount or currency does not match the original payment attempt.");
+    }
+    // 7. Handle Success Callback -> Create Authoritative Payment
     const existingPayment = await this.paymentRepo.findByProviderTransaction(
       providerName,
       parsed.providerTransactionId || `TXN_${parsed.providerEventId}`,
@@ -978,9 +996,41 @@ export class PaymentService {
       throw new PaymentNotFoundError(dto.paymentId);
     }
 
+    // Reserve ALL outstanding refund obligations, not only money already
+    // disbursed. Multiple pending requests must never overbook one payment.
+    // A rental-deposit refund must be supported by THIS payment's allocation
+    // to THIS tenant's real deposit liability, not an arbitrary client-supplied
+    // source ID. A mismatch must never trigger a provider disbursement.
+    if (dto.sourceObligationType === "RENTAL_DEPOSIT") {
+      if (!this.depositPositionRepo || !dto.sourceObligationId) {
+        throw new Error("Rental-deposit refunds require a linked deposit position.");
+      }
+      const deposit =
+        await this.depositPositionRepo.findById(dto.sourceObligationId, tenantId) ||
+        await this.depositPositionRepo.findByRentalId(dto.sourceObligationId, tenantId) ||
+        await this.depositPositionRepo.findByBookingId(dto.sourceObligationId, tenantId);
+      const lines = await this.allocationRepo.findByPaymentId(payment.id, tenantId);
+      if (!deposit || payment.purpose !== "RENTAL_DEPOSIT" ||
+          deposit.currency !== payment.currency ||
+          !lines.some((line) => line.sourceType === "RENTAL_DEPOSIT" &&
+            line.sourceId === deposit.id && Number(line.amount) > 0) ||
+          Number(dto.amount) > Number(deposit.heldAmount) + 0.0001) {
+        throw new Error("Refund must be backed by this payment's held rental-deposit allocation.");
+      }
+    }
+
+    const outstanding = await this.refundRepo.findByOriginalPaymentId(payment.id, tenantId);
+    const outstandingAmount = outstanding
+      .filter((r) => ["PENDING", "APPROVED", "PROCESSING"].includes(r.status))
+      .reduce((total, r) => total + Number(r.amount), 0);
+    if (!Number.isFinite(Number(dto.amount)) || Number(dto.amount) <= 0) {
+      throw new Error("Refund amount must be positive and finite.");
+    }
+    // This canonical state-machine throws RefundExceedsPaymentError on every
+    // request that would exceed total paid money, including reserved requests.
     const { newRefunded } = PaymentStateMachine.computeRefundOutcome(
       payment.amount,
-      payment.refundedAmount,
+      String(Number(payment.refundedAmount) + outstandingAmount),
       dto.amount,
       payment.id
     );
@@ -1024,6 +1074,13 @@ export class PaymentService {
       throw new RefundNotFoundError(refundId);
     }
 
+    // Terminal refunds are safe to replay without contacting the provider.
+    // An in-flight provider request is deliberately non-retryable until its
+    // outcome is reconciled, preventing a second outbound disbursement.
+    if (refund.status === "COMPLETED") return refund;
+    if (refund.status !== "PENDING") {
+      throw new Error("Refund must be PENDING before a provider disbursement; reconcile PROCESSING/FAILED refunds first.");
+    }
     if (refund.requestedBy && refund.requestedBy === actor.userId) {
       const err: any = new Error("Refund approval requires a different authorized user from the requester.");
       err.code = "SEPARATION_OF_DUTIES";
@@ -1047,7 +1104,14 @@ export class PaymentService {
     }
 
     const provider = this.providerRegistry.get(payment.provider);
-    const refundResult = await provider.refundPayment({
+    // Claim one irreversible execution attempt via optimistic versioning
+    // BEFORE talking to the provider. A crash cannot silently re-disburse.
+    const processing = await this.refundRepo.update(
+      refund.id, tenantId, { status: "PROCESSING", approvedBy: actor.userId,
+        approvedAt: new Date().toISOString() }, refund.version);
+    let refundResult;
+    try {
+      refundResult = await provider.refundPayment({
       tenantId,
       originalPaymentId: payment.id,
       providerTransactionId: payment.providerTransactionId,
@@ -1056,6 +1120,11 @@ export class PaymentService {
       reason: refund.reason,
       idempotencyKey: `refund_${refund.id}`,
     });
+    } catch (providerError) {
+      // An ambiguous network failure must NOT be treated as 'FAILED'. The
+      // provider may have sent money; require reconciliation before retry.
+      throw providerError;
+    }
 
     if (!refundResult.success) {
       await this.refundRepo.update(
@@ -1065,7 +1134,7 @@ export class PaymentService {
           status: "FAILED",
           failureReason: refundResult.failureReason || "Provider failed to disburse refund",
         },
-        refund.version
+        processing.version
       );
       throw new Error(`Refund disbursement failed: ${refundResult.failureReason}`);
     }
@@ -1081,7 +1150,7 @@ export class PaymentService {
         providerRefundReference: refundResult.providerRefundReference,
         completedAt: refundResult.completedAt || now,
       },
-      refund.version
+      processing.version
     );
 
     const { newRefunded, newStatus } = PaymentStateMachine.computeRefundOutcome(
@@ -1143,6 +1212,13 @@ export class PaymentService {
     if (payable.status === "PAID") {
       throw new SettlementAlreadyPaidError(payable.payableNumber);
     }
+    // Never call the transfer provider twice for an in-flight payable.
+    if (payable.status === "PROCESSING" || payable.status === "CANCELLED") {
+      throw new Error("Payout is already processing or cancelled. Reconcile its outcome before retrying.");
+    }
+    if (!["PENDING", "FAILED"].includes(payable.status)) {
+      throw new Error("Payout must be a pending approved payable.");
+    }
 
     const settlement = await this.settlementRepo.findById(payable.settlementId, tenantId);
     if (!settlement) {
@@ -1152,6 +1228,15 @@ export class PaymentService {
       throw new Error(
         `Settlement ${settlement.settlementNumber} must be APPROVED before provider payout; current status is ${settlement.status}.`
       );
+    }
+    if (!Number.isFinite(Number(payable.netDisbursementAmount)) ||
+        Number(payable.netDisbursementAmount) <= 0 ||
+        Math.abs(Number(payable.netDisbursementAmount) - Number(settlement.netPayoutAmount)) > 0.0001 ||
+        payable.ownerId !== settlement.ownerId || payable.currency !== settlement.currency) {
+      throw new Error("Payable amount, owner and currency must match its approved settlement.");
+    }
+    if (!payable.destinationMpesaNumber && !payable.destinationAccount) {
+      throw new Error("An explicitly configured owner payout destination is required.");
     }
     if (settlement.approvedBy && settlement.approvedBy === actor.userId) {
       const err: any = new Error("Owner payout execution requires a different authorized user from the settlement approver.");
@@ -1187,7 +1272,7 @@ export class PaymentService {
       payableId: payable.id,
       recipientName: payable.recipientName,
       recipientAccountOrPhone:
-        payable.destinationMpesaNumber || payable.destinationAccount || "DEFAULT_ACCOUNT",
+        payable.destinationMpesaNumber || payable.destinationAccount || "",
       amount: payable.netDisbursementAmount,
       currency: payable.currency,
       payoutMethod: payable.payoutMethod,

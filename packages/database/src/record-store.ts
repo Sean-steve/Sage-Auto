@@ -20,6 +20,11 @@ function db(): DatabaseSync {
 }
 
 const transactionStores = new AsyncLocalStorage<Map<string, Map<any, any>>>();
+// In-memory stores are used by isolated domain tests; production must configure
+// SQLITE_PATH before repositories are imported.
+const memoryStores = new Set<Map<unknown, unknown>>();
+const memoryTransactionContext = new AsyncLocalStorage<boolean>();
+let memoryTransactionTail: Promise<void> = Promise.resolve();
 function staged(namespace:string):Map<any,any>|undefined {
   const stores=transactionStores.getStore();
   if(!stores) return;
@@ -31,7 +36,29 @@ function staged(namespace:string):Map<any,any>|undefined {
 // Replace whole-database conflict detection with indexed row versions as it grows.
 // Only database work belongs in this callback; external delivery stays outside it.
 export async function withRecordTransaction<T>(work:()=>Promise<T>):Promise<T> {
-  if(transactionStores.getStore()) return work();
+  if (transactionStores.getStore() || memoryTransactionContext.getStore()) return work();
+  if (!process.env.SQLITE_PATH) {
+    // Roll back every in-memory repository on injected failures in domain tests.
+    // A per-process lease serializes test transactions; this is not durable storage.
+    const previous = memoryTransactionTail;
+    let release!: () => void;
+    memoryTransactionTail = new Promise<void>((resolve) => { release = resolve; });
+    await previous;
+    const snapshots = new Map(
+      [...memoryStores].map((store) => [store, deserialize(serialize([...store.entries()])) as [unknown, unknown][]])
+    );
+    try {
+      return await memoryTransactionContext.run(true, work);
+    } catch (error) {
+      for (const [store, entries] of snapshots) {
+        store.clear();
+        for (const [key, value] of entries) store.set(key, value);
+      }
+      throw error;
+    } finally {
+      release();
+    }
+  }
   const database=db();
   const snapshot=()=>database.prepare('SELECT namespace,key,value,unique_value FROM records ORDER BY namespace,key').all();
   const original=snapshot(), fingerprint=serialize(original);
@@ -107,7 +134,10 @@ class SqliteRecordStore<K, V> extends Map<K, V> {
 export function createRecordStore<K,V>(namespace: string): Map<K,V> {
   // Domain unit tests explicitly run without a configured database. The API entry
   // point always configures a durable path before importing repositories.
-  return process.env.SQLITE_PATH ? new SqliteRecordStore<K,V>(namespace) : new Map<K,V>();
+  if (process.env.SQLITE_PATH) return new SqliteRecordStore<K,V>(namespace);
+  const store = new Map<K,V>();
+  memoryStores.add(store as Map<unknown, unknown>);
+  return store;
 }
 
 export function probeRecordStore(): void {

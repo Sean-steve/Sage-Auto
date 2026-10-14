@@ -379,6 +379,20 @@ async function runPaymentSuite() {
   assert.strictEqual(refundReq.amount, "5000.0000");
   assert.strictEqual(refundReq.requestedBy, actor.userId);
 
+  // Stage 7: PENDING refunds reserve real money just as already completed
+  // refunds do. Competing requests must not overbook a provider payment.
+  await assert.rejects(
+    () => paymentService.requestRefund(tenantId, {
+      paymentId: verifiedPayment.id, amount: "11000.0000",
+      reason: "Competing refund exceeds remaining unreserved funds",
+    }, actor),
+    (err: any) => err?.name === "RefundExceedsPaymentError"
+  );
+  assert.strictEqual(
+    (await refundRepo.findById(refundReq.id,tenantId))?.status,"PENDING",
+    "Rejected second request cannot mutate the original refund"
+  );
+
   await assert.rejects(
     () => paymentService.requestRefund(
       tenantId,
@@ -401,6 +415,25 @@ async function runPaymentSuite() {
   const updatedProviderPmt = await paymentRepo.findById(verifiedPayment.id, tenantId);
   assert.strictEqual(updatedProviderPmt?.refundedAmount, "5000.0000");
   assert.strictEqual(updatedProviderPmt?.status, "PARTIALLY_REFUNDED");
+
+  // Stage 7: Retry after successful provider disbursement is a read-only
+  // idempotent response; it must not refund the same money twice.
+  const refundReplay=await paymentService.approveAndExecuteRefund(
+    tenantId,refundReq.id,refundApprover
+  );
+  assert.strictEqual(refundReplay.id,executedRefund.id);
+  assert.strictEqual(
+    (await paymentRepo.findById(verifiedPayment.id,tenantId))?.refundedAmount,
+    "5000.0000"
+  );
+  await assert.rejects(
+    () => paymentService.requestRefund(tenantId, {
+      paymentId:verifiedPayment.id,amount:"10001.0000",
+      reason:"Refund remaining funds plus one fraction beyond cap",
+    },actor),
+    (err:any)=>err?.name==="RefundExceedsPaymentError"
+  );
+  console.log("  ✓ Stage 7 refund replay and reserved-money ceilings verified");
   console.log("  ✓ Provider refund approved by a second user and payment updated");
 
   // TEST 8: Vehicle Owner Settlement Payout Execution (Sprint 21 Integration)
@@ -457,6 +490,57 @@ async function runPaymentSuite() {
     (err: any) => err?.code === "SEPARATION_OF_DUTIES"
   );
   console.log("  ✓ Settlement approver cannot execute the same payout");
+  // Stage 7: A payable is not payment authorization. Matching tenant,
+  // approved settlement, owner, currency and exact net amount are required.
+  const unapproved=await settlementRepo.create({
+    tenantId,settlementNumber:"SET-2026-NOT-APPROVED",
+    ownerId:"owner_test_unapproved",ownerName:"Not Approved",
+    periodStart:"2026-09-01",periodEnd:"2026-09-30",
+    currency:"KES",status:"CALCULATED",
+    calculatedAt:"2026-10-01T08:00:00Z",
+    calculatedBy:"stage7-calculator",netPayoutAmount:"1000.0000",
+  } as any);
+  const unapprovedPayable=await settlementRepo.createPayable({
+    tenantId,payableNumber:"PAY-STAGE7-UNAPPROVED",
+    settlementId:unapproved.id,ownerId:"owner_test_unapproved",
+    recipientName:"Unapproved Owner",destinationMpesaNumber:"+254700123123",
+    amount:"1000.0000",taxWithholdingAmount:"0.0000",
+    netDisbursementAmount:"1000.0000",currency:"KES",
+    payoutMethod:"MPESA_B2C",status:"PENDING",
+    createdBy:actor.userId,retryCount:0,
+  } as any);
+  await assert.rejects(
+    () => paymentService.executeOwnerPayout(tenantId,{
+      settlementPayableId:unapprovedPayable.id,provider:"FAKE_PROVIDER",
+    },actor),
+    /must be APPROVED/
+  );
+  assert.strictEqual(
+    (await settlementRepo.findPayableById(unapprovedPayable.id,tenantId))?.status,
+    "PENDING","An unapproved payable must not enter provider processing"
+  );
+
+  const mismatchedPayable=await settlementRepo.createPayable({
+    tenantId,payableNumber:"PAY-STAGE7-MISMATCH",
+    settlementId:approvedSettlement.id,
+    ownerId:"DIFFERENT_OWNER",
+    recipientName:"Wrong Owner",destinationMpesaNumber:"+254700123456",
+    amount:"42751.0000",taxWithholdingAmount:"0.0000",
+    netDisbursementAmount:"42751.0000",currency:"KES",
+    payoutMethod:"MPESA_B2C",status:"PENDING",
+    createdBy:actor.userId,retryCount:0,
+  } as any);
+  await assert.rejects(
+    () => paymentService.executeOwnerPayout(tenantId,{
+      settlementPayableId:mismatchedPayable.id,provider:"FAKE_PROVIDER",
+    },actor),
+    /amount, owner and currency must match/
+  );
+  assert.strictEqual(
+    (await settlementRepo.findPayableById(mismatchedPayable.id,tenantId))?.status,
+    "PENDING","Wrong-owner payable cannot trigger provider transfer"
+  );
+  console.log("  ✓ Stage 7 owner payouts reject unapproved and mismatched payables");
 
   const payoutResult = await paymentService.executeOwnerPayout(
     tenantId,

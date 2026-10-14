@@ -71,6 +71,7 @@ import {
   InspectionOdometerRegressionError,
   InspectionInvalidFuelLevelError,
   RecordNotFoundError,
+  withRecordTransaction,
 } from "@carhire/database";
 import { RentalStateMachine } from "../domain/rental-state-machine";
 
@@ -1706,6 +1707,7 @@ export class RentalService {
     dto: ProcessDepositSettlementDto,
     actor: RentalActor
   ): Promise<RentalFinalCalculation> {
+    return withRecordTransaction(async () => {
     const calc = await this.rentalRepo.getFinalCalculation(rentalId, tenantId);
     if (!calc) {
       throw new Error(`Final calculation for rental '${rentalId}' not found. Please calculate final rental charges first.`);
@@ -1856,6 +1858,7 @@ export class RentalService {
     });
 
     return updatedCalc;
+    });
   }
 
   // ==========================================================================
@@ -1868,12 +1871,16 @@ export class RentalService {
     dto: CompleteRentalDto,
     actor: RentalActor
   ): Promise<Rental> {
+    return withRecordTransaction(async () => {
     if (!["AVAILABLE", "MAINTENANCE", "INSPECTION", "GROUNDED"].includes(dto.releaseVehicleToStatus)) {
       throw new Error("Rental completion requires an explicit vehicle disposition: AVAILABLE, MAINTENANCE, INSPECTION or GROUNDED.");
     }
     if (dto.idempotencyKey) {
       const cached = await this.idempotencyRepo.findByKey(tenantId, dto.idempotencyKey);
       if (cached?.responseBody) {
+        if ((cached.resourceId || (cached.responseBody as any)?.id) !== rentalId || cached.operationScope !== "RentalCompletion") {
+          throw new Error("This completion idempotency key is already assigned to another operation.");
+        }
         return cached.responseBody as unknown as Rental;
       }
     }
@@ -1923,69 +1930,54 @@ export class RentalService {
       occurredAt: now,
     });
 
-    // 3. Complete Linked Booking
+    // 3. Complete Linked Booking — missing or cancelled links are inconsistencies.
     if (rental.bookingId) {
-      try {
-        const booking = await this.bookingRepo.findById(rental.bookingId, tenantId);
-        if (booking && booking.status !== "COMPLETED" && booking.status !== "CANCELLED") {
-          await this.bookingRepo.update(booking.id, tenantId, {
-            status: "COMPLETED",
-          });
-        }
-      } catch {
-        // gracefully handle missing booking
+      const booking = await this.bookingRepo.findById(rental.bookingId, tenantId);
+      if (!booking) throw new BookingNotFoundError(rental.bookingId);
+      if (booking.status === "CANCELLED") throw new Error("Cannot complete a rental with a cancelled linked booking.");
+      if (booking.status !== "COMPLETED") {
+        await this.bookingRepo.update(booking.id, tenantId, { status: "COMPLETED" });
       }
     }
 
     // 4. Complete Linked Contract
     if (rental.contractId) {
-      try {
-        const contract = await this.contractRepo.findById(rental.contractId, tenantId);
-        if (contract && contract.status !== "COMPLETED") {
-          await this.contractRepo.update(contract.id, tenantId, {
-            status: "COMPLETED",
-          });
-        }
-      } catch {
-        // gracefully handle missing contract
+      const contract = await this.contractRepo.findById(rental.contractId, tenantId);
+      if (!contract) throw new ContractNotFoundError(rental.contractId);
+      if (contract.status !== "COMPLETED") {
+        await this.contractRepo.update(contract.id, tenantId, { status: "COMPLETED" });
       }
     }
 
-    // 5. Update Vehicle Mileage, Fuel, and Availability Status
+    // 5. Vehicle and allocation must commit together with Rental completion.
     const targetVehicleStatus = dto.releaseVehicleToStatus as any;
-    try {
-      const vehicle = await this.vehicleRepo.findById(rental.vehicleId, tenantId);
-      if (vehicle) {
-        await this.vehicleRepo.update(vehicle.id, tenantId, {
-          availabilityStatus: targetVehicleStatus,
-          odometer: returnOdometer,
-          fuelLevel: returnFuelLevel,
-        });
-      }
-    } catch {
-      // gracefully handle vehicle update
-    }
+    const vehicle = await this.vehicleRepo.findById(rental.vehicleId, tenantId);
+    if (!vehicle) throw new RecordNotFoundError("Vehicle", rental.vehicleId);
+    await this.vehicleRepo.update(vehicle.id, tenantId, {
+      availabilityStatus: targetVehicleStatus,
+      odometer: returnOdometer,
+      fuelLevel: returnFuelLevel,
+    });
 
-    // 6. Release Vehicle Allocation
-    try {
+    // 6. Release only allocations belonging to this Rental's linked booking.
+    // Never use an undefined sourceId to query/release other bookings' holds.
+    if (rental.bookingId) {
       const allocations = await this.allocationRepo.findAllocations(tenantId, {
         vehicleId: rental.vehicleId,
         sourceType: "BOOKING",
         sourceId: rental.bookingId,
       });
-      const blockingAllocations = allocations.filter((a) =>
-        ["ACTIVE", "CONFIRMED", "HELD"].includes(a.status)
+      const blockingAllocations = allocations.filter((allocation) =>
+        allocation.vehicleId === rental.vehicleId &&
+        allocation.sourceType === "BOOKING" &&
+        allocation.sourceId === rental.bookingId &&
+        ["ACTIVE", "CONFIRMED", "HELD"].includes(allocation.status)
       );
-      for (const alloc of blockingAllocations) {
+      for (const allocation of blockingAllocations) {
         await this.allocationRepo.releaseAllocation(
-          alloc.id,
-          tenantId,
-          "Rental returned and completed",
-          actor.userId
+          allocation.id, tenantId, "Rental returned and completed", actor.userId
         );
       }
-    } catch {
-      // gracefully handle allocation release
     }
 
     // 7. Audit Log
@@ -2057,6 +2049,7 @@ export class RentalService {
     }
 
     return completedRental;
+    });
   }
 
   async getRentalReturnRecord(tenantId: string, rentalId: string): Promise<RentalReturnRecord | null> {

@@ -78,7 +78,9 @@ export const ReturnFinalCalculationView: React.FC = () => {
   const [rentals, setRentals] = useState<Rental[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("IN_RETURN");
-  const [selectedRentalId, setSelectedRentalId] = useState<string | null>(null);
+  const [selectedRentalId, setSelectedRentalId] = useState<string | null>(
+    () => window.sessionStorage.getItem(`sage:return-selection:${activeTenantId}`)
+  );
   const [returnRecord, setReturnRecord] = useState<RentalReturnRecord | null>(null);
   const [finalCalculation, setFinalCalculation] = useState<RentalFinalCalculation | null>(null);
   const [comparison, setComparison] = useState<InspectionComparison | null>(null);
@@ -149,7 +151,14 @@ export const ReturnFinalCalculationView: React.FC = () => {
 
   useEffect(() => {
     void loadRentals();
-  }, [loadRentals]);
+    setSelectedRentalId(window.sessionStorage.getItem(`sage:return-selection:${activeTenantId}`));
+  }, [loadRentals, activeTenantId]);
+
+  useEffect(() => {
+    if (selectedRentalId) {
+      window.sessionStorage.setItem(`sage:return-selection:${activeTenantId}`, selectedRentalId);
+    }
+  }, [selectedRentalId, activeTenantId]);
 
   useEffect(() => {
     if (!selectedRentalId) {
@@ -659,7 +668,10 @@ export const ReturnFinalCalculationView: React.FC = () => {
                       <button disabled={restoration} onClick={() => openAction("CALCULATE")} className="rounded-xl bg-violet-700 px-3 py-2 text-xs font-bold text-white">Calculate final charges</button>
                     )}
                     {["FINAL_CALCULATION", "FINAL_SETTLEMENT_PENDING"].includes(selectedRental.state) && finalCalculation && (
-                      <button disabled={restoration || !hasPermission("invoice.read")} onClick={() => setCurrentView("finance")} className="rounded-xl bg-fuchsia-700 px-3 py-2 text-xs font-bold text-white disabled:opacity-50">Continue in Finance & Payments</button>
+                      <button disabled={restoration || !hasPermission("invoice.read")} onClick={() => {
+                          window.sessionStorage.setItem(`sage:return-finance:${activeTenantId}`, selectedRental.id);
+                          setCurrentView("finance");
+                        }} className="rounded-xl bg-fuchsia-700 px-3 py-2 text-xs font-bold text-white disabled:opacity-50">Continue in Finance & Payments</button>
                     )}
                     {selectedRental.state === "DEPOSIT_PROCESSING" && finalCalculation?.isImmutable && hasPermission("rental.final_complete") && (
                       <button disabled={restoration} onClick={() => openAction("COMPLETE")} className="rounded-xl bg-emerald-700 px-3 py-2 text-xs font-bold text-white">Complete & release vehicle</button>
