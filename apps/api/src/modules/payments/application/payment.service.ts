@@ -302,8 +302,18 @@ export class PaymentService {
       return dupPayment;
     }
 
+    // Provider evidence must match the original authoritative attempt exactly.
+    // Never mint funds from an under/over-paid or wrong-currency callback.
+    if (
+      !Number.isFinite(Number(verifyResult.amount)) ||
+      Math.abs(Number(verifyResult.amount) - Number(attempt.amount)) > 0.0001 ||
+      !verifyResult.currency ||
+      verifyResult.currency.toUpperCase() !== attempt.currency.toUpperCase()
+    ) {
+      throw new PaymentVerificationFailedError("Provider verified amount/currency does not match the payment attempt.");
+    }
     const now = new Date().toISOString();
-    const verifiedAmount = to4Dec(verifyResult.amount || attempt.amount);
+    const verifiedAmount = to4Dec(verifyResult.amount);
 
     const payment = await this.paymentRepo.create({
       tenantId,
@@ -504,7 +514,15 @@ export class PaymentService {
       return { status: "ATTEMPT_FAILED", attempt: updated };
     }
 
-    // 6. Handle Success Callback -> Create Authoritative Payment
+    // 6. Strictly reconcile provider-reported money to the original intent.
+    // This also protects the BOOKING auto-projection path, which otherwise
+    // could mark a partial/incorrect callback as an authoritative payment.
+    if (!parsed.amount || !Number.isFinite(Number(parsed.amount)) ||
+        Math.abs(Number(parsed.amount) - Number(attempt.amount)) > 0.0001 ||
+        !parsed.currency || parsed.currency.toUpperCase() !== attempt.currency.toUpperCase()) {
+      throw new PaymentVerificationFailedError("Webhook amount or currency does not match the original payment attempt.");
+    }
+    // 7. Handle Success Callback -> Create Authoritative Payment
     const existingPayment = await this.paymentRepo.findByProviderTransaction(
       providerName,
       parsed.providerTransactionId || `TXN_${parsed.providerEventId}`,
