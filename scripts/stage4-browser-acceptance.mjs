@@ -206,6 +206,16 @@ try {
       assert.ok(s,spec.role+' was not provisioned expected '+section+' permission');
       await cdp.clickSection(s.label);
       checks++;
+      if (spec.role==='COMPANY_OWNER' && section==='rentals') {
+        await waitFor(()=>cdp.evaluate(
+          'document.querySelectorAll(\'[data-testid="rental-fleet-card"]\').length >= 12'
+        ),'persisted demo vehicles visible in Rental Operations',35000);
+        const categories=await cdp.evaluate(
+          'document.querySelectorAll(\'[aria-label="Car category filters"] button\').length'
+        );
+        assert.ok(categories>=7,'All six vehicle categories must be browsable');
+        checks+=2;
+      }
     }
 
     // Session persistence on hard refresh, as seen by a returning staff member.
