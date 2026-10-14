@@ -443,7 +443,7 @@ export class PricingService {
       || (quotedVehicle as any)?.vehicleCategoryId
       || quotedVehicle?.category;
     const categoryById = categoryInput
-      ? await this.vehicleCategoryRepo.findById(categoryInput, tenantId)
+      ? await this.vehicleCategoryRepo.findById(categoryInput)
       : null;
     const resolvedCategory = categoryById && (!categoryById.tenantId || categoryById.tenantId === tenantId)
       ? categoryById
