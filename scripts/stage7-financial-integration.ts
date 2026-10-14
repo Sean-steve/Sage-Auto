@@ -257,8 +257,10 @@ async function main(){
   const prev=process.env.APP_ENV;
   try {
     process.env.APP_ENV="production";
-    await rejected("Fake provider forbidden in production",
-      ()=>Promise.resolve(registry.get("FAKE_PROVIDER")));
+    assert.throws(()=>registry.get("FAKE_PROVIDER"),
+      /Production and staging require an explicit payment provider/,
+      "FAKE_PROVIDER must fail closed in production");
+    checks++;
   }finally{process.env.APP_ENV=prev;}
 
   console.log("PASS Stage 7 SIMULATED financial integration: "+checks+
