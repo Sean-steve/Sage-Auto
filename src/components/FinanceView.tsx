@@ -17,6 +17,7 @@ import {
   X,
 } from "lucide-react";
 import { apiClient } from "../lib/api-client";
+import { useOperationalSync } from "../experience/useOperationalSync";
 import { useApp } from "../lib/store";
 import type {
   DepositPosition,
@@ -152,6 +153,8 @@ export const FinanceView: React.FC = () => {
   useEffect(() => {
     void loadAll();
   }, [activeTenantId, loadAll]);
+
+  useOperationalSync(activeTenantId,loadAll);
 
   const completedRentals = useMemo(
     () =>

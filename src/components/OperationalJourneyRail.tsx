@@ -17,7 +17,7 @@ export function OperationalJourneyRail({portal,section,onSection,onSync}:{portal
   const visible=stages.filter(stage=>permitted.has(stage.id));
   if(visible.length<2)return null;
   return <div className="sage-journey-frame">
-    <div className="sage-journey-label"><span>Rental lifecycle</span><button type="button" onClick={onSync} aria-label="Refresh current operational module"><RefreshCw size={13}/>Sync module</button></div>
+    <div className="sage-journey-label"><span>Rental lifecycle</span>{["rentals","returns","finance","settlements"].includes(section)&&<button type="button" onClick={onSync} aria-label="Refresh current operational module"><RefreshCw size={13}/>Sync module</button>}</div>
     <nav className="sage-journey-rail" aria-label="Rental lifecycle navigation">
       {visible.map((stage,index)=><React.Fragment key={stage.id}>
         {index>0&&<ArrowRight aria-hidden="true" size={13} className="sage-journey-arrow"/>}

@@ -18,6 +18,7 @@ import {
   X,
 } from "lucide-react";
 import { apiClient } from "../lib/api-client";
+import { useOperationalSync } from "../experience/useOperationalSync";
 import { useApp } from "../lib/store";
 import type { InspectionComparison, Rental, RentalFinalCalculation, RentalReturnRecord } from "../types";
 
@@ -146,6 +147,8 @@ export const ReturnFinalCalculationView: React.FC = () => {
     setFinalCalculation(!calcResponse.error && calcResponse.data ? (calcResponse.data as RentalFinalCalculation) : null);
     setComparison(!comparisonResponse.error && comparisonResponse.data ? (comparisonResponse.data as InspectionComparison) : null);
   }, []);
+
+  useOperationalSync(activeTenantId,loadRentals);
 
   useEffect(() => {
     void loadRentals();
