@@ -1,4 +1,3 @@
-import { WorkflowNextStep } from "./WorkflowNextStep";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
@@ -636,10 +635,6 @@ export const FinanceView: React.FC = () => {
         </div>
       </div>
 
-      <WorkflowNextStep current="Finance" next="Settlements"
-        description="After invoices, verified payments and return deposit/refund settlements are reconciled, continue to owner settlement review and payouts."
-        onNext={()=>setCurrentView("settlements")}
-        canNext={hasPermission("settlement.read")||hasPermission("owner_settlement.read")}/>
 
       {hasPermission("rental.read") && (
         <section className="rounded-2xl border border-fuchsia-200 bg-white p-4 dark:border-fuchsia-900 dark:bg-slate-900" aria-label="Return settlement handoff">
