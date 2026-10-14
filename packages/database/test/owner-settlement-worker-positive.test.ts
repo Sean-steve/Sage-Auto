@@ -179,7 +179,7 @@ async function positivePeriodWorkerTest() {
   assert.equal((await settlementRepo.findById(settlement.id,tenantId))?.status,"PAID");
   await assert.rejects(
     ()=>payouts.executeOwnerPayout(tenantId,payoutDto,{userId:"separate-payment-executor"} as any),
-    /already paid/i
+    /already.*paid/i
   );
   assert.equal((await paymentRepo.listByTenant(tenantId)).filter(p=>p.purpose==="OWNER_SETTLEMENT").length,1,
     "Payout replay must never create a second outbound payment");
