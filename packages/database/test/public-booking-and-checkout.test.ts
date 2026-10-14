@@ -63,11 +63,13 @@ async function runSprint31TestSuite() {
   const providerRegistry = new PaymentProviderRegistry();
   const fakeProvider = new FakePaymentProvider();
   providerRegistry.register(fakeProvider);
+  let simulatedMpesaAmount = "0.0000";
   providerRegistry.register({
     name: "MPESA_DARAJA",
     type: "MOBILE_MONEY",
     supportedCurrencies: ["KES"],
     async initializePayment(req) {
+      simulatedMpesaAmount = req.amount;
       return {
         status: "INITIATED",
         providerReference: `ws_CO_${Date.now()}`,
@@ -79,7 +81,7 @@ async function runSprint31TestSuite() {
         verified: true,
         providerTransactionId: `NLX${Date.now()}`,
         status: "SETTLED",
-        amount: "15000.0000",
+        amount: simulatedMpesaAmount,
         currency: "KES",
         paidAt: new Date().toISOString(),
         verificationSource: "PROVIDER_QUERY" as any,
