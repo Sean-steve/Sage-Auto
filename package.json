@@ -89,7 +89,9 @@
     "test:email": "tsx packages/database/test/email-delivery.test.ts",
     "test:owner-settlements": "tsx packages/database/test/owner-settlements-blueprint.test.ts",
     "audit:closure": "tsx scripts/closure-integrity-audit.ts",
-    "test:closure-audit": "tsx packages/database/test/closure-integrity-audit.test.ts"
+    "test:closure-audit": "tsx packages/database/test/closure-integrity-audit.test.ts",
+    "dev:workers": "LOCAL_PAYMENT_WORKER_ENABLED=true pnpm dev:worker",
+    "dev:worker:payments": "LOCAL_PAYMENT_WORKER_ENABLED=true pnpm dev:worker"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
