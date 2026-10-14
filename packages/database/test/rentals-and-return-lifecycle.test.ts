@@ -6,6 +6,7 @@
 import assert from "node:assert/strict";
 import {
   RentalRepository,
+  RefundRepository,
   BookingRepository,
   ContractRepository,
   HandoverRepository,
@@ -741,6 +742,93 @@ async function runTests() {
   assert.equal(finalReturnRecord?.returnInspectionId, returnInspection.id);
 
   console.log("✓ Rental, Booking, Contract completed; ReturnRecord history preserved and Vehicle allocation released.");
+
+  // --------------------------------------------------------------------------
+  // SETTLEMENT PROOF VARIANTS: zero balance, provider refund, authorized waiver.
+  // These variants use isolated Rental records and do not send funds to a provider.
+  // --------------------------------------------------------------------------
+  const sealedSource = await rentalRepo.getFinalCalculation(rental.id, tenantId);
+  assert.ok(sealedSource);
+  const { id: _sourceCalcId, calculatedAt: _sourceCalcAt, ...sourceCalculation } = sealedSource;
+  const makeSettlementRental = async (suffix: string, refundDue: number, extraDue: number) => {
+    const variant = await rentalRepo.create(tenantId, {
+      rentalNumber: `RNT-SETTLEMENT-${suffix}`,
+      bookingId: `BKG-SETTLEMENT-${suffix}`,
+      contractId: `CTR-SETTLEMENT-${suffix}`,
+      handoverId: `HND-SETTLEMENT-${suffix}`,
+      customerId: rental.customerId,
+      primaryDriverId: rental.primaryDriverId,
+      vehicleId: rental.vehicleId,
+      status: "FINAL_CALCULATION",
+      pricingSnapshot: rental.pricingSnapshot,
+    });
+    await rentalRepo.saveFinalCalculation(tenantId, {
+      ...sourceCalculation,
+      rentalId: variant.id,
+      bookingId: variant.bookingId,
+      isImmutable: false,
+      sealedAt: undefined,
+      sealedBy: undefined,
+      depositRefundDue: refundDue,
+      depositAdditionalPaymentDue: extraDue,
+    });
+    return variant;
+  };
+
+  const zeroBalanceRental = await makeSettlementRental("ZERO", 0, 0);
+  const zeroSealed = await service.processDepositSettlement(
+    tenantId, zeroBalanceRental.id, { settlementStatus: "SETTLED" }, actor
+  );
+  assert.equal(zeroSealed.isImmutable, true);
+  assert.equal(zeroSealed.depositSettlementStatus, "SETTLED");
+  assert.equal((await rentalRepo.findById(zeroBalanceRental.id, tenantId))?.state, "DEPOSIT_PROCESSING");
+
+  const refundRental = await makeSettlementRental("REFUND", 1250, 0);
+  await assert.rejects(
+    service.processDepositSettlement(
+      tenantId, refundRental.id, { settlementStatus: "REFUNDED" }, actor
+    ), /completed provider Refund/
+  );
+  assert.equal((await rentalRepo.findById(refundRental.id, tenantId))?.state, "FINAL_CALCULATION");
+  const refundRepo = new RefundRepository();
+  const completedRefund = await refundRepo.create({
+    tenantId,
+    originalPaymentId: "verified-deposit-payment-for-refund-variant",
+    sourceObligationType: "RENTAL_DEPOSIT",
+    sourceObligationId: refundRental.id,
+    amount: "1250.0000",
+    currency: "KES",
+    status: "COMPLETED",
+    reason: "Verified renter deposit balance returned.",
+    requestedAt: new Date().toISOString(),
+    postedToLedger: false,
+  });
+  const refunded = await service.processDepositSettlement(
+    tenantId, refundRental.id, {
+      settlementStatus: "REFUNDED",
+      refundId: completedRefund.id,
+      refundAmount: 1250,
+    }, actor
+  );
+  assert.equal(refunded.depositSettlementStatus, "REFUNDED");
+  assert.equal(refunded.isImmutable, true);
+
+  const waivedRental = await makeSettlementRental("WAIVED", 0, 200);
+  await assert.rejects(
+    service.processDepositSettlement(
+      tenantId, waivedRental.id, { settlementStatus: "WAIVED" }, actor
+    ), /documented reason/
+  );
+  assert.equal((await rentalRepo.findById(waivedRental.id, tenantId))?.state, "FINAL_CALCULATION");
+  const waived = await service.processDepositSettlement(
+    tenantId, waivedRental.id, {
+      settlementStatus: "WAIVED",
+      notes: "Approved commercial write-off recorded by authorized finance operator.",
+    }, actor
+  );
+  assert.equal(waived.depositSettlementStatus, "WAIVED");
+  assert.equal(waived.isImmutable, true);
+  console.log("✓ Zero, completed deposit refund, and documented waiver seal correctly without fabricated payment proof.");
 
   // --------------------------------------------------------------------------
   // TEST 10: Terminal State Invariants
