@@ -87,7 +87,9 @@
     "test:booking-experience": "tsx packages/database/test/booking-experience-contract.test.ts",
     "test:contract-handover-experience": "tsx packages/database/test/contract-handover-experience-contract.test.ts",
     "test:email": "tsx packages/database/test/email-delivery.test.ts",
-    "test:owner-settlements": "tsx packages/database/test/owner-settlements-blueprint.test.ts"
+    "test:owner-settlements": "tsx packages/database/test/owner-settlements-blueprint.test.ts",
+    "audit:closure": "tsx scripts/closure-integrity-audit.ts",
+    "test:closure-audit": "tsx packages/database/test/closure-integrity-audit.test.ts"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
