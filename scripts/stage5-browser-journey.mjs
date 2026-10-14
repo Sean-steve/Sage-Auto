@@ -81,7 +81,7 @@ class CDP {
     await wait(()=>this.js(js),'click button '+text,30000);
   }
   async visible(text){
-    return this.js(`([...document.querySelectorAll('button,h1,h2,p,strong')]
+    return this.js(`([...document.querySelectorAll('button,h1,h2,p,strong,span')]
       .some(n=>n.textContent.trim()===${JSON.stringify(text)} && n.getClientRects().length>0))`);
   }
   async nav(label){
