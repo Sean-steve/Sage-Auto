@@ -7,6 +7,10 @@ on:
       - 'scripts/stage4-browser-acceptance.mjs'
       - 'scripts/stage4-live-closure-acceptance.ts'
       - 'scripts/stage5-browser-journey.mjs'
+      - 'scripts/release-preflight.mjs'
+      - 'scripts/release-preflight.test.mjs'
+      - '.github/workflows/ci.yml'
+      - '.github/workflows/rollback.yml'
       - 'scripts/access-review.ts'
       - 'src/**'
       - 'apps/api/**'
@@ -33,6 +37,8 @@ jobs:
           cache: pnpm
       - name: Install exact project dependencies
         run: pnpm install --frozen-lockfile
+      - name: Verify staging, production, and rollback cannot silently succeed
+        run: node scripts/release-preflight.test.mjs
       - name: Locate installed Chromium
         run: |
           which google-chrome || which google-chrome-stable || which chromium || which chromium-browser
