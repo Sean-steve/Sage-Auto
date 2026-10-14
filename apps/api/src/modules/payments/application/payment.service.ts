@@ -1002,11 +1002,11 @@ export class PaymentService {
     const outstandingAmount = outstanding
       .filter((r) => ["PENDING", "APPROVED", "PROCESSING"].includes(r.status))
       .reduce((total, r) => total + Number(r.amount), 0);
-    if (!Number.isFinite(Number(dto.amount)) || Number(dto.amount) <= 0 ||
-        Number(dto.amount) + outstandingAmount + Number(payment.refundedAmount) >
-          Number(payment.amount) + 0.0001) {
-      throw new Error("Refund request exceeds the unreserved, verified payment balance.");
+    if (!Number.isFinite(Number(dto.amount)) || Number(dto.amount) <= 0) {
+      throw new Error("Refund amount must be positive and finite.");
     }
+    // This canonical state-machine throws RefundExceedsPaymentError on every
+    // request that would exceed total paid money, including reserved requests.
     const { newRefunded } = PaymentStateMachine.computeRefundOutcome(
       payment.amount,
       String(Number(payment.refundedAmount) + outstandingAmount),
