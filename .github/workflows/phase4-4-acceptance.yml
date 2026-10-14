@@ -1,0 +1,67 @@
+name: Phase 4.4 · Operational and Settlement Acceptance
+on:
+  push:
+    branches: [feat/phase4-4-operational-sync-settlement-acceptance]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  acceptance:
+    name: Typecheck · Build · Positive settlement worker · Full regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 9.15.9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Strict typecheck
+        run: pnpm typecheck
+      - name: React production build
+        run: pnpm build
+      - name: Positive settlement worker acceptance
+        run: pnpm exec tsx packages/database/test/owner-settlement-worker-positive.test.ts
+      - name: Unified frontend permission contracts
+        run: pnpm test:frontend-foundation
+      - name: Full backend regression matrix
+        run: pnpm test:all
+  multirole-browser:
+    name: Chromium · Six portal roles · Desktop + mobile
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 9.15.9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Install browser runner without changing the lockfile
+        run: npm install --no-save --package-lock=false --ignore-scripts playwright@1.56.1
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Start React Vite server
+        run: |
+          pnpm dev > /tmp/sage-vite.log 2>&1 &
+          for attempt in $(seq 1 45); do
+            if curl --silent --fail http://127.0.0.1:3000/login > /dev/null; then exit 0; fi
+            sleep 2
+          done
+          cat /tmp/sage-vite.log
+          exit 1
+      - name: Role-specific responsive browser smoke
+        run: node tests/phase4-4-multirole-browser.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: phase4-4-multirole-chromium
+          path: artifacts/phase4-4-browser
+          if-no-files-found: ignore

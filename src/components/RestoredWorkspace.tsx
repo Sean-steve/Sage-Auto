@@ -5,6 +5,8 @@ import {
   ShieldCheck, Tags, UsersRound, WalletCards, Wrench, X, Search, Sun, Moon, ChevronRight
 } from "lucide-react";
 import { AppProvider, useApp } from "../lib/store";
+import { apiClient } from "../lib/api-client";
+import { OperationalJourneyRail } from "./OperationalJourneyRail";
 import { navigation, describe, commands } from "../experience/registry";
 import type { AccessContext, AccessPortal } from "../lib/access-context";
 import { FleetExperienceView } from "./FleetExperienceView";
@@ -94,6 +96,21 @@ function Shell({context,portal,section,onSection,onSwitch,onSignOut}:{context:Ac
     window.addEventListener("sage:navigate",handler);return()=>window.removeEventListener("sage:navigate",handler);
   },[portal.id,portal.sections.map(s=>s.id).join("|")]);
 
+  const syncCurrent=()=>{
+    // Never send refresh signals into a workspace whose tenant context has changed.
+    if(!portal.tenantId || portal.tenantId!==apiClient.getTenantId())return;
+    if(document.visibilityState==="hidden")return;
+    window.dispatchEvent(new CustomEvent("sage:operational-sync",{detail:{tenantId:portal.tenantId,section}}));
+  };
+  useEffect(()=>{
+    const onFocus=()=>syncCurrent();
+    const onVisible=()=>{if(document.visibilityState==="visible")syncCurrent();};
+    window.addEventListener("focus",onFocus);
+    document.addEventListener("visibilitychange",onVisible);
+    const timer=window.setInterval(onFocus,30000);
+    return()=>{window.removeEventListener("focus",onFocus);document.removeEventListener("visibilitychange",onVisible);window.clearInterval(timer);};
+  },[portal.id,portal.tenantId,section]);
+
   const select=(id:string)=>{onSection(id);setMobileOpen(false);setCommandOpen(false);setCommandQuery("");};
   const roles=portal.roles.map(r=>r.replaceAll("_"," ").toLowerCase().replace(/\b\w/g,c=>c.toUpperCase())).join(" · ");
   const title=portal.sections.find(s=>s.id===section)?.label||section;
@@ -117,7 +134,7 @@ function Shell({context,portal,section,onSection,onSwitch,onSignOut}:{context:Ac
     {mobileOpen&&<div className="fixed inset-0 z-50 lg:hidden"><button aria-label="Close navigation" className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm" onClick={()=>setMobileOpen(false)}/><div className="relative h-full w-[86vw] max-w-[310px] shadow-2xl"><Sidebar/></div></div>}
     <div className={`min-w-0 transition-[padding] duration-200 ${sidebarCollapsed?"lg:pl-[76px]":"lg:pl-[272px]"}`}>
       <header className="sage-topbar sticky top-0 z-30 flex items-center justify-between gap-4 border-b bg-white/90 px-4 backdrop-blur-xl sm:px-6 lg:px-8">
-        <div className="flex min-w-0 items-center gap-3"><button onClick={()=>setMobileOpen(true)} className="grid h-10 w-10 place-items-center rounded-xl border border-slate-200 lg:hidden"><Menu size={18}/></button><div className="min-w-0"><div className="truncate text-[11px] font-bold uppercase tracking-[.16em] text-slate-400">{portal.name}</div><div className="sage-context-title truncate text-base text-slate-950">{title}</div></div></div>
+        <div className="flex min-w-0 items-center gap-3"><button aria-label="Open workspace navigation" onClick={()=>setMobileOpen(true)} className="grid h-10 w-10 place-items-center rounded-xl border border-slate-200 lg:hidden"><Menu size={18}/></button><div className="min-w-0"><div className="truncate text-[11px] font-bold uppercase tracking-[.16em] text-slate-400">{portal.name}</div><div className="sage-context-title truncate text-base text-slate-950">{title}</div></div></div>
         <div className="flex items-center gap-2">
           <button onClick={()=>setCommandOpen(true)} className="hidden h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-500 hover:bg-slate-50 sm:flex"><Search size={14}/>Search <span className="sage-command-kbd">Ctrl/⌘ K</span></button>
           <button title={density==="compact"?"Use comfortable density":"Use compact density"} onClick={()=>setDensity(d=>d==="compact"?"comfortable":"compact")} className="grid h-9 w-9 place-items-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:bg-slate-50"><Gauge size={15}/></button>
@@ -127,7 +144,10 @@ function Shell({context,portal,section,onSection,onSwitch,onSignOut}:{context:Ac
         </div>
       </header>
       {section!=="overview"&&<div className="sage-page-context border-b bg-white px-4 sm:px-6 lg:px-8"><div className="mx-auto max-w-[1500px]"><div className="text-[10px] font-black uppercase tracking-[.2em] text-emerald-600">Company workspace</div><div className="mt-1 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between"><div><h1 className="text-2xl font-black tracking-[-.025em] text-slate-950">{title}</h1><p className="mt-1 text-sm text-slate-500">{describe(section)}</p></div></div></div></div>}
-      <main className="min-w-0 overflow-x-hidden"><WorkspaceScreen key={section} section={section} portal={portal}/></main>
+      <main className="min-w-0 overflow-x-hidden">
+        {["pricing","availability","bookings","handover","rentals","returns","finance","settlements"].includes(section)&&<OperationalJourneyRail portal={portal} section={section} onSection={select} onSync={syncCurrent}/>}
+        <WorkspaceScreen key={section} section={section} portal={portal}/>
+      </main>
       {commandOpen&&<div className="fixed inset-0 z-[70] flex items-start justify-center bg-slate-950/40 px-4 pt-[10vh] backdrop-blur-sm" onMouseDown={e=>{if(e.target===e.currentTarget)setCommandOpen(false);}}>
         <section role="dialog" aria-modal="true" aria-label="Search Sage Auto" className="w-full max-w-2xl overflow-hidden border border-slate-200 bg-white shadow-2xl">
           <div className="flex items-center gap-3 border-b border-slate-200 px-4"><Search size={18} className="text-slate-400"/><input autoFocus value={commandQuery} onChange={e=>setCommandQuery(e.target.value)} placeholder="Search modules and workflows…" className="h-14 flex-1 border-0 bg-transparent text-sm text-slate-900 outline-none"/><span className="sage-command-kbd">ESC</span></div>

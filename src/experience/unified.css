@@ -44,3 +44,17 @@
 @media(max-width:1000px){.sage-unified .sage-board-row{grid-template-columns:24px 1fr auto}.sage-unified .sage-row-pickup{grid-column:2}.sage-unified .sage-row-status{grid-column:3;grid-row:1}.sage-unified .sage-row-action{grid-column:3;grid-row:2}}
 @media(max-width:490px){.sage-unified .sage-board-heading{padding:20px 17px}.sage-unified .sage-board-tabs{padding:0 17px 13px}.sage-unified .sage-board-row{grid-template-columns:20px 1fr auto;padding:14px 17px}.sage-unified .sage-row-status{grid-column:2;grid-row:3}.sage-unified .sage-row-pickup{grid-column:2;grid-row:2}.sage-unified .sage-row-action{grid-column:3;grid-row:1}}
 @media(prefers-reduced-motion:reduce){.sage-unified :is(button,a){transition:none!important}}
+
+/* Phase 4.4: compact workflow crosswalk connecting original-only and V2 modules. */
+.sage-unified .sage-journey-frame{border-bottom:1px solid #e7e8ee;background:#fff;padding:13px clamp(14px,2.2vw,30px) 10px;max-width:100%;overflow:hidden}
+.sage-unified .sage-journey-label{display:flex;align-items:center;justify-content:space-between;color:#665cc5;text-transform:uppercase;letter-spacing:.13em;font-size:10px;font-weight:850;margin-bottom:9px}
+.sage-unified .sage-journey-label button{display:flex;align-items:center;gap:6px;text-transform:none;letter-spacing:0;font-size:11px;background:#f1efff;color:#554da8;border-radius:9px;padding:7px 11px;min-height:36px}
+.sage-unified .sage-journey-rail{display:flex;align-items:center;gap:6px;overflow:auto;max-width:100%;padding-bottom:3px;scrollbar-width:thin}
+.sage-unified .sage-journey-rail button{flex:0 0 auto;font-size:11px;font-weight:700;border-radius:9px;color:#50596f;background:#f7f7f8;border:1px solid #e7e8ee;padding:7px 11px;min-height:36px}
+.sage-unified .sage-journey-rail button[aria-current="step"]{background:#282c45;color:#fff;border-color:#282c45}
+.sage-unified .sage-journey-arrow{color:#a7a8bb;flex:0 0 auto}
+.sage-unified .sage-journey-disclaimer{font-size:10px;color:#747d8a;padding-top:8px;margin:0}
+.sage-unified[data-theme="dark"] .sage-journey-frame{background:#1b2431;border-color:#36404d}
+.sage-unified[data-theme="dark"] .sage-journey-rail button{background:#2d3446;color:#dbe3ef;border-color:#48516a}
+.sage-unified[data-theme="dark"] .sage-journey-rail button[aria-current="step"]{background:#b5afea;color:#202334}
+.sage-unified[data-theme="dark"] .sage-journey-disclaimer{color:#c1c8d4}

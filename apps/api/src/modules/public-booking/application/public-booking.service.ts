@@ -556,12 +556,20 @@ export class PublicBookingService {
     }
     const renterNotifications: NonNullable<PublicBookingVoucherDto["renterNotifications"]> = [];
     if (rental) {
+      // A persisted rental does not imply ongoing possession after vehicle receipt
+      // or completion. Project the authoritative Rental state into renter updates.
+      const onRoad = ["ACTIVE_ON_ROAD", "OVERDUE"].includes(rental.state);
+      const completed = returnStatus === "COMPLETED";
       renterNotifications.push({
-        id: `rental-started:${rental.id}`,
-        level: "INFO",
-        title: "Vehicle collected — rental active",
-        message: `Your rental ${rental.rentalNumber} is active until ${new Date(rental.scheduledEnd).toLocaleString()}.`,
-        occurredAt: rental.actualStart || rental.createdAt,
+        id: `rental-lifecycle:${rental.id}:${rental.state}`,
+        level: completed ? "INFO" : onRoad ? "INFO" : "REMINDER",
+        title: completed ? "Rental completed" : onRoad ? "Vehicle collected — rental active" : "Vehicle return being processed",
+        message: completed
+          ? "Your rental is completed. The company can provide your final statement and any deposit outcome."
+          : onRoad
+            ? `Your rental ${rental.rentalNumber} is active until ${new Date(rental.scheduledEnd).toLocaleString()}.`
+            : "The rental company has begun receiving or finalizing your returned vehicle. No active-possession claim is made.",
+        occurredAt: completed ? rental.completedAt || rental.updatedAt : onRoad ? rental.actualStart || rental.createdAt : rental.updatedAt,
       });
       if (returnStatus === "RETURN_WITHIN_24H") renterNotifications.push({
         id: `return-24h:${rental.id}`,

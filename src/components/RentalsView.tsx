@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { useApp } from "../lib/store";
 import { apiClient } from "../lib/api-client";
+import { useOperationalSync } from "../experience/useOperationalSync";
 import { Rental, RentalState } from "../types";
 
 type ActionMode = "EXTEND" | "INCIDENT" | "RETURN" | null;
@@ -101,11 +102,14 @@ export const RentalsView: React.FC = () => {
     if (!response.error && Array.isArray(response.data)) {
       setRentals(response.data as Rental[]);
     } else {
-      setRentals(cachedRentals.filter((r) => r.tenantId === activeTenantId));
+      setRentals([]);
+      showNotification("Rental records could not be synchronized. No cached rentals are presented as live.", "error");
     }
     setDispatchReady(!readyResponse.error && Array.isArray(readyResponse.data) ? readyResponse.data : []);
     setLoading(false);
-  }, [activeTenantId, cachedRentals]);
+  }, [activeTenantId, showNotification]);
+
+  useOperationalSync(activeTenantId,loadRentals);
 
   useEffect(() => {
     void loadRentals();

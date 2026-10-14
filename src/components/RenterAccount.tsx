@@ -32,7 +32,7 @@ export default function RenterAccount({slug}:{slug:string}){
       const data=await publicRequest(`booking/account/booking?site=${encodeURIComponent(slug)}`,{bookingReference:ref.trim(),email:mail.trim()});
       setBooking(data);setLastUpdated(new Date().toISOString());
       if(remember)localStorage.setItem(storageKey,JSON.stringify({bookingReference:ref.trim(),email:mail.trim()}));
-    }catch(e:any){setBooking(null);setError(e.message||"We could not find that booking.");}
+    }catch(e:any){setError(e.message||"The booking could not be synchronized. Last visible information may be outdated.");}
     finally{setBusy(false);}
   }
 
@@ -43,12 +43,24 @@ export default function RenterAccount({slug}:{slug:string}){
   },[booking?.bookingId,bookingReference,email]);
 
   const currentIndex=useMemo(()=>{
+    const rentalStatus=String(booking?.activeRental?.returnStatus||"");
+    if(rentalStatus==="COMPLETED")return 5;
+    if(booking?.activeRental)return 4;
     const status=String(booking?.status||"");
     const exact=stageOrder.indexOf(status);
-    if(exact>=0)return exact;
-    if(["CANCELLED","REJECTED","EXPIRED","NO_SHOW"].includes(status))return 0;
-    return 0;
-  },[booking?.status]);
+    return exact>=0?exact:0;
+  },[booking?.status,booking?.activeRental?.returnStatus]);
+
+  const rentalReturnStatus=String(booking?.activeRental?.returnStatus||"");
+  const onRoad=["ON_ROAD","RETURN_WITHIN_24H","RETURN_WITHIN_3H","OVERDUE"].includes(rentalReturnStatus);
+  const possessionHeading=rentalReturnStatus==="COMPLETED"?"Rental completed":
+    rentalReturnStatus==="RETURN_PROCESSING"?"Vehicle returned — finalizing":
+    rentalReturnStatus==="OVERDUE"?"Return overdue":"You have the vehicle";
+  const possessionMessage=rentalReturnStatus==="COMPLETED"?
+    "Your company has completed the rental. See the final statement or contact the team about deposit settlement.":
+    rentalReturnStatus==="RETURN_PROCESSING"?
+    "The vehicle is being received or the return charges are being finalized. The rental is no longer shown as active possession.":
+    "Your rental remains active until the agreed return time unless an extension is approved by the team.";
 
   const branding=site?.branding||{};
   const businessName=branding.businessName||slug.replace(/-/g," ").replace(/\b\w/g,(c:string)=>c.toUpperCase());
@@ -73,6 +85,7 @@ export default function RenterAccount({slug}:{slug:string}){
       </section>}
 
       {booking&&<>
+        {error&&<div role="alert" className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">Live refresh failed: {error} The information below was last synchronized {dateTime(lastUpdated)} and must not be treated as current.</div>}
         <section className="overflow-hidden rounded-3xl bg-slate-950 p-6 text-white sm:p-8">
           <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
             <div><p className="text-xs font-bold uppercase tracking-[.18em] text-emerald-300">Booking {booking.bookingReference}</p><h2 className="mt-2 text-3xl font-black">{human(booking.status)}</h2><p className="mt-2 text-sm text-slate-300">{booking.vehicle?.make} {booking.vehicle?.model} · {dateTime(booking.schedule?.pickupAt)}</p></div>
@@ -86,7 +99,7 @@ export default function RenterAccount({slug}:{slug:string}){
         </section>
 
         {booking.activeRental&&<section className={"rounded-3xl border p-5 shadow-sm sm:p-7 "+(booking.activeRental.returnStatus==="OVERDUE"?"border-rose-200 bg-rose-50":booking.activeRental.returnStatus==="RETURN_WITHIN_3H"?"border-amber-200 bg-amber-50":"border-emerald-200 bg-emerald-50")}>
-          <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between"><div><p className="text-xs font-black uppercase tracking-[.16em] text-emerald-700">On rental · {booking.activeRental.rentalNumber}</p><h3 className="mt-1 text-2xl font-black">{booking.activeRental.returnStatus==="OVERDUE"?"Return overdue":"You have the vehicle"}</h3><p className="mt-2 text-sm text-slate-600">Your rental is active. Keep the vehicle until the agreed return time below unless an extension is approved by the rental team.</p></div><div className={"rounded-2xl px-4 py-3 text-right "+(booking.activeRental.returnStatus==="OVERDUE"?"bg-rose-600 text-white":"bg-white text-slate-950")}><p className="text-[10px] font-black uppercase tracking-wide opacity-70">Time to return</p><p className="mt-1 text-lg font-black">{remaining(booking.activeRental.timeRemainingMinutes)}</p></div></div>
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between"><div><p className="text-xs font-black uppercase tracking-[.16em] text-emerald-700">On rental · {booking.activeRental.rentalNumber}</p><h3 className="mt-1 text-2xl font-black">{possessionHeading}</h3><p className="mt-2 text-sm text-slate-600">{possessionMessage}</p></div><div className={"rounded-2xl px-4 py-3 text-right "+(booking.activeRental.returnStatus==="OVERDUE"?"bg-rose-600 text-white":"bg-white text-slate-950")}><p className="text-[10px] font-black uppercase tracking-wide opacity-70">Time to return</p><p className="mt-1 text-lg font-black">{onRoad?remaining(booking.activeRental.timeRemainingMinutes):"Not on road"}</p></div></div>
           <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><div className="rounded-2xl bg-white p-4"><div className="flex items-center gap-2 text-slate-400"><CalendarDays size={15}/><span className="text-[10px] font-black uppercase">Return by</span></div><p className="mt-2 text-sm font-bold">{dateTime(booking.activeRental.scheduledEnd)}</p></div><div className="rounded-2xl bg-white p-4"><div className="flex items-center gap-2 text-slate-400"><Gauge size={15}/><span className="text-[10px] font-black uppercase">Checkout odometer</span></div><p className="mt-2 text-sm font-bold">{Number(booking.activeRental.checkoutOdometer||0).toLocaleString()} km</p></div><div className="rounded-2xl bg-white p-4"><div className="flex items-center gap-2 text-slate-400"><Fuel size={15}/><span className="text-[10px] font-black uppercase">Checkout fuel</span></div><p className="mt-2 text-sm font-bold">{booking.activeRental.checkoutFuelLevel}%</p></div><div className="rounded-2xl bg-white p-4"><div className="flex items-center gap-2 text-slate-400"><Car size={15}/><span className="text-[10px] font-black uppercase">Rental state</span></div><p className="mt-2 text-sm font-bold">{human(booking.activeRental.state)}</p></div></div>
           <div className="mt-4 flex gap-3 rounded-2xl bg-white/80 p-4 text-sm text-slate-600"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600"/><p>If you need more time, contact the rental team before the return deadline. An extension only becomes valid after the operator approves it.</p></div>
         </section>}
@@ -94,7 +107,7 @@ export default function RenterAccount({slug}:{slug:string}){
         <section className="grid gap-5 lg:grid-cols-[1.1fr_.9fr]">
           <div className="rounded-3xl border bg-white p-5 shadow-sm sm:p-7">
             <h3 className="text-lg font-black">Latest notifications</h3>
-            <div className="mt-4 space-y-3">{[...(booking.renterNotifications||[]),...(booking.timeline||[])].length?[...(booking.renterNotifications||[]),...(booking.timeline||[])].sort((a:any,b:any)=>new Date(b.occurredAt||0).getTime()-new Date(a.occurredAt||0).getTime()).map((item:any)=><div key={item.id} className={"flex gap-3 rounded-2xl p-4 "+(item.level==="URGENT"?"bg-rose-50":item.level==="REMINDER"?"bg-amber-50":"bg-slate-50")}><div className={"mt-1 grid h-8 w-8 shrink-0 place-items-center rounded-full "+(item.level==="URGENT"?"bg-rose-100 text-rose-700":item.level==="REMINDER"?"bg-amber-100 text-amber-700":"bg-emerald-100 text-emerald-700")}><Clock3 size={15}/></div><div><p className="font-bold">{item.title}</p><p className="mt-1 text-sm text-slate-600">{item.message}</p><p className="mt-2 text-xs text-slate-400">{dateTime(item.occurredAt)}</p></div></div>):<p className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-500">Your booking has been received. Further rental-stage updates will appear here.</p>}</div>
+            <div className="mt-4 space-y-3">{[...(booking.renterNotifications||[]),...(booking.timeline||[])].length?[...(booking.renterNotifications||[]),...(booking.timeline||[])].sort((a:any,b:any)=>new Date(b.occurredAt||0).getTime()-new Date(a.occurredAt||0).getTime()).map((item:any)=><div key={item.id} className={"flex gap-3 rounded-2xl p-4 "+(item.level==="URGENT"?"bg-rose-50":item.level==="REMINDER"?"bg-amber-50":"bg-slate-50")}><div className={"mt-1 grid h-8 w-8 shrink-0 place-items-center rounded-full "+(item.level==="URGENT"?"bg-rose-100 text-rose-700":item.level==="REMINDER"?"bg-amber-100 text-amber-700":"bg-emerald-100 text-emerald-700")}><Clock3 size={15}/></div><div><p className="font-bold">{item.title}</p><p className="mt-1 text-sm text-slate-600">{item.message}</p><p className="mt-2 text-xs text-slate-400">{dateTime(item.occurredAt)}</p></div></div>):<p className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-500">No new renter notifications are recorded yet. Refresh to check the latest server status.</p>}</div>
           </div>
           <div className="space-y-5">
             <section className="rounded-3xl border bg-white p-5 shadow-sm"><h3 className="font-black">Trip details</h3><div className="mt-4 space-y-3 text-sm"><Row icon={<Car size={16}/>} label="Vehicle" value={`${booking.vehicle?.make||""} ${booking.vehicle?.model||""}`}/><Row icon={<CalendarDays size={16}/>} label="Pickup" value={dateTime(booking.schedule?.pickupAt)}/><Row icon={<CalendarDays size={16}/>} label="Return" value={dateTime(booking.schedule?.returnAt)}/><Row icon={<ShieldCheck size={16}/>} label="Payment" value={booking.pricing?.isPaid?"Paid":"Not yet marked paid"}/></div></section>

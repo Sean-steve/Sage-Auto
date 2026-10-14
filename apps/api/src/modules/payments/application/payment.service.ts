@@ -1181,6 +1181,15 @@ export class PaymentService {
       );
     }
     const provider = this.providerRegistry.get(providerName);
+    const payoutDestination = payable.destinationMpesaNumber || payable.destinationAccount;
+    // Never send money to an invented fallback account: a missing beneficiary
+    // must be corrected in Owner onboarding before a payable is executable.
+    if (!payoutDestination || !String(payoutDestination).trim()) {
+      const err: any = new Error("Owner payout requires a saved, verified recipient destination.");
+      err.code = "PAYOUT_DESTINATION_REQUIRED";
+      err.statusCode = 409;
+      throw err;
+    }
 
     await this.settlementRepo.updatePayableStatus(payable.id, tenantId, "PROCESSING");
     if (settlement.status !== "PAYMENT_PENDING") {
@@ -1195,7 +1204,7 @@ export class PaymentService {
       payableId: payable.id,
       recipientName: payable.recipientName,
       recipientAccountOrPhone:
-        payable.destinationMpesaNumber || payable.destinationAccount || "DEFAULT_ACCOUNT",
+        payoutDestination,
       amount: payable.netDisbursementAmount,
       currency: payable.currency,
       payoutMethod: payable.payoutMethod,
