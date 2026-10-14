@@ -93,6 +93,12 @@ async function main() {
     returnOdometer:22020,returnFuelLevel:80,
     pricingSnapshot:{currency:"KES",dailyRate:5000,totalDays:2,grossTotal:10000},
   } as any);
+  // The repository create DTO initializes dispatch facts; a vehicle receipt
+  // updates the Rental aggregate separately in the real service workflow.
+  await rentalRepo.update(rental.id,tenantId,{
+    returnOdometer:22020,returnFuelLevel:80,
+    actualEnd:"2026-10-12T10:00:00Z",
+  });
   await rentalRepo.saveReturnRecord(tenantId,{
     tenantId,rentalId:rental.id,status:"FINAL_CALCULATION",
     scheduledReturnAt:"2026-10-12T10:00:00Z",
