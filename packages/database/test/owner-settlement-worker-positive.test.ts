@@ -1,5 +1,8 @@
 import { strict as assert } from "node:assert";
 import {
+  PaymentAttemptRepository, PaymentRepository, PaymentAllocationRepository,
+  RefundRepository, PaymentReconciliationRepository, WebhookRepository, DepositPositionRepository,
+  AuditRepository, OutboxRepository,
   OperationalInvoiceRepository, VehicleOwnerRepository, VehicleRepository,
   VehicleOwnershipRepository, RentalRepository, OwnerSettlementPeriodRepository,
   OwnerSettlementRepository, OwnerSettlementBatchRepository,
@@ -7,6 +10,10 @@ import {
 import { processSettlementBatch } from "../../../apps/worker/src/jobs/owner-settlement.job";
 import { FinanceModule } from "../../../apps/api/src/modules/finance/finance.module";
 import { OwnerSettlementsModule } from "../../../apps/api/src/modules/owner-settlements/owner-settlements.module";
+import { LedgerModule } from "../../../apps/api/src/modules/ledger/ledger.module";
+import { PaymentService } from "../../../apps/api/src/modules/payments/application/payment.service";
+import { PaymentProviderRegistry } from "../../../apps/api/src/modules/payments/infrastructure/providers/provider-registry";
+import { StripeCardPaymentProvider, StripeConfigProvider, StripeClient } from "../../../apps/api/src/modules/payments/infrastructure/providers/stripe/index";
 
 /**
  * Positive integration through persisted Finance invoice, completed Rental,
@@ -38,6 +45,7 @@ async function positivePeriodWorkerTest() {
   const owner = await ownerRepo.create({
     tenantId, name: "Settled Revenue Owner", email: "positive-worker-owner@example.test",
     phone: "+254711120000", ownerType: "INDIVIDUAL", status: "ACTIVE",
+    payoutBank: "Isolated QA Bank", payoutAccountNumber: "acct_qa_owner_paid_0001",
   } as any);
   const vehicle = await vehicleRepo.create({
     tenantId, registrationPlate: "KZG 478Q", make: "Toyota", model: "Corolla",
@@ -118,7 +126,9 @@ async function positivePeriodWorkerTest() {
   assert.equal((await batchRepo.listByTenant(foreignTenantId)).length,0);
 
   // An unapproved record cannot bypass the Payments boundary and become a payout.
-  const settlementService = new OwnerSettlementsModule(undefined,undefined,finance).settlementService;
+  const ledgerModule = new LedgerModule();
+  await ledgerModule.ledgerService.ensureChartOfAccounts(tenantId,"KES");
+  const settlementService = new OwnerSettlementsModule(undefined,ledgerModule.ledgerService,finance).settlementService;
   await assert.rejects(
     ()=>settlementService.executePayout(tenantId,settlement.id,{} as any,{userId:"operator"}),
     /Direct settlement payout is disabled/i
@@ -128,6 +138,52 @@ async function positivePeriodWorkerTest() {
     /different authorized user/i
   );
   assert.equal((await settlementRepo.listPayables(tenantId)).length,0);
+
+  // Independent approver posts an auditable payable; only a different executor
+  // may execute via the payment provider (never a settlement-service shortcut).
+  const approved=await settlementService.approveSettlement(
+    tenantId,settlement.id,{payoutMethod:"BANK_TRANSFER"} as any,{userId:"independent-settlement-approver"}
+  );
+  assert.equal(approved.status,"APPROVED");
+  const payables=await settlementRepo.listPayables(tenantId);
+  assert.equal(payables.length,1);
+  const payable=payables[0];
+  assert.equal(payable.netDisbursementAmount,"7000.0000");
+  assert.equal(payable.destinationAccount,"acct_qa_owner_paid_0001");
+
+  const registry=new PaymentProviderRegistry();
+  const stripeConfig=new StripeConfigProvider({
+    environment:"TEST",publishableKey:"pk_test_phase44",
+    secretKey:"sk_test_phase44",webhookSecret:"whsec_test_phase44"
+  });
+  const stripeClient=new StripeClient({configProvider:stripeConfig,useOfflineSimulator:true});
+  registry.register(new StripeCardPaymentProvider(stripeConfig,stripeClient));
+  const paymentRepo=new PaymentRepository();
+  const payouts=new PaymentService(
+    new PaymentAttemptRepository(),paymentRepo,new PaymentAllocationRepository(),
+    new RefundRepository(),new PaymentReconciliationRepository(),registry,
+    new WebhookRepository(),invoiceRepo,new DepositPositionRepository(),
+    settlementRepo,new AuditRepository(),new OutboxRepository()
+  );
+  const payoutDto={settlementPayableId:payable.id,provider:"STRIPE_CARD" as const,
+    idempotencyKey:"phase44-payout-"+payable.id};
+  await assert.rejects(
+    ()=>payouts.executeOwnerPayout(tenantId,payoutDto,{userId:"independent-settlement-approver"} as any),
+    /different authorized user/i
+  );
+  assert.equal((await paymentRepo.listByTenant(tenantId)).filter(p=>p.purpose==="OWNER_SETTLEMENT").length,0);
+  const disbursed=await payouts.executeOwnerPayout(tenantId,payoutDto,{userId:"separate-payment-executor"} as any);
+  assert.equal(disbursed.payable.status,"PAID");
+  assert.equal(disbursed.payment.amount,"7000.0000");
+  assert.equal(disbursed.payment.direction,"OUTBOUND");
+  assert.equal((await settlementRepo.findById(settlement.id,tenantId))?.status,"PAID");
+  await assert.rejects(
+    ()=>payouts.executeOwnerPayout(tenantId,payoutDto,{userId:"separate-payment-executor"} as any),
+    /already paid/i
+  );
+  assert.equal((await paymentRepo.listByTenant(tenantId)).filter(p=>p.purpose==="OWNER_SETTLEMENT").length,1,
+    "Payout replay must never create a second outbound payment");
+
   console.log("✓ Paid Finance invoice → completed Rental → historical owner agreement → worker batch → KES 7,000 (replay and tenant isolation verified)");
 }
 void positivePeriodWorkerTest().catch(error=>{console.error(error);process.exitCode=1;});
