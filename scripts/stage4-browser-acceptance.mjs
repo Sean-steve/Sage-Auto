@@ -180,7 +180,7 @@ try {
     }
 
     // Reuse one isolated browser with a clean role session between actors.
-    await cdp.navigate(web+'/');
+    await cdp.navigate(web+'/login');
     await cdp.evaluate('localStorage.clear();sessionStorage.clear();true');
     await cdp.evaluate(`(()=>{
       localStorage.setItem('carhire_access_token',${JSON.stringify(token)});
