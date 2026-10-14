@@ -164,7 +164,13 @@ export class CanonicalScheduler {
     options?: Record<string, unknown>
   ): Promise<string> {
     const now = new Date();
-    const window = now.toISOString().slice(0, 16); // 1-minute window bucket
+    // Local simulator ticks every 5 seconds. Dedupe in its real interval
+    // window, not by minute, or unpaid bookings can remain blocked for 60s.
+    const isLocalPayment=jobName===SCHEDULED_JOB_NAMES.LOCAL_PAYMENT_SIMULATION;
+    const interval=Math.max(1000,Number(process.env.LOCAL_PAYMENT_WORKER_INTERVAL_MS||5000));
+    const window=isLocalPayment
+      ? String(Math.floor(now.getTime()/interval))
+      : now.toISOString().slice(0, 16);
     const deterministicId = buildScheduledJobId(jobName, window);
 
     const payload: ScheduledJobPayload = {
