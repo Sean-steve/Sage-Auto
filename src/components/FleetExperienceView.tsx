@@ -223,7 +223,7 @@ export function FleetExperienceView({portal}:FleetExperienceProps) {
       </div>
       <div className="flex flex-wrap gap-2">
         <button onClick={()=>void refresh()} className={buttonSecondary}><RefreshCw size={16}/>Refresh</button>
-        {can("vehicle.create")&&<button onClick={()=>document.getElementById("fleet-intake-quantity")?.focus()} className={buttonSecondary}><Plus size={16}/>Add fleet entries</button>
+        {can("vehicle.create")&&<button onClick={()=>document.getElementById("fleet-intake-quantity")?.focus()} className={buttonSecondary}><Plus size={16}/>Add fleet entries</button>}
         {can("vehicle.create")&&<button onClick={()=>setCreateOpen(true)} className={buttonPrimary}><Plus size={16}/>Register vehicle</button>}
       </div>
     </header>
