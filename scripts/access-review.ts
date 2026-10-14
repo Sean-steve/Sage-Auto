@@ -53,6 +53,12 @@ async function main() {
     await request('/access/profile',renter.token,{intent:'renter',site:'role-review-workspace',phone:'+254700000000'},'PUT');
     await request('/access/complete',renter.token,{});
   }
+  // Make the actual isolated Fleet, Availability, Booking and Rental screens
+  // useful on first sign-in. This persists canonical Vehicle records but never
+  // fabricates rentals, customer payments, maintenance or owner settlements.
+  const {seedDemoFleetForTenant}=await import('./demo-fleet');
+  const demoFleet=await seedDemoFleetForTenant(tenantId);
+  console.log(`Demo Fleet ready: ${demoFleet.created} new / ${demoFleet.skipped} existing vehicles.`);
   const lines=['# Isolated role review access','','Open http://localhost:3510/','', 'These accounts are for the isolated review database only. Do not reuse these passwords elsewhere.','','| Role | Email | Password |','|---|---|---|',...Object.entries(credentials).map(([role,value])=>`| ${role} | ${value.email} | ${value.password} |`)];
   writeFileSync(join(dir,'ACCESS.md'),lines.join('\n')+'\n',{mode:0o600});
   console.log(`READY: 20 role accounts. Private access instructions: ${join(dir,'ACCESS.md')}`);
