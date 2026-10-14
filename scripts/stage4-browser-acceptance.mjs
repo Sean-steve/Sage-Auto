@@ -113,13 +113,14 @@ try {
   const binary=chromeBinary();
   browser=spawn(binary,['--headless=new','--no-sandbox','--disable-gpu','--no-first-run',
     '--no-default-browser-check','--disable-extensions','--remote-debugging-port=0',
+    '--remote-allow-origins=*',
     '--user-data-dir='+profileDir,'about:blank'],{stdio:'ignore'});
   const portFile=join(profileDir,'DevToolsActivePort');
   await waitFor(()=>existsSync(portFile),'Chrome DevTools port',15000);
   const port=Number(readFileSync(portFile,'utf8').split('\n')[0]);
-  const targets=await getJson(await fetch('http://127.0.0.1:'+port+'/json/list'),'Chrome targets');
-  // DevTools discovery returns a raw array, not the Sage API envelope.
-  void targets;
+  const discovery=await (await fetch('http://127.0.0.1:'+port+'/json/list')).json();
+  assert.ok(Array.isArray(discovery) && discovery.some(page=>page.type==='page'),
+    'Headless Chrome must expose a CDP page.');
 } catch(err) {
   // Startup is handled below too: keep cleanup outside catch.
   failed=true;console.error('BROWSER STARTUP FAILURE:',err.message);
