@@ -45,7 +45,12 @@ try{
      return route.fulfill(response([]));
    });
    await page.goto(origin+"/login",{waitUntil:"domcontentloaded"});
-   await page.waitForFunction(({name})=>document.body.innerText.includes(name),{name:role.portal.name},{timeout:20000});
+   try{await page.waitForFunction(({name})=>document.body.innerText.includes(name),{name:role.portal.name},{timeout:12000});}
+   catch(err){
+     console.error("ROLE HYDRATION DEBUG",role.name,screen,"url",page.url(),"body",(await page.locator("body").innerText()).slice(0,1400));
+     await page.screenshot({path:`${output}/failed-${role.name}-${screen}.png`,fullPage:true});
+     throw err;
+   }
    const body=await page.locator("body").innerText();
    assert(!body.includes("Something went wrong"),role.name+" did not render");
    assert(body.includes(role.portal.name),role.name+" did not display its authorized portal: "+body.slice(0,220));
