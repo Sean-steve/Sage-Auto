@@ -280,6 +280,7 @@ export class FinanceService {
       throw new RentalNotFoundError(dto.rentalId);
     }
     const invoiceEligibleStates = new Set([
+      "FINAL_CALCULATION",
       "FINAL_SETTLEMENT_PENDING",
       "DEPOSIT_PROCESSING",
       "COMPLETED",
@@ -311,8 +312,8 @@ export class FinanceService {
     // 4. Fetch final calculation and start snapshot
     const finalCalc = await this.rentalRepo.getFinalCalculation(dto.rentalId, tenantId);
     const startSnapshot = await this.rentalRepo.getStartSnapshot(dto.rentalId, tenantId);
-    if (rental.state === "FINAL_SETTLEMENT_PENDING" && !finalCalc) {
-      throw new Error("Final settlement pending Rental is missing its authoritative final calculation.");
+    if (["FINAL_CALCULATION", "FINAL_SETTLEMENT_PENDING"].includes(rental.state) && !finalCalc) {
+      throw new Error("Rental cannot be invoiced without an authoritative final calculation.");
     }
 
     const currency = (startSnapshot?.pricingSnapshot?.currency || "KES").toUpperCase();
