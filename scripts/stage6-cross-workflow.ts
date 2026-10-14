@@ -52,7 +52,9 @@ async function main() {
   const owner=await login("COMPANY_OWNER");
   const agent=await login("BOOKING_AGENT");
   const finance=await login("FINANCE_MANAGER");
-  const renter=await login("RENTER");
+  const renterAuth=await call("/auth/login",undefined,undefined,secrets.RENTER);
+  assert.equal(renterAuth.status,200,"Renter account login");
+  const renterToken=renterAuth.data.tokens.accessToken;
   assert.equal(owner.tenant,agent.tenant);
   assert.equal(owner.tenant,finance.tenant);
   const tenant=owner.tenant;
@@ -148,7 +150,7 @@ async function main() {
   const contract=await ok("Generate Contract","/contracts/generate",owner,{bookingId:booking.id});
   assert.equal(contract.bookingId,booking.id);assert.equal(contract.vehicleId,vehicle.id);
   assertions+=2;
-  const wrongSign=await call("/contracts/"+contract.id+"/sign",renter.token,tenant,{
+  const wrongSign=await call("/contracts/"+contract.id+"/sign",renterToken,tenant,{
     signerType:"CUSTOMER",signerId:customer.id,signerName:"Stage6 Test Renter",
     signatureMethod:"MANUAL_UPLOAD",signatureReference:"qa-test-only-"+code,
   });
@@ -219,7 +221,7 @@ async function main() {
     bookingId:booking.id,idempotencyKey:"qa6-dispatch-"+code
   });
   assert.equal(rentalReplay.id,dispatch.id);assertions++;
-  const onRoad=await call("/rentals/"+dispatch.id,renter.token,tenant);
+  const onRoad=await call("/rentals/"+dispatch.id,renterToken,tenant);
   assert.ok([401,403,404].includes(onRoad.status),"Renter must not access staff rentals");
   assertions++;
 
