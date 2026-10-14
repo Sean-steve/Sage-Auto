@@ -223,7 +223,11 @@ try {
 } finally {
   websocket?.close();
   browser?.kill('SIGKILL');
-  rmSync(profileDir,{recursive:true,force:true});
+  // Chrome may still flush preferences after SIGKILL; cleanup must not turn
+  // a successful API/DOM acceptance run into a false test failure.
+  await delay(400);
+  try { rmSync(profileDir,{recursive:true,force:true,maxRetries:12,retryDelay:200}); }
+  catch(err) { console.warn('Temporary Chrome cleanup warning:',err.code||err.message); }
   if(failed) process.exitCode=1;
 }
 }
