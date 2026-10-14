@@ -42,6 +42,7 @@ export * from "./repositories/entitlement-restriction.repository";
 export * from "./repositories/entitlement-usage.repository";
 export * from "./repositories/feature-flag.repository";
 export * from "./repositories/vehicle.repository";
+export * from "./repositories/fleet-registration-entry.repository";
 export * from "./repositories/vehicle-owner.repository";
 export * from "./repositories/vehicle-ownership.repository";
 export * from "./repositories/vehicle-category.repository";
