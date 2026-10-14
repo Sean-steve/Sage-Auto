@@ -53,13 +53,9 @@ production and staging reject it even if the flag is set.
 
 Once a completed handover is present, **Rental Operations** refreshes
 outstanding payment/deposit blockers automatically every 10 seconds.
-If the deposit is still unfunded, the workflow card takes an authorized
-operator to **Finance**. Start Rental becomes active only when the full
-authoritative readiness rules pass.
-
-The workflow navigation across Booking, Handover, Rental Operations, Return
-and Finance directs the operator to the next workspace. It does **not** skip
-authorization, contract, inspection, allocation, payment or settlement checks.
+Start Rental becomes active only when the full authoritative readiness
+rules pass. No new contextual cross-workspace navigation cards are displayed.
+Existing operation-specific actions and authorization rules are unchanged.
 
 ## Diagnostics
 
