@@ -5,7 +5,6 @@
  * NODE_ENV=development SQLITE_PATH=.local/sage.sqlite \
  * pnpm demo:fleet -- --tenant-id=<tenant UUID> --confirm-demo
  */
-import { resolve, relative, isAbsolute } from "node:path";
 import { seedDemoFleetForTenant, DEMO_FLEET } from "./demo-fleet";
 
 async function main() {
