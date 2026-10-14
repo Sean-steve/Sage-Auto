@@ -428,7 +428,7 @@ async function runPaymentSuite() {
   );
   await assert.rejects(
     () => paymentService.requestRefund(tenantId, {
-      paymentId:verifiedPayment.id,amount:"10000.0001",
+      paymentId:verifiedPayment.id,amount:"10001.0000",
       reason:"Refund remaining funds plus one fraction beyond cap",
     },actor),
     (err:any)=>err?.name==="RefundExceedsPaymentError"
