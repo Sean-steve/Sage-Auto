@@ -1191,6 +1191,13 @@ export class PaymentService {
     if (payable.status === "PAID") {
       throw new SettlementAlreadyPaidError(payable.payableNumber);
     }
+    // Never call the transfer provider twice for an in-flight payable.
+    if (payable.status === "PROCESSING" || payable.status === "CANCELLED") {
+      throw new Error("Payout is already processing or cancelled. Reconcile its outcome before retrying.");
+    }
+    if (!["PENDING", "FAILED"].includes(payable.status)) {
+      throw new Error("Payout must be a pending approved payable.");
+    }
 
     const settlement = await this.settlementRepo.findById(payable.settlementId, tenantId);
     if (!settlement) {
@@ -1200,6 +1207,15 @@ export class PaymentService {
       throw new Error(
         `Settlement ${settlement.settlementNumber} must be APPROVED before provider payout; current status is ${settlement.status}.`
       );
+    }
+    if (!Number.isFinite(Number(payable.netDisbursementAmount)) ||
+        Number(payable.netDisbursementAmount) <= 0 ||
+        Math.abs(Number(payable.netDisbursementAmount) - Number(settlement.netPayoutAmount)) > 0.0001 ||
+        payable.ownerId !== settlement.ownerId || payable.currency !== settlement.currency) {
+      throw new Error("Payable amount, owner and currency must match its approved settlement.");
+    }
+    if (!payable.destinationMpesaNumber && !payable.destinationAccount) {
+      throw new Error("An explicitly configured owner payout destination is required.");
     }
     if (settlement.approvedBy && settlement.approvedBy === actor.userId) {
       const err: any = new Error("Owner payout execution requires a different authorized user from the settlement approver.");
@@ -1235,7 +1251,7 @@ export class PaymentService {
       payableId: payable.id,
       recipientName: payable.recipientName,
       recipientAccountOrPhone:
-        payable.destinationMpesaNumber || payable.destinationAccount || "DEFAULT_ACCOUNT",
+        payable.destinationMpesaNumber || payable.destinationAccount || "",
       amount: payable.netDisbursementAmount,
       currency: payable.currency,
       payoutMethod: payable.payoutMethod,
