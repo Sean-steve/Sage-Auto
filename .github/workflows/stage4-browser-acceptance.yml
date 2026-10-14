@@ -1,4 +1,4 @@
-name: Stage 4 Authenticated Browser Acceptance
+name: Stage 4 & 5 Authenticated Browser Acceptance
 
 on:
   pull_request:
@@ -6,6 +6,7 @@ on:
     paths:
       - 'scripts/stage4-browser-acceptance.mjs'
       - 'scripts/stage4-live-closure-acceptance.ts'
+      - 'scripts/stage5-browser-journey.mjs'
       - 'scripts/access-review.ts'
       - 'src/**'
       - 'apps/api/**'
@@ -18,7 +19,7 @@ permissions:
 
 jobs:
   browser-review:
-    name: Six real authenticated roles in isolated Chromium
+    name: Six-role browser and real cross-role settlement completion
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -67,6 +68,19 @@ jobs:
         run: pnpm audit:closure -- --all-tenants
       - name: Authenticated six-role browser and server RBAC acceptance
         run: node scripts/stage4-browser-acceptance.mjs
+      - name: Prepare unsealed rental in isolated review database
+        env:
+          NODE_ENV: test
+          APP_ENV: test
+          SQLITE_PATH: .review/access/review.sqlite
+          STAGE5_PREPARE_ONLY: '1'
+        run: pnpm exec tsx scripts/stage4-live-closure-acceptance.ts
+      - name: Browser-driven multi-actor Return to Finance to fleet release
+        run: node scripts/stage5-browser-journey.mjs
+      - name: Read-only integrity scan after browser-driven closure
+        env:
+          SQLITE_PATH: .review/access/review.sqlite
+        run: pnpm audit:closure -- --all-tenants
       - name: Safe diagnostic tails on failure
         if: failure()
         run: |
