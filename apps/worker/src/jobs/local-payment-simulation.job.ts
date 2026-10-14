@@ -107,7 +107,7 @@ export async function processLocalPaymentSimulation(
       // test intent instead of fabricating a provider callback.
       const simulated = await fakeProvider.initializePayment({
         attemptId:attempt.id,tenantId,intentReference:attempt.paymentIntentReference,
-        purpose,direction:"INBOUND",amount:attempt.amount,
+        purpose,direction:"INBOUND",amount:String(attempt.amount),
         currency:attempt.currency,customerId:booking.customerId,
         metadata:{localSimulation:true},
       });
