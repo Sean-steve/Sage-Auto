@@ -39,6 +39,14 @@ jobs:
         run: pnpm test:rentals
       - name: Operational Finance and pre-completion invoice generation
         run: pnpm test:finance
+      - name: Category code / canonical Pricing tests
+        run: pnpm test:pricing && pnpm test:pricing-experience
+      - name: Back-office booking and public checkout
+        run: pnpm test:bookings && pnpm test:public-booking
+      - name: Owner settlement worker and provider four-eyes payout tests
+        run: pnpm test:workers && pnpm exec tsx packages/database/test/stripe-card-provider-and-lifecycle.test.ts
+      - name: Prior operational and multi-role UI contracts
+        run: pnpm exec tsx packages/database/test/execution1-operational-repairs.test.ts && pnpm exec tsx packages/database/test/execution2-public-owner-experience.test.ts
       - name: Cross-domain lifecycle
         run: pnpm exec tsx packages/database/test/e2e-cross-domain-lifecycle.test.ts
       - name: Production build
