@@ -194,5 +194,10 @@ try {
   console.error('Stage 5 browser journey failed:',e.stack||e.message);
   process.exitCode=1;
 } finally {
-  socket?.close();proc?.kill('SIGKILL');rmSync(profile,{recursive:true,force:true});
+  socket?.close();
+  if(proc && proc.exitCode===null && proc.signalCode===null)proc.kill('SIGKILL');
+  // Chromium can still be writing to its profile briefly after SIGKILL.
+  await sleep(400);
+  try {rmSync(profile,{recursive:true,force:true,maxRetries:12,retryDelay:200});}
+  catch(error) {console.warn('Temporary Chrome profile cleanup warning:',error.code||error.message);}
 }
