@@ -63,7 +63,12 @@ export function globalErrorMiddleware(
   if (
     typeof domainError.statusCode === "number" &&
     domainError.statusCode >= 400 &&
-    domainError.statusCode < 600
+    domainError.statusCode < 600 &&
+    // Legacy DatabaseError subclasses default to 500 even for ordinary
+    // conflicts/not-found errors. Classify those by their canonical code
+    // below, rather than leaking a misleading HTTP 500 to the browser.
+    !(domainError.statusCode === 500 &&
+      (domainError as Error & {isOperational?: unknown}).isOperational === true)
   ) {
     const code =
       typeof domainError.code === "string" && domainError.code
@@ -94,6 +99,7 @@ export function globalErrorMiddleware(
   if (operationalError.isOperational === true && typeof operationalError.code === "string") {
     const code = operationalError.code;
     const statusCode =
+      code === "INTERNAL_DATABASE_ERROR" ? 500 :
       code.includes("NOT_FOUND") || code === "RECORD_NOT_FOUND" ? 404 :
       code.includes("CROSS_TENANT") ? 403 :
       code.includes("SUBSCRIPTION_SUSPENDED") ? 403 :
