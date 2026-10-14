@@ -35,6 +35,8 @@ jobs:
         run: pnpm typecheck
       - name: Durable record transaction rollback and retry
         run: pnpm exec tsx packages/database/test/record-transactions.test.ts
+      - name: Historic closure read-only audit checks
+        run: pnpm test:closure-audit
       - name: Rental return lifecycle and injected closure failures
         run: pnpm test:rentals
       - name: Operational Finance and pre-completion invoice generation
