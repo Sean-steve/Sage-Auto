@@ -115,8 +115,13 @@ async function main() {
   assert.ok(earlyRental.status>=400,"Rental must reject missing signed contract and handover");
   assertions+=2;
 
-  // Booking agent is allowed to confirm (not to forge Finance settlement).
-  const confirmed=await ok("Confirm booking","/bookings/"+booking.id+"/confirm",agent,{});
+  // Booking Agent may prepare reservations but cannot confirm them: the
+  // permission matrix intentionally reserves booking.confirm for an approver.
+  const deniedConfirmation=await call("/bookings/"+booking.id+"/confirm",agent.token,tenant,{});
+  assert.equal(deniedConfirmation.status,403,
+    "Booking Agent must not be able to bypass booking.confirm approval");
+  assertions++;
+  const confirmed=await ok("Confirm booking","/bookings/"+booking.id+"/confirm",owner,{});
   assert.equal(confirmed.status,"CONFIRMED");assert.equal(confirmed.assignedVehicleId,vehicle.id);
   assert.ok(confirmed.allocationId);assertions+=3;
   const a=await allocations.findById(confirmed.allocationId,tenant);
@@ -135,7 +140,7 @@ async function main() {
     pricingSnapshot:price,grossTotal:0,netRentalSubtotal:0,
     depositRequired:0,taxAmount:0,
   } as any);
-  const overlap=await call("/bookings/"+second.id+"/confirm",agent.token,tenant,{});
+  const overlap=await call("/bookings/"+second.id+"/confirm",owner.token,tenant,{});
   assert.ok([409,422,400].includes(overlap.status),
     "Overlapping booking MUST be rejected by allocation boundary; was "+overlap.status);
   assert.notEqual((await bookings.findById(second.id,tenant))?.status,"CONFIRMED");
