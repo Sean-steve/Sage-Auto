@@ -1,3 +1,4 @@
+import { WorkflowNextStep } from "./WorkflowNextStep";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle, BadgeCheck, CalendarClock, Car, CheckCircle2, ChevronRight,
@@ -161,6 +162,10 @@ export function ContractHandoverExperienceView({portal}:Props){
     <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between"><div><p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-600">Legal & physical dispatch gate</p><h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">Contract & Handover</h1><p className="mt-2 max-w-3xl text-sm text-slate-500">Turn a confirmed Booking into signed legal evidence, complete the physical dispatch checkpoints, then hand the verified record to Rental Operations.</p></div><div className="flex flex-wrap gap-2"><button onClick={()=>void refreshAll()} className={secondary}><RefreshCw size={16}/>Refresh</button>{can("contract.generate")&&<button onClick={()=>setGenerateOpen(true)} className={primary}><FileText size={16}/>Generate Contract</button>}{can("rental.start")&&<button onClick={()=>setScheduleOpen(true)} className={secondary}><CalendarClock size={16}/>Schedule Handover</button>}</div></header>
     {error&&<ErrorBox text={error}/>}
     {notice&&<Notice text={notice}/>}
+    <WorkflowNextStep current="Handover" next="Rentals"
+      description="After the contract is signed and all physical handover checkpoints are complete, continue to Rental Operations for the authorized dispatch. If the deposit is still pending, settle it in Finance first."
+      onNext={()=>navigateSection("rentals")}
+      canNext={portal.sections.some(s=>s.id==="rentals")}/>
     <section className="grid grid-cols-2 gap-3 lg:grid-cols-4"><Metric label="Contracts" value={contracts.length}/><Metric label="Signed" value={contracts.filter(x=>x.status==="SIGNED").length}/><Metric label="Active handovers" value={handovers.filter(x=>x.status!=="HANDOVER_COMPLETED").length}/><Metric label="Completed handovers" value={handovers.filter(x=>x.status==="HANDOVER_COMPLETED").length}/></section>
 
     <div className="overflow-x-auto"><div className="inline-flex min-w-max rounded-xl border bg-white p-1 shadow-sm">{can("contract.read")&&<button onClick={()=>setTab("contracts")} className={"rounded-lg px-4 py-2 text-sm font-semibold "+(tab==="contracts"?"bg-slate-950 text-white":"text-slate-600")}>Contracts</button>}{can("rental.read")&&<button onClick={()=>setTab("handovers")} className={"rounded-lg px-4 py-2 text-sm font-semibold "+(tab==="handovers"?"bg-slate-950 text-white":"text-slate-600")}>Handovers</button>}</div></div>

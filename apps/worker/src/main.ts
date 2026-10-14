@@ -9,6 +9,14 @@ import { WorkerManager } from "./worker.module";
 
 export async function bootstrap(): Promise<{ manager: WorkerManager; healthServer: http.Server }> {
   console.log("[Worker] Bootstrapping @carhire/worker background execution platform...");
+  const environment=(process.env.APP_ENV||process.env.NODE_ENV||"development").toLowerCase();
+  const localPayments=process.env.LOCAL_PAYMENT_WORKER_ENABLED==="true";
+  if(localPayments && (["production","staging"].includes(environment) ||
+     ["production","staging"].includes((process.env.NODE_ENV||"").toLowerCase()))) {
+    throw new Error("Local payment simulation cannot run in production or staging.");
+  }
+  console.log(`[Worker] Local payment simulation: ${localPayments?"ENABLED (SIMULATED MONEY ONLY)":"DISABLED"}`);
+  if(localPayments)console.log(`[Worker] Local SQLite path: ${process.env.SQLITE_PATH||"<unset>"} (must match API SQLite path)`);
   const manager = new WorkerManager();
   await manager.start();
 

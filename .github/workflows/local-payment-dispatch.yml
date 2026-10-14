@@ -1,0 +1,40 @@
+name: Local Payment to Rental Dispatch Acceptance
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'apps/worker/src/jobs/local-payment-simulation.job.ts'
+      - 'apps/worker/src/infrastructure/scheduler/canonical-scheduler.ts'
+      - 'apps/worker/src/main.ts'
+      - 'packages/database/test/local-payment-dispatch.test.ts'
+      - 'src/components/WorkflowNextStep.tsx'
+      - 'src/components/BookingExperienceView.tsx'
+      - 'src/components/ContractHandoverExperienceView.tsx'
+      - 'src/components/RentalsView.tsx'
+      - 'src/components/ReturnFinalCalculationView.tsx'
+      - 'src/components/FinanceView.tsx'
+      - '.github/workflows/local-payment-dispatch.yml'
+      - 'package.json'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  acceptance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 9.15.9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Local fake-provider deposit funding, idempotency and fail-closed test
+        run: pnpm exec tsx packages/database/test/local-payment-dispatch.test.ts
+      - name: TypeScript strict
+        run: pnpm typecheck
+      - name: Frontend production build
+        run: pnpm build
