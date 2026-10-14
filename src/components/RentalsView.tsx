@@ -1,3 +1,4 @@
+import { WorkflowNextStep } from "./WorkflowNextStep";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
@@ -328,6 +329,15 @@ export const RentalsView: React.FC = () => {
         </button>
       </div>
 
+      <WorkflowNextStep current="Rentals"
+        next={dispatchReady.some((x:any)=>!x.readiness?.isReady&&x.readiness?.blockers?.some((b:string)=>/deposit|payment/i.test(b)))?"Payment":"Returns"}
+        description={dispatchReady.some((x:any)=>!x.readiness?.isReady&&x.readiness?.blockers?.some((b:string)=>/deposit|payment/i.test(b)))
+          ?"A completed handover is waiting for verified deposit funding. Finance must allocate the security deposit before Start rental becomes available. Refresh runs automatically while blocked."
+          :"Dispatch only after readiness passes. Active rentals proceed to vehicle return, inspection and final calculation."}
+        onNext={()=>setCurrentView(dispatchReady.some((x:any)=>!x.readiness?.isReady&&x.readiness?.blockers?.some((b:string)=>/deposit|payment/i.test(b)))?"finance":"returns")}
+        canNext={dispatchReady.some((x:any)=>!x.readiness?.isReady&&x.readiness?.blockers?.some((b:string)=>/deposit|payment/i.test(b)))
+          ?hasPermission("payment.read")||hasPermission("invoice.read")
+          :hasPermission("rental.read")}/>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-6">
         {[
           ["Awaiting dispatch", dispatchReady.length, KeyRound],
