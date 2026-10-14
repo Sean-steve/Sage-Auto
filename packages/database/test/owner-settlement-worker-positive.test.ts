@@ -184,6 +184,31 @@ async function positivePeriodWorkerTest() {
   assert.equal((await paymentRepo.listByTenant(tenantId)).filter(p=>p.purpose==="OWNER_SETTLEMENT").length,1,
     "Payout replay must never create a second outbound payment");
 
+  // A payable with no real beneficiary details must fail closed before any
+  // provider transfer. In particular, do not use a "DEFAULT_ACCOUNT".
+  const unaddressedSettlement=await settlementRepo.create({
+    tenantId,ownerId:owner.id,periodStart:"2026-10-01",periodEnd:"2026-10-10",
+    status:"APPROVED",approvedBy:"different-approver",currency:"KES",
+    grossRevenue:"80.0000",totalDeductions:"0.0000",
+    netPayoutAmount:"80.0000",calculatedAt:new Date().toISOString(),
+  } as any);
+  const withoutRecipient=await settlementRepo.createPayable({
+    tenantId,settlementId:unaddressedSettlement.id,ownerId:owner.id,
+    payableNumber:"PAY-MISSING-DESTINATION",recipientName:owner.name,
+    amount:"80.0000",netDisbursementAmount:"80.0000",
+    currency:"KES",taxWithholdingAmount:"0.0000",payoutMethod:"BANK_TRANSFER",
+    status:"PENDING",retryCount:0,createdBy:"different-approver",
+  });
+  await assert.rejects(
+    ()=>payouts.executeOwnerPayout(tenantId,{
+      settlementPayableId:withoutRecipient.id,provider:"STRIPE_CARD",
+    },{userId:"safe-independent-executor"} as any),
+    /saved, verified recipient destination/i
+  );
+  assert.equal((await settlementRepo.findPayableById(withoutRecipient.id,tenantId))?.status,"PENDING");
+  assert.equal((await paymentRepo.listByTenant(tenantId)).filter(p=>p.purpose==="OWNER_SETTLEMENT").length,1,
+    "Invalid beneficiary cannot generate an outbound payment");
+
   console.log("✓ Paid Finance invoice → completed Rental → historical owner agreement → worker batch → KES 7,000 (replay and tenant isolation verified)");
 }
 void positivePeriodWorkerTest().catch(error=>{console.error(error);process.exitCode=1;});
