@@ -996,9 +996,20 @@ export class PaymentService {
       throw new PaymentNotFoundError(dto.paymentId);
     }
 
+    // Reserve ALL outstanding refund obligations, not only money already
+    // disbursed. Multiple pending requests must never overbook one payment.
+    const outstanding = await this.refundRepo.findByOriginalPaymentId(payment.id, tenantId);
+    const outstandingAmount = outstanding
+      .filter((r) => ["PENDING", "APPROVED", "PROCESSING"].includes(r.status))
+      .reduce((total, r) => total + Number(r.amount), 0);
+    if (!Number.isFinite(Number(dto.amount)) || Number(dto.amount) <= 0 ||
+        Number(dto.amount) + outstandingAmount + Number(payment.refundedAmount) >
+          Number(payment.amount) + 0.0001) {
+      throw new Error("Refund request exceeds the unreserved, verified payment balance.");
+    }
     const { newRefunded } = PaymentStateMachine.computeRefundOutcome(
       payment.amount,
-      payment.refundedAmount,
+      String(Number(payment.refundedAmount) + outstandingAmount),
       dto.amount,
       payment.id
     );
@@ -1042,6 +1053,13 @@ export class PaymentService {
       throw new RefundNotFoundError(refundId);
     }
 
+    // Terminal refunds are safe to replay without contacting the provider.
+    // An in-flight provider request is deliberately non-retryable until its
+    // outcome is reconciled, preventing a second outbound disbursement.
+    if (refund.status === "COMPLETED") return refund;
+    if (refund.status !== "PENDING") {
+      throw new Error("Refund must be PENDING before a provider disbursement; reconcile PROCESSING/FAILED refunds first.");
+    }
     if (refund.requestedBy && refund.requestedBy === actor.userId) {
       const err: any = new Error("Refund approval requires a different authorized user from the requester.");
       err.code = "SEPARATION_OF_DUTIES";
@@ -1065,7 +1083,14 @@ export class PaymentService {
     }
 
     const provider = this.providerRegistry.get(payment.provider);
-    const refundResult = await provider.refundPayment({
+    // Claim one irreversible execution attempt via optimistic versioning
+    // BEFORE talking to the provider. A crash cannot silently re-disburse.
+    const processing = await this.refundRepo.update(
+      refund.id, tenantId, { status: "PROCESSING", approvedBy: actor.userId,
+        approvedAt: new Date().toISOString() }, refund.version);
+    let refundResult;
+    try {
+      refundResult = await provider.refundPayment({
       tenantId,
       originalPaymentId: payment.id,
       providerTransactionId: payment.providerTransactionId,
@@ -1074,6 +1099,11 @@ export class PaymentService {
       reason: refund.reason,
       idempotencyKey: `refund_${refund.id}`,
     });
+    } catch (providerError) {
+      // An ambiguous network failure must NOT be treated as 'FAILED'. The
+      // provider may have sent money; require reconciliation before retry.
+      throw providerError;
+    }
 
     if (!refundResult.success) {
       await this.refundRepo.update(
@@ -1083,7 +1113,7 @@ export class PaymentService {
           status: "FAILED",
           failureReason: refundResult.failureReason || "Provider failed to disburse refund",
         },
-        refund.version
+        processing.version
       );
       throw new Error(`Refund disbursement failed: ${refundResult.failureReason}`);
     }
@@ -1099,7 +1129,7 @@ export class PaymentService {
         providerRefundReference: refundResult.providerRefundReference,
         completedAt: refundResult.completedAt || now,
       },
-      refund.version
+      processing.version
     );
 
     const { newRefunded, newStatus } = PaymentStateMachine.computeRefundOutcome(
