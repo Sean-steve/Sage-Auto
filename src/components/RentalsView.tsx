@@ -94,8 +94,8 @@ export const RentalsView: React.FC = () => {
   const [returnLocation, setReturnLocation] = useState("");
   const [returnNotes, setReturnNotes] = useState("");
 
-  const loadRentals = useCallback(async () => {
-    setLoading(true);
+  const loadRentals = useCallback(async (silent = false) => {
+    if(!silent)setLoading(true);
     const [response, readyResponse] = await Promise.all([
       apiClient.rentals.listRentals(),
       apiClient.rentals.listDispatchReady(),
@@ -107,12 +107,25 @@ export const RentalsView: React.FC = () => {
     }
     setDispatchReady(!readyResponse.error && Array.isArray(readyResponse.data) ? readyResponse.data : []);
     setDispatchError(readyResponse.error ? `Unable to load handovers awaiting dispatch: ${readyResponse.error.message}` : "");
-    setLoading(false);
+    if(!silent)setLoading(false);
   }, [activeTenantId, cachedRentals]);
 
   useEffect(() => {
     void loadRentals();
   }, [loadRentals]);
+
+  // A completed handover can become dispatch-ready as soon as the local
+  // payment worker allocates the deposit. Refresh silently without forcing
+  // the operator to hunt for another view or repeatedly click Refresh.
+  const isWaitingForFunding=dispatchReady.some((item:any)=>
+    !item.readiness?.isReady &&
+    item.readiness?.blockers?.some((reason:string)=>/deposit|payment/i.test(reason))
+  );
+  useEffect(()=>{
+    if(!isWaitingForFunding)return;
+    const timer=window.setInterval(()=>void loadRentals(true),10000);
+    return ()=>window.clearInterval(timer);
+  },[isWaitingForFunding,loadRentals]);
 
   useEffect(() => {
     if (!selectedRentalId) {
