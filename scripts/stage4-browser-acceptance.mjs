@@ -160,10 +160,18 @@ try {
 
     // Explicit authorization check; sidebar gating alone cannot prove isolation.
     const finance=await req('/finance/invoices',token,tenantId);
-    const financeAllowed=['COMPANY_OWNER','FINANCE_MANAGER'].includes(spec.role);
+    // Front desk has limited invoice READ, but no Finance workspace or
+    // authority to seal settlements; test the actual permission matrix.
+    const financeAllowed=portal.permissions.includes('*') || portal.permissions.includes('invoice.read');
     assert.equal(finance.status,financeAllowed?200:403,
-      spec.role+' Finance read authorization must be server-side');
+      spec.role+' invoice.read authorization must be server-side');
     checks++;
+
+    if(spec.role==='BOOKING_AGENT') {
+      const seal=await req('/rentals/nonexistent/deposit-settlement',token,tenantId,{settlementStatus:'SETTLED'});
+      assert.equal(seal.status,403,'Booking Agent must not finalize Finance settlements');
+      checks++;
+    }
 
     if(spec.role==='RENTER') {
       const rentals=await req('/rentals',token,tenantId);
