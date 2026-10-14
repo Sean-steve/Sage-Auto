@@ -7,7 +7,6 @@ on:
       - 'apps/worker/src/infrastructure/scheduler/canonical-scheduler.ts'
       - 'apps/worker/src/main.ts'
       - 'packages/database/test/local-payment-dispatch.test.ts'
-      - 'src/components/WorkflowNextStep.tsx'
       - 'src/components/BookingExperienceView.tsx'
       - 'src/components/ContractHandoverExperienceView.tsx'
       - 'src/components/RentalsView.tsx'

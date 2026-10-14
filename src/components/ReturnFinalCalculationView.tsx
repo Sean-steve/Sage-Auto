@@ -1,4 +1,3 @@
-import { WorkflowNextStep } from "./WorkflowNextStep";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
@@ -497,10 +496,6 @@ export const ReturnFinalCalculationView: React.FC = () => {
         </button>
       </div>
 
-      <WorkflowNextStep current="Returns" next="Finance"
-        description="After vehicle receipt, return inspection and calculation, continue to Finance to reconcile payment/refund evidence and settle the security deposit."
-        onNext={()=>setCurrentView("finance")}
-        canNext={hasPermission("payment.read")||hasPermission("invoice.read")}/>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
         {[
           ["Awaiting receipt", metrics.awaitingReceipt, Car],
