@@ -1,0 +1,49 @@
+name: Stage 7 Financial Safety — Simulated Provider Only
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'scripts/stage7-financial-integration.ts'
+      - 'apps/api/src/modules/payments/**'
+      - 'apps/api/src/modules/rentals/**'
+      - 'packages/database/src/repositories/**'
+      - 'packages/database/test/payments-and-provider-contracts.test.ts'
+      - '.github/workflows/stage7-financial-safety.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  simulated-finance:
+    name: Provider-simulator financial invariants (NO external money)
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 9.15.9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Run isolated provider-simulator integration
+        env:
+          NODE_ENV: test
+          APP_ENV: test
+          SQLITE_PATH: .review/access/review.sqlite
+        run: |
+          mkdir -p .review/access
+          pnpm exec tsx scripts/stage7-financial-integration.ts
+      - name: Verify historical financial contract suites
+        env:
+          NODE_ENV: test
+          APP_ENV: test
+          SQLITE_PATH: .review/access/legacy-finance.sqlite
+        run: pnpm exec tsx packages/database/test/payments-and-provider-contracts.test.ts
+      - name: Remove disposable test data
+        if: always()
+        run: rm -rf .review/access
