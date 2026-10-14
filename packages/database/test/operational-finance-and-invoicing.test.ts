@@ -467,6 +467,39 @@ async function runSprint19FinanceTestSuite() {
   assert.strictEqual(noDepositInvoice.amountOutstanding, noDepositInvoice.total);
   assert.strictEqual(await depositPositionRepo.findByRentalId(rentalWithoutDeposit.id, tenantA), null);
 
+  // Regression: Finance can invoice a returned rental before it is marked COMPLETED.
+  // No money is inferred from a deposit requirement without a held deposit position.
+  const preCompletionRental = await rentalRepo.create(tenantA, {
+    rentalNumber: "RNT-2026-00091",
+    bookingId: "bkg_test_91",
+    contractId: "ctr_test_91",
+    handoverId: "hnd_test_91",
+    customerId: customerA.id,
+    primaryDriverId: "drv_test_91",
+    vehicleId: "veh_test_91",
+    status: "FINAL_CALCULATION",
+    pricingSnapshot: (await rentalRepo.getStartSnapshot(rentalWithoutDeposit.id, tenantA))!.pricingSnapshot,
+  });
+  const originalCalculation = await rentalRepo.getFinalCalculation(rental1.id, tenantA);
+  assert.ok(originalCalculation);
+  const { id: _calculationId, calculatedAt: _calculatedAt, ...cloneCalculation } = originalCalculation;
+  await rentalRepo.saveFinalCalculation(tenantA, {
+    ...cloneCalculation,
+    rentalId: preCompletionRental.id,
+    bookingId: preCompletionRental.bookingId,
+    isImmutable: false,
+  });
+  const preCompletionInvoice = await financeService.generateRentalInvoice(
+    tenantA, { rentalId: preCompletionRental.id, applyDepositDeduction: true }, staffUser1
+  );
+  assert.strictEqual(preCompletionInvoice.rentalId, preCompletionRental.id);
+  assert.strictEqual(preCompletionInvoice.amountPaid, "0.0000");
+  assert.strictEqual(preCompletionInvoice.amountOutstanding, preCompletionInvoice.total);
+  assert.strictEqual((await rentalRepo.findById(preCompletionRental.id, tenantA))?.state, "FINAL_CALCULATION");
+  assert.strictEqual((await financeService.generateRentalInvoice(
+    tenantA, { rentalId: preCompletionRental.id }, staffUser1
+  )).id, preCompletionInvoice.id);
+
   const activeRental = await rentalRepo.create(tenantA, {
     rentalNumber: "RNT-2026-00090",
     bookingId: "bkg_test_90",
@@ -480,7 +513,7 @@ async function runSprint19FinanceTestSuite() {
   });
   await assert.rejects(
     () => financeService.generateRentalInvoice(tenantA, { rentalId: activeRental.id }, staffUser1),
-    /must complete the Return & Final Calculation lifecycle/i
+    /must have an authoritative final calculation before invoicing/i
   );
 
   console.log("✓ Rental invoice generation requires completed Return truth and never invents deposit receipts.");
