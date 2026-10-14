@@ -9,7 +9,7 @@
  */
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 async function main() {
@@ -119,6 +119,19 @@ async function main() {
     depositAdditionalPaymentDue:0,depositSettlementStatus:"PENDING",
     isImmutable:false,lineItems:[],
   } as any);
+  // Stage 5 browser journey creates the same committed, zero-balance
+  // fixture but does not seal it here: an actual Finance operator must click
+  // through the UI before a separate Company Owner releases the vehicle.
+  if (process.env.STAGE5_PREPARE_ONLY === "1") {
+    const file = resolve(".review/access/stage5-fixture.json");
+    writeFileSync(file, JSON.stringify({
+      rentalId:rental.id,rentalNumber:rental.rentalNumber,
+      bookingId:booking.id,contractId:contract.id,vehicleId:vehicle.id,
+      allocationId:allocation.id,tenantId,
+    }), {mode:0o600});
+    console.log("PASS Stage 5 isolated fixture prepared for real browser Finance and Returns actions.");
+    return;
+  }
   let checks=0;
 
   // Authorized Finance should see an unsealed saved calculation.
