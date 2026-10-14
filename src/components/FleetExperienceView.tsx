@@ -131,15 +131,6 @@ export function FleetExperienceView({portal}:FleetExperienceProps) {
   const [category,setCategory]=useState("");
   const [owner,setOwner]=useState("");
   const [createOpen,setCreateOpen]=useState(false);
-  const [registrationEntries,setRegistrationEntries]=useState<Array<{
-    id:string;sequence:number;status:"UNREGISTERED"|"REGISTERED";vehicleId?:string;
-  }>>([]);
-  const [intakeCount,setIntakeCount]=useState(10);
-  const [intakeBusy,setIntakeBusy]=useState(false);
-  const [intakeError,setIntakeError]=useState("");
-  const [selectedIntakeId,setSelectedIntakeId]=useState<string|null>(null);
-  const [showAllIntake,setShowAllIntake]=useState(false);
-  const intakeKey=useRef<string>(crypto.randomUUID());
   const [selectedId,setSelectedId]=useState<string|null>(null);
   const requestSeq=useRef(0);
 
@@ -165,15 +156,10 @@ export function FleetExperienceView({portal}:FleetExperienceProps) {
         apiClient.fleet.listVehicles({availabilityStatus:"MAINTENANCE",page:1,limit:1}),
         apiClient.fleet.listVehicles({availabilityStatus:"BLOCKED",page:1,limit:1}),
       ];
-      const [list,total,availableNow,onRentNow,maintenanceNow,blockedNow,categoriesResponse,intakeResponse]=await Promise.all([
-        ...requests,apiClient.fleet.getCategories(),
-        can("vehicle.read")?apiClient.get<any[]>("/fleet/registration-entries"):Promise.resolve({data:[]} as ApiResponse<any[]>),
-      ]);
+      const [list,total,availableNow,onRentNow,maintenanceNow,blockedNow,categoriesResponse]=await Promise.all([...requests,apiClient.fleet.getCategories()]);
       if(seq!==requestSeq.current)return;
       if(list.error) throw new Error(list.error.message);
       setVehicles(list.data||[]);
-      if((intakeResponse as ApiResponse<any[]>).error) throw new Error((intakeResponse as ApiResponse<any[]>).error!.message);
-      setRegistrationEntries((intakeResponse.data||[]) as typeof registrationEntries);
       const serverCategories=((categoriesResponse.data as any[])||[]).map((item:any)=>item.code||item.name).filter(Boolean);
       const vehicleCategories=(list.data||[]).map((item:any)=>item.category).filter(Boolean);
       setCategoryOptions([...new Set([...serverCategories,...vehicleCategories,...categories])]);
@@ -197,23 +183,6 @@ export function FleetExperienceView({portal}:FleetExperienceProps) {
 
   useEffect(()=>{const timer=setTimeout(()=>void refresh(),search?250:0);return()=>{clearTimeout(timer);requestSeq.current++;};},[portal.id,JSON.stringify(query)]);
 
-  async function reserveIntake(){
-    if(!Number.isInteger(intakeCount)||intakeCount<1||intakeCount>100){
-      setIntakeError("Choose a whole number between 1 and 100.");return;
-    }
-    setIntakeBusy(true);setIntakeError("");
-    try{
-      await unwrap(apiClient.post("/fleet/registration-entries",{
-        count:intakeCount,idempotencyKey:intakeKey.current,
-      }));
-      intakeKey.current=crypto.randomUUID();
-      await refresh();
-    }catch(error:any){setIntakeError(error.message||"Could not create fleet entries.");}
-    finally{setIntakeBusy(false);}
-  }
-
-  const unregisteredEntries=registrationEntries.filter(x=>x.status==="UNREGISTERED");
-
   return <div className="mx-auto max-w-[1500px] space-y-6 p-4 sm:p-6 lg:p-8">
     <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
       <div>
@@ -223,53 +192,16 @@ export function FleetExperienceView({portal}:FleetExperienceProps) {
       </div>
       <div className="flex flex-wrap gap-2">
         <button onClick={()=>void refresh()} className={buttonSecondary}><RefreshCw size={16}/>Refresh</button>
-        {can("vehicle.create")&&<button onClick={()=>document.getElementById("fleet-intake-quantity")?.focus()} className={buttonSecondary}><Plus size={16}/>Add fleet entries</button>}
         {can("vehicle.create")&&<button onClick={()=>setCreateOpen(true)} className={buttonPrimary}><Plus size={16}/>Register vehicle</button>}
       </div>
     </header>
 
-    <section className="grid grid-cols-2 gap-3 md:grid-cols-6" aria-label="Fleet summary">
-      <Metric label="Registered vehicles" value={summary.total} />
-      <Metric label="Awaiting registration" value={unregisteredEntries.length} />
+    <section className="grid grid-cols-2 gap-3 md:grid-cols-5" aria-label="Fleet summary">
+      <Metric label="Fleet records" value={summary.total} />
       <Metric label="Available" value={summary.available} tone="emerald"/>
       <Metric label="On rent" value={summary.onRent} tone="blue"/>
       <Metric label="Maintenance" value={summary.maintenance} tone="amber"/>
       <Metric label="Blocked" value={summary.blocked} tone="rose"/>
-    </section>
-
-    <section aria-label="Fleet registration entries" className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div><h2 className="text-base font-bold text-slate-900">Fleet entries awaiting your details</h2>
-          <p className="mt-1 max-w-2xl text-sm text-slate-500">
-            Choose how many entries you need. These are real saved database records, not sample cars.
-            Supply each car's plate, make, model and rate later. Unregistered entries cannot be rented.
-          </p></div>
-        {can("vehicle.create")&&<div className="flex flex-wrap items-end gap-2">
-          <label className="block text-xs font-semibold text-slate-600" htmlFor="fleet-intake-quantity">
-            Number of entries
-            <input id="fleet-intake-quantity" type="number" min="1" max="100" step="1"
-              className={inputClass+" mt-1 w-28"} value={intakeCount}
-              onChange={e=>setIntakeCount(Number(e.target.value))}/>
-          </label>
-          <button type="button" disabled={intakeBusy} onClick={()=>void reserveIntake()}
-            className={buttonPrimary}>{intakeBusy?<Loader2 className="animate-spin" size={16}/>:<Plus size={16}/>}
-            Create entries</button>
-        </div>}
-      </div>
-      {intakeError&&<div role="alert" className="mt-3"><ErrorBox text={intakeError}/></div>}
-      {unregisteredEntries.length ? <>
-        <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {(showAllIntake?unregisteredEntries:unregisteredEntries.slice(0,20)).map(entry=>
-            <div key={entry.id} className="flex items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
-              <div><p className="text-sm font-bold text-slate-800">Fleet entry {entry.sequence}</p>
-                <p className="mt-0.5 text-xs text-amber-700">Needs vehicle details</p></div>
-              {can("vehicle.create")&&<button type="button" className="text-xs font-bold text-emerald-700 hover:underline"
-                onClick={()=>setSelectedIntakeId(entry.id)}>Register</button>}
-            </div>)}
-        </div>
-        {unregisteredEntries.length>20&&<button type="button" className={buttonSecondary+" mt-4"}
-          onClick={()=>setShowAllIntake(x=>!x)}>{showAllIntake?"Show fewer":`Show all ${unregisteredEntries.length} entries`}</button>}
-      </>:<p className="mt-4 text-sm text-slate-500">No incomplete fleet entries. You can still register a vehicle directly.</p>}
     </section>
 
     <section className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
@@ -292,9 +224,6 @@ export function FleetExperienceView({portal}:FleetExperienceProps) {
       <FleetList vehicles={vehicles} owners={owners} onOpen={setSelectedId}/>}
 
     {createOpen&&<RegisterVehicleDialog portal={portal} owners={owners} categoryOptions={categoryOptions} onClose={()=>setCreateOpen(false)} onCreated={async(id)=>{setCreateOpen(false);await refresh();setSelectedId(id);}}/>}
-    {selectedIntakeId&&<RegisterVehicleDialog portal={portal} owners={owners} categoryOptions={categoryOptions}
-      registrationEntryId={selectedIntakeId} onClose={()=>setSelectedIntakeId(null)}
-      onCreated={async(id)=>{setSelectedIntakeId(null);await refresh();setSelectedId(id);}}/>}
     {selectedId&&<AssetProfile vehicleId={selectedId} portal={portal} owners={owners} categoryOptions={categoryOptions} onClose={()=>setSelectedId(null)} onChanged={refresh} navigate={navigateSection}/>} 
   </div>;
 }
@@ -339,7 +268,7 @@ function FleetList({vehicles,owners,onOpen}:{vehicles:any[];owners:any[];onOpen:
   </section>;
 }
 
-function RegisterVehicleDialog({portal,owners,categoryOptions,registrationEntryId,onClose,onCreated}:{portal:AccessPortal;owners:any[];categoryOptions:string[];registrationEntryId?:string;onClose:()=>void;onCreated:(id:string)=>void|Promise<void>}) {
+function RegisterVehicleDialog({portal,owners,categoryOptions,onClose,onCreated}:{portal:AccessPortal;owners:any[];categoryOptions:string[];onClose:()=>void;onCreated:(id:string)=>void|Promise<void>}) {
   const [busy,setBusy]=useState(false);const [error,setError]=useState("");
   const [imageUrl,setImageUrl]=useState("");
   const [imageFile,setImageFile]=useState<File|null>(null);
@@ -387,9 +316,7 @@ function RegisterVehicleDialog({portal,owners,categoryOptions,registrationEntryI
       let vehicleId=createdIdRef.current;
       let created:any=null;
       if(!vehicleId){
-        created=registrationEntryId
-          ? await unwrap(apiClient.post(`/fleet/registration-entries/${registrationEntryId}/register`,payload))
-          : await unwrap(apiClient.fleet.createVehicle(payload));
+        created=await unwrap(apiClient.fleet.createVehicle(payload));
         vehicleId=created.id;
         createdIdRef.current=vehicleId;
       }
@@ -407,11 +334,7 @@ function RegisterVehicleDialog({portal,owners,categoryOptions,registrationEntryI
     catch(err:any){setError(err.message||"Vehicle could not be registered.");}
     finally{setBusy(false);}
   }
-  return <Modal title={registrationEntryId?"Complete fleet entry":"Register fleet vehicle"}
-    subtitle={registrationEntryId
-      ?"Enter the real vehicle's identity. The incomplete database entry will become a registered asset; public publishing remains off until you enable it."
-      :"Create the server-backed asset first; lifecycle and availability are commissioned by FleetService."}
-    onClose={onClose}>
+  return <Modal title="Register fleet vehicle" subtitle="Create the server-backed asset first; lifecycle and availability are commissioned by FleetService." onClose={onClose}>
     {error&&<ErrorBox text={error}/>}
     <form onSubmit={submit} className="grid gap-5">
       <FormSection title="Vehicle identity"><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"><Field label="Registration plate *"><input required name="registrationPlate" className={inputClass}/></Field><Field label="Make *"><input required name="make" className={inputClass}/></Field><Field label="Model *"><input required name="model" className={inputClass}/></Field><Field label="Year *"><input required name="year" type="number" min="1980" max="2100" defaultValue={new Date().getFullYear()} className={inputClass}/></Field><Field label="VIN / chassis"><input name="vin" className={inputClass}/></Field><Field label="Color"><input name="color" className={inputClass}/></Field></div></FormSection>
