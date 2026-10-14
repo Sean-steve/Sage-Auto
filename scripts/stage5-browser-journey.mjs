@@ -117,6 +117,7 @@ try {
   await new Promise((res,rej)=>{socket.addEventListener('open',res,{once:true});socket.addEventListener('error',rej,{once:true});});
   const cdp=new CDP(socket);
   await cdp.call('Page.enable');await cdp.call('Runtime.enable');
+  await cdp.call('Emulation.setDeviceMetricsOverride',{width:1440,height:900,deviceScaleFactor:1,mobile:false});
   let checks=0;
   async function as(actor,section='returns'){
     await cdp.navigate(web+'/login');
