@@ -1,4 +1,4 @@
-name: Stage 4–6 Cross-Workflow Integration Acceptance
+name: Stage 4–7 Cross-Workflow & Financial Integration Acceptance
 
 on:
   pull_request:
@@ -8,6 +8,7 @@ on:
       - 'scripts/stage4-live-closure-acceptance.ts'
       - 'scripts/stage5-browser-journey.mjs'
       - 'scripts/stage6-cross-workflow.ts'
+      - 'scripts/stage7-financial-integration.ts'
       - 'packages/database/test/stage6-http-boundary.test.ts'
       - 'apps/api/src/common/filters/http-exception.filter.ts'
       - 'scripts/release-preflight.mjs'
@@ -26,7 +27,7 @@ permissions:
 
 jobs:
   browser-review:
-    name: Six-role browser and full booking-to-release API integration
+    name: Six-role browser, rental lifecycle & simulated financial integration
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -99,6 +100,16 @@ jobs:
           SQLITE_PATH: .review/access/review.sqlite
         run: pnpm exec tsx scripts/stage6-cross-workflow.ts
       - name: Read-only integrity audit after Stage 6 integration scenario
+        env:
+          SQLITE_PATH: .review/access/review.sqlite
+        run: pnpm audit:closure -- --all-tenants
+      - name: Stage 7 simulated verified-money, refund and owner-payout integration
+        env:
+          NODE_ENV: test
+          APP_ENV: test
+          SQLITE_PATH: .review/access/review.sqlite
+        run: pnpm exec tsx scripts/stage7-financial-integration.ts
+      - name: Read-only integrity audit after Stage 7 financial integration
         env:
           SQLITE_PATH: .review/access/review.sqlite
         run: pnpm audit:closure -- --all-tenants
