@@ -136,17 +136,9 @@ export class PaymentService {
       return true;
     }
 
-    if (purpose === "RENTAL_DEPOSIT") {
-      const required = Number(booking.depositRequired || 0);
-      const depositStatus = required <= 0 || numericAmount + 0.0001 >= required ? "HELD" : "REQUESTED";
-      await this.bookingRepo.update(
-        booking.id,
-        tenantId,
-        { depositStatus },
-        booking.version
-      );
-      return true;
-    }
+    // Deposits must use allocatePayment below: it funds the durable deposit
+    // position and accumulates instalments before marking the booking HELD.
+    // A booking flag alone is not evidence of money available for dispatch.
 
     return false;
   }

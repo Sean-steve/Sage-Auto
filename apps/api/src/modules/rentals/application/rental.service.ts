@@ -629,7 +629,8 @@ export class RentalService {
       if (!handover) continue;
 
       const readiness = await this.evaluateReadiness(tenantId, booking.id);
-      if (!readiness.isReady) continue;
+      // Keep completed handovers visible even when a remaining requirement
+      // blocks dispatch. The start command still enforces every readiness gate.
 
       const vehicleId = booking.assignedVehicleId || booking.requestedVehicleId || handover.vehicleId;
       const vehicle = vehicleId ? await this.vehicleRepo.findById(vehicleId, tenantId) : null;
@@ -1867,6 +1868,9 @@ export class RentalService {
     dto: CompleteRentalDto,
     actor: RentalActor
   ): Promise<Rental> {
+    if (!["AVAILABLE", "MAINTENANCE", "INSPECTION", "GROUNDED"].includes(dto.releaseVehicleToStatus)) {
+      throw new Error("Rental completion requires an explicit vehicle disposition: AVAILABLE, MAINTENANCE, INSPECTION or GROUNDED.");
+    }
     if (dto.idempotencyKey) {
       const cached = await this.idempotencyRepo.findByKey(tenantId, dto.idempotencyKey);
       if (cached?.responseBody) {
@@ -1948,9 +1952,6 @@ export class RentalService {
     }
 
     // 5. Update Vehicle Mileage, Fuel, and Availability Status
-    if (!dto.releaseVehicleToStatus) {
-      throw new Error("Rental completion requires an explicit vehicle disposition.");
-    }
     const targetVehicleStatus = dto.releaseVehicleToStatus as any;
     try {
       const vehicle = await this.vehicleRepo.findById(rental.vehicleId, tenantId);
