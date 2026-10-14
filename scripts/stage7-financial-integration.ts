@@ -120,6 +120,22 @@ async function main(){
     "Booking deposit becomes HELD only on allocation");
 
   // C. Refund reservation, 4-eyes, provider failure and replay safety.
+  await rejected("Missing deposit obligation must never be refundable",
+    ()=>service.requestRefund(tenant,{
+      paymentId:depositResult.payment!.id,amount:"100.0000",reason:"Wrong deposit",
+      sourceObligationType:"RENTAL_DEPOSIT",sourceObligationId:"not-a-real-position",
+    },requester),e=>/backed|linked/.test(String(e.message)));
+  const unlinked=await deposits.create({
+    tenantId:tenant,bookingId:"different-booking",customerId:"different-customer",
+    currency:"KES",requiredAmount:"7000.0000",receivedAmount:"7000.0000",
+    heldAmount:"7000.0000",appliedAmount:"0.0000",refundDueAmount:"7000.0000",
+    refundedAmount:"0.0000",forfeitedAmount:"0.0000",status:"HELD",
+  } as any);
+  await rejected("Another customer's funded deposit must never be a refund source",
+    ()=>service.requestRefund(tenant,{
+      paymentId:depositResult.payment!.id,amount:"100.0000",reason:"Source substitution",
+      sourceObligationType:"RENTAL_DEPOSIT",sourceObligationId:unlinked.id,
+    },requester),e=>/backed/.test(String(e.message)));
   const depositRefund=await service.requestRefund(tenant,{
     paymentId:depositResult.payment!.id,amount:"7000.0000",reason:"Test deposit released",
     sourceObligationType:"RENTAL_DEPOSIT",sourceObligationId:held!.id,
