@@ -28,27 +28,28 @@ jobs:
     runs-on: ubuntu-latest
     environment: ${{ github.event.inputs.target_environment }}
     steps:
-      - name: Checkout Source Code
-        uses: actions/checkout@v4
-
-      - name: Validate Target Release Artifact
-        run: |
-          echo "================================================================="
-          echo "EMERGENCY ROLLBACK INITIATED"
-          echo "Target Environment: ${{ github.event.inputs.target_environment }}"
-          echo "Target Release:     ${{ github.event.inputs.target_release_id }}"
-          echo "Reason:             ${{ github.event.inputs.reason }}"
-          echo "Forward Compatible: ${{ github.event.inputs.skip_db_check }}"
-          echo "================================================================="
-
-      - name: Roll Back Ingress / Traffic Routing
-        run: |
-          echo "==> Directing traffic routing to previous immutable revision..."
-
-      - name: Revert Background Workers
-        run: |
-          echo "==> Draining current workers and redeploying revision ${{ github.event.inputs.target_release_id }}..."
-
-      - name: Verify Post-Rollback System Health
-        run: |
-          echo "==> Querying /api/health and /api/health/ready on active pods..."
+      - uses: actions/checkout@v4
+      - name: Fail closed unless verified rollback adapter is available
+        run: node scripts/release-preflight.mjs rollback
+      - name: Validate the target artifact and forward-compatibility
+        env:
+          TARGET_RELEASE_ID: ${{ inputs.target_release_id }}
+          TARGET_ENVIRONMENT: ${{ inputs.target_environment }}
+          ROLLBACK_REASON: ${{ inputs.reason }}
+          SKIP_DB_CHECK: ${{ inputs.skip_db_check }}
+        run: ./infrastructure/deployment/adapters/rollback.sh validate
+      - name: Roll back application ingress
+        env:
+          TARGET_RELEASE_ID: ${{ inputs.target_release_id }}
+          TARGET_ENVIRONMENT: ${{ inputs.target_environment }}
+        run: ./infrastructure/deployment/adapters/rollback.sh traffic
+      - name: Drain and restore background workers
+        env:
+          TARGET_RELEASE_ID: ${{ inputs.target_release_id }}
+          TARGET_ENVIRONMENT: ${{ inputs.target_environment }}
+        run: ./infrastructure/deployment/adapters/rollback.sh workers
+      - name: Verify restored release health
+        env:
+          TARGET_RELEASE_ID: ${{ inputs.target_release_id }}
+          TARGET_ENVIRONMENT: ${{ inputs.target_environment }}
+        run: ./infrastructure/deployment/adapters/rollback.sh verify
