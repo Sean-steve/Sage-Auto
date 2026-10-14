@@ -433,11 +433,23 @@ export class PricingService {
     // Booking/Availability use human vehicle category codes (e.g. "SUV"),
     // while Pricing rate lines and assignments use canonical category record IDs
     // (e.g. "cat-suv"). Accept either shape at this boundary.
-    const categoryInput = request.vehicleCategoryId?.trim();
-    const resolvedCategory = categoryInput
-      ? (await this.vehicleCategoryRepo.findById(categoryInput)) ||
-        (await this.vehicleCategoryRepo.findByCode(categoryInput, tenantId))
+    // Fleet records may carry the human-readable category code while saved
+    // rate lines may carry that code OR the category record ID. A vehicle-only
+    // quotation must resolve its category from the tenant-owned vehicle first.
+    const quotedVehicle = request.vehicleId
+      ? await new VehicleRepository().findById(request.vehicleId, tenantId)
       : null;
+    const categoryInput = request.vehicleCategoryId?.trim()
+      || (quotedVehicle as any)?.vehicleCategoryId
+      || quotedVehicle?.category;
+    const categoryById = categoryInput
+      ? await this.vehicleCategoryRepo.findById(categoryInput, tenantId)
+      : null;
+    const resolvedCategory = categoryById && (!categoryById.tenantId || categoryById.tenantId === tenantId)
+      ? categoryById
+      : categoryInput
+        ? await this.vehicleCategoryRepo.findByCode(categoryInput, tenantId)
+        : null;
     const canonicalCategoryId = resolvedCategory?.id || categoryInput;
     const fleetCategoryCode = resolvedCategory?.code || categoryInput;
     const normalizedRequest: PricingRequest = canonicalCategoryId
@@ -471,12 +483,15 @@ export class PricingService {
         throw err;
       }
 
-      const explicitRate = await this.ratePlanRepo.getRateForCategoryOrVehicle(
+      const explicitRate = (await this.ratePlanRepo.getRateForCategoryOrVehicle(
         explicitPlan.id,
         tenantId,
         normalizedRequest.vehicleCategoryId,
         normalizedRequest.vehicleId
-      );
+      )) || (fleetCategoryCode && fleetCategoryCode !== canonicalCategoryId
+        ? await this.ratePlanRepo.getRateForCategoryOrVehicle(
+            explicitPlan.id, tenantId, fleetCategoryCode, normalizedRequest.vehicleId
+          ) : null);
       if (!explicitRate) {
         const err: any = new Error(`Rate plan '${explicitPlan.code}' has no rate configured for the selected vehicle category. Add a matching rate line or use automatic pricing.`);
         err.statusCode = 422;
@@ -486,14 +501,22 @@ export class PricingService {
       matchedPlan = explicitPlan;
       matchedRate = explicitRate;
     } else {
-      const effectiveMatch = await this.ratePlanRepo.findEffectiveRatePlan(tenantId, {
+      const lookup = {
         vehicleId: normalizedRequest.vehicleId,
         vehicleCategoryId: normalizedRequest.vehicleCategoryId,
         corporateAccountId: normalizedRequest.corporateAccountId,
         customerId: normalizedRequest.customerId,
         agentId: normalizedRequest.agentId,
         dateTime: normalizedRequest.pickupDateTime,
-      });
+      };
+      // Prefer canonical category-ID rates, then support legacy category-code
+      // rate lines saved by earlier Pricing and Booking experiences.
+      const effectiveMatch = (await this.ratePlanRepo.findEffectiveRatePlan(tenantId, lookup))
+        || (fleetCategoryCode && fleetCategoryCode !== canonicalCategoryId
+          ? await this.ratePlanRepo.findEffectiveRatePlan(tenantId, {
+              ...lookup, vehicleCategoryId: fleetCategoryCode,
+            })
+          : null);
 
       if (effectiveMatch) {
         matchedPlan = effectiveMatch.plan;
