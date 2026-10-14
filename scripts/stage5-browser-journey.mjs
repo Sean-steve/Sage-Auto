@@ -182,7 +182,10 @@ try {
   assert.equal(returns.data?.status,'COMPLETED');checks++;
   // Read-only integrity scanner then checks all linked durable records.
   await cdp.call('Page.reload',{ignoreCache:true});
-  await wait(()=>cdp.visible('Return lifecycle completed'),'completed state persists after hard reload',35000);
+  await wait(()=>cdp.js("Boolean(document.querySelector('.saas-workspace'))"),
+    'Company Owner workspace after hard reload',35000);
+  await cdp.nav(company.portal.sections.find(s=>s.id==='returns').label);
+  await wait(()=>cdp.visible('Return lifecycle completed'),'completed state persists after re-opening Returns',35000);
   checks++;
   console.log('PASS Company Owner: clicked disposition + completion; saved status persists after reload');
   console.log('PASS Stage 5 UI-to-API cross-role journey: '+checks+
