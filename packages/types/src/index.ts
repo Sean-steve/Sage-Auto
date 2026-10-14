@@ -2037,6 +2037,8 @@ export interface Rental {
   checkoutFuelLevel: number;
   returnOdometer?: number;
   returnFuelLevel?: number;
+  /** The authoritative completed Handover that dispatched this rental. */
+  handoverId?: string;
   handoverInspectionId?: string;
   returnInspectionId?: string;
   contractId?: string;
