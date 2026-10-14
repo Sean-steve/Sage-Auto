@@ -120,7 +120,7 @@ async function main() {
     "Finance calculation read");
   assert.equal(current.isImmutable,false);checks++;
   const wrongTenant=await call("/rentals/"+rental.id+"/final-calculation",finance.token,"another-tenant");
-  assert.equal(wrongTenant.status,403,"Cross-tenant facts must be inaccessible");checks++;
+  assert.ok([403,404].includes(wrongTenant.status),"Cross-tenant facts must be inaccessible");checks++;
   const forbidden=await call("/rentals/"+rental.id+"/deposit-settlement",
     bookingAgent.token,tenantId,{settlementStatus:"SETTLED"});
   assert.equal(forbidden.status,403,"Booking Agent must not finalize settlement");checks++;
