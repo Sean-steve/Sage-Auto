@@ -6,13 +6,8 @@
 import assert from "node:assert/strict";
 import {resolve} from "node:path";
 import {randomUUID} from "node:crypto";
-import {
-  PaymentAttemptRepository,PaymentRepository,PaymentAllocationRepository,
-  RefundRepository,PaymentReconciliationRepository,WebhookRepository,
-  OperationalInvoiceRepository,DepositPositionRepository,
-  OwnerSettlementRepository,BookingRepository,RentalRepository,
-  AuditRepository,OutboxRepository,
-} from "@carhire/database";
+// The repository package is CommonJS under tsx in review CI; resolve its
+// exports dynamically, as the Stage 6 acceptance runner does.
 import {PaymentService} from "../apps/api/src/modules/payments/application/payment.service";
 import {PaymentProviderRegistry} from "../apps/api/src/modules/payments/infrastructure/providers/provider-registry";
 import {FakePaymentProvider} from "../apps/api/src/modules/payments/infrastructure/providers/fake-payment-provider";
@@ -23,6 +18,13 @@ async function main(){
     !process.env.SQLITE_PATH ||
     resolve(process.env.SQLITE_PATH)!==resolve(".review/access/review.sqlite"))
     throw new Error("Stage 7 accepts ONLY the disposable review SQLite database in test mode.");
+  const {
+    PaymentAttemptRepository,PaymentRepository,PaymentAllocationRepository,
+    RefundRepository,PaymentReconciliationRepository,WebhookRepository,
+    OperationalInvoiceRepository,DepositPositionRepository,
+    OwnerSettlementRepository,BookingRepository,RentalRepository,
+    AuditRepository,OutboxRepository,
+  }=await import("@carhire/database");
   const tenant="stage7-financial-"+randomUUID().slice(0,8);
   const approver={tenantId:tenant,userId:"stage7-finance-approver",role:"FINANCE_ADMIN"};
   const requester={tenantId:tenant,userId:"stage7-requests",role:"FINANCE_ADMIN"};
@@ -91,7 +93,7 @@ async function main(){
   match(payment.amount,"15000.0000","Verified exact invoice amount");
   match((await invoices.findById(invoice.id,tenant))?.status,"PAID","Invoice must settle");
   match((await invoices.findById(invoice.id,tenant))?.amountOutstanding,"0.0000","No invoice balance remains");
-  match((await allocations.listByPaymentId(payment.id,tenant)).length,1,"Exactly one invoice allocation");
+  match((await allocations.findByPaymentId(payment.id,tenant)).length,1,"Exactly one invoice allocation");
   const duplicated=await callback(attempt,"15000.0000",{eventId,providerTransactionId:txn});
   match(duplicated.status,"ALREADY_PROCESSED","Webhook receipt idempotency");
   match((await payments.listByTenant(tenant)).length,1,"Webhook replay cannot duplicate Payment");
