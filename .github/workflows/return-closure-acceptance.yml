@@ -1,0 +1,45 @@
+name: Return & Finance Closure Acceptance
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'apps/api/src/modules/rentals/**'
+      - 'apps/api/src/modules/finance/**'
+      - 'packages/database/src/**'
+      - 'packages/database/test/rentals-and-return-lifecycle.test.ts'
+      - 'packages/database/test/operational-finance-and-invoicing.test.ts'
+      - 'src/components/FinanceView.tsx'
+      - 'src/components/ReturnFinalCalculationView.tsx'
+      - '.github/workflows/return-closure-acceptance.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  closure-acceptance:
+    name: Transaction, Rental, Finance, Cross-domain & Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 9.15.9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Typecheck
+        run: pnpm typecheck
+      - name: Durable record transaction rollback and retry
+        run: pnpm exec tsx packages/database/test/record-transactions.test.ts
+      - name: Rental return lifecycle and injected closure failures
+        run: pnpm test:rentals
+      - name: Operational Finance and pre-completion invoice generation
+        run: pnpm test:finance
+      - name: Cross-domain lifecycle
+        run: pnpm exec tsx packages/database/test/e2e-cross-domain-lifecycle.test.ts
+      - name: Production build
+        run: pnpm build
