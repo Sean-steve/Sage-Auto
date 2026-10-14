@@ -1,4 +1,5 @@
 import { BookingPayments } from "./BookingPayments";
+import { WorkflowNextStep } from "./WorkflowNextStep";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle, ArrowRightLeft, CalendarClock, Car, CheckCircle2, ChevronRight,
@@ -163,6 +164,18 @@ export function BookingExperienceView({portal}:Props){
     <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between"><div><p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-600">Reservation engine</p><h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">Bookings</h1><p className="mt-2 max-w-3xl text-sm text-slate-500">Customer reservation dossiers with frozen PricingSnapshots, Availability-backed confirmation and explicit lifecycle history.</p></div><div className="flex flex-wrap gap-2"><button onClick={()=>void refreshAll()} className={secondary}><RefreshCw size={16}/>Refresh</button>{can("booking.create")&&<button onClick={()=>setCreateOpen(true)} className={primary}><Plus size={16}/>Create Booking</button>}</div></header>
     {error&&<ErrorBox text={error}/>}
     {notice&&<Notice text={notice}/>}
+    <WorkflowNextStep current="Bookings"
+      next={bookings.some(b=>b.status==="AWAITING_PAYMENT"||
+        (b.status==="CONFIRMED"&&Number(b.depositRequired||0)>0&&b.depositStatus!=="HELD"))
+        ?"Payment":"Handover"}
+      description={bookings.some(b=>b.status==="AWAITING_PAYMENT"||
+        (b.status==="CONFIRMED"&&Number(b.depositRequired||0)>0&&b.depositStatus!=="HELD"))
+        ?"Payment and deposit obligations must be verified in Finance before rental dispatch. In local development, pnpm dev:workers runs the simulated provider."
+        :"After confirmation, generate a contract, collect signatures and complete each handover checkpoint."}
+      onNext={()=>navigateSection(bookings.some(b=>b.status==="AWAITING_PAYMENT"||
+        (b.status==="CONFIRMED"&&Number(b.depositRequired||0)>0&&b.depositStatus!=="HELD"))
+        ?"finance":"handover")}
+      canNext={portal.sections.some(s=>s.id==="finance"||s.id==="handover")}/>
     <section className="grid grid-cols-2 gap-3 lg:grid-cols-4"><Metric label="Visible dossiers" value={bookings.length}/><Metric label="Confirmed / active" value={activeCount}/><Metric label="Awaiting payment" value={awaitingCount}/><Metric label="Quoted" value={quotedCount}/></section>
     <section className="rounded-2xl border bg-white p-4 shadow-sm"><form onSubmit={e=>{e.preventDefault();setSearch(searchInput.trim());}} className="grid gap-3 md:grid-cols-[1fr_180px_200px_auto]"><Field label="Search"><div className="relative"><Search size={15} className="absolute left-3 top-3 text-slate-400"/><input value={searchInput} onChange={e=>setSearchInput(e.target.value)} placeholder="Booking number, customer, Vehicle…" className={inputClass+" pl-9"}/></div></Field><Field label="Status"><select value={status} onChange={e=>setStatus(e.target.value)} className={inputClass}><option>ALL</option>{["DRAFT","PENDING","PENDING_CONFIRMATION","QUOTED","AWAITING_PAYMENT","CONFIRMED","ACTIVE","COMPLETED","CANCELLED","REJECTED","EXPIRED","NO_SHOW"].map(x=><option key={x}>{x}</option>)}</select></Field><Field label="Source"><select value={source} onChange={e=>setSource(e.target.value)} className={inputClass}><option>ALL</option>{["TENANT_ADMIN","OPERATIONS_DESK","PUBLIC_WEBSITE","PUBLIC_PORTAL","AGENT_REFERRAL","CORPORATE","CORPORATE_PORTAL","PHONE","WALK_IN","API","BACKOFFICE","WEB"].map(x=><option key={x}>{x}</option>)}</select></Field><div className="flex items-end"><button className={secondary+" w-full"}>Apply search</button></div></form></section>
 
