@@ -167,7 +167,7 @@ export function FleetExperienceView({portal}:FleetExperienceProps) {
       ];
       const [list,total,availableNow,onRentNow,maintenanceNow,blockedNow,categoriesResponse,intakeResponse]=await Promise.all([
         ...requests,apiClient.fleet.getCategories(),
-        can("vehicle.read")?apiClient.get<any[]>("/fleet/registration-entries"):Promise.resolve({data:[]}),
+        can("vehicle.read")?apiClient.get<any[]>("/fleet/registration-entries"):Promise.resolve({data:[]} as ApiResponse<any[]>),
       ]);
       if(seq!==requestSeq.current)return;
       if(list.error) throw new Error(list.error.message);
