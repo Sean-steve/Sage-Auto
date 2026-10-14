@@ -37,34 +37,6 @@ export function createFleetController(
     return { actorId, actorName };
   };
 
-  // Real saved registration entries are deliberately not bookable Vehicles.
-  router.get("/registration-entries",guard("vehicle.read"),async(req:Request,res:Response,next:NextFunction)=>{
-    try{
-      const rows=await fleetService.listRegistrationEntries(getTenantId(req));
-      res.json({status:"success",data:rows});
-    }catch(err){next(err);}
-  });
-
-  router.post("/registration-entries",guard("vehicle.create"),async(req:Request,res:Response,next:NextFunction)=>{
-    try{
-      const {actorId}=getActor(req);
-      const rows=await fleetService.reserveRegistrationEntries(
-        getTenantId(req),req.body?.count,req.body?.idempotencyKey,actorId
-      );
-      res.status(201).json({status:"success",data:rows,meta:{total:rows.length}});
-    }catch(err){next(err);}
-  });
-
-  router.post("/registration-entries/:id/register",guard("vehicle.create"),async(req:Request,res:Response,next:NextFunction)=>{
-    try{
-      const {actorId,actorName}=getActor(req);
-      const vehicle=await fleetService.registerFromEntry(
-        getTenantId(req),req.params.id,req.body,actorId,actorName
-      );
-      res.status(201).json({status:"success",data:vehicle});
-    }catch(err){next(err);}
-  });
-
   // GET /api/v1/fleet/vehicles - List Vehicles
   router.get(
     "/vehicles",

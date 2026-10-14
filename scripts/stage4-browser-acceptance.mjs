@@ -116,7 +116,7 @@ try {
     '--remote-allow-origins=*',
     '--user-data-dir='+profileDir,'about:blank'],{stdio:'ignore'});
   const portFile=join(profileDir,'DevToolsActivePort');
-  await waitFor(()=>existsSync(portFile),'Chrome DevTools port',15000);
+  await waitFor(()=>existsSync(portFile),'Chrome DevTools port',45000);
   const port=Number(readFileSync(portFile,'utf8').split('\n')[0]);
   const discovery=await (await fetch('http://127.0.0.1:'+port+'/json/list')).json();
   assert.ok(Array.isArray(discovery) && discovery.some(page=>page.type==='page'),
