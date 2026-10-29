@@ -51,7 +51,10 @@ export function createPlatformTenantsController(
           req.platformContext!,
           req.params.id
         );
-        res.json({ data: detail });
+        const ownerInvitation=accessService
+          ? await accessService.getProvisionedOwnerInvitation(req.platformContext!.userId,req.params.id)
+          : {status:"NOT_CONFIGURED"};
+        res.json({ data: {...detail,ownerInvitation} });
       } catch (err: any) {
         res.status(err.statusCode || 500).json({
           error: { code: err.code || "INTERNAL_ERROR", message: err.message },
