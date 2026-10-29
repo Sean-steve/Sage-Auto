@@ -88,137 +88,34 @@ export class PlatformOperationsService {
   ): Promise<ProviderHealthStatus[]> {
     this.platformAuthService.require(platformContext, PLATFORM_PERMISSIONS.PLATFORM_PAYMENT_READ);
 
-    const now = new Date().toISOString();
-    const tenants = await this.tenantRepo.listAll();
-    const activeTenants = tenants.filter((t) => t.status === "ACTIVE").length;
-
-    return [
-      {
-        providerId: "stripe_connect",
-        name: "Stripe Connect & Billing",
-        category: "PAYMENT_GATEWAY",
-        status: "OPERATIONAL",
-        latencyMs: 142,
-        lastCheckedAt: now,
-        endpoint: "https://api.stripe.com/v1",
-        activeTenantsCount: activeTenants,
-        errorRate24h: 0.02,
-        message: "Webhooks responding within 180ms p95",
-      },
-      {
-        providerId: "mpesa_daraja",
-        name: "Safaricom M-Pesa Daraja (B2C & Express)",
-        category: "PAYMENT_GATEWAY",
-        status: "OPERATIONAL",
-        latencyMs: 310,
-        lastCheckedAt: now,
-        endpoint: "https://api.safaricom.co.ke/mpesa",
-        activeTenantsCount: activeTenants,
-        errorRate24h: 0.12,
-        message: "C2B & STK callbacks operational",
-      },
-      {
-        providerId: "pesapal_v3",
-        name: "Pesapal 3.0 API",
-        category: "PAYMENT_GATEWAY",
-        status: "OPERATIONAL",
-        latencyMs: 245,
-        lastCheckedAt: now,
-        endpoint: "https://pay.pesapal.com/v3/api",
-        activeTenantsCount: Math.max(1, Math.floor(activeTenants * 0.4)),
-        errorRate24h: 0.05,
-        message: "IPN listeners healthy",
-      },
-      {
-        providerId: "africas_talking",
-        name: "Africa's Talking SMS & USSD",
-        category: "COMMUNICATION",
-        status: "OPERATIONAL",
-        latencyMs: 185,
-        lastCheckedAt: now,
-        endpoint: "https://api.africastalking.com/version1",
-        activeTenantsCount: activeTenants,
-        errorRate24h: 0.04,
-        message: "SMS queue depth 0",
-      },
-      {
-        providerId: "postmark_email",
-        name: "Postmark Transactional Delivery",
-        category: "COMMUNICATION",
-        status: "OPERATIONAL",
-        latencyMs: 95,
-        lastCheckedAt: now,
-        endpoint: "https://api.postmarkapp.com",
-        activeTenantsCount: activeTenants,
-        errorRate24h: 0.01,
-        message: "DKIM & SPF verified for all verified subdomains",
-      },
-      {
-        providerId: "cloudflare_r2",
-        name: "Cloudflare R2 Object Storage",
-        category: "STORAGE",
-        status: "OPERATIONAL",
-        latencyMs: 65,
-        lastCheckedAt: now,
-        endpoint: "https://r2.cloudflarestorage.com",
-        activeTenantsCount: activeTenants,
-        errorRate24h: 0.0,
-        message: "Presigned upload URLs generating normally",
-      },
-    ];
+    // No authenticated provider telemetry adapter is registered yet. Returning an
+    // empty set is safer than inventing successful gateway checks or latencies.
+    // Future provider probes must record real observed timestamps and failures.
+    return [];
   }
 
-  /**
-   * Retrieves background job queues and transactional outbox telemetry.
-   */
   async getQueueStats(platformContext: PlatformAuthorizationContext): Promise<any> {
     this.platformAuthService.require(platformContext, PLATFORM_PERMISSIONS.PLATFORM_JOB_READ);
 
-    let stats = { pending: 0, claimed: 0, published: 0, failed: 0, deadLetter: 0, total: 0 };
-    if (this.outboxRepo.getStats) {
-      stats = await this.outboxRepo.getStats();
-    }
-
+    // The transactional outbox is the only operational queue with verified
+    // repository statistics here. Other BullMQ queues require real instrumentation.
+    if (!this.outboxRepo.getStats) return { queues: [], aggregated: null };
+    const stats = await this.outboxRepo.getStats();
     return {
-      queues: [
-        {
-          name: "transactional-outbox",
-          description: "Reliable event publishing pipeline",
-          pending: stats.pending,
-          claimed: stats.claimed,
-          published: stats.published,
-          failed: stats.failed,
-          deadLetter: stats.deadLetter,
-          health: stats.deadLetter > 0 ? "DEGRADED" : "HEALTHY",
-        },
-        {
-          name: "notification-dispatcher",
-          description: "Async SMS, WhatsApp, and Email broadcast queue",
-          pending: Math.max(0, Math.floor(stats.pending * 0.4)),
-          claimed: 0,
-          published: Math.max(0, Math.floor(stats.published * 0.8)),
-          failed: 0,
-          deadLetter: 0,
-          health: "HEALTHY",
-        },
-        {
-          name: "billing-metering",
-          description: "Subscription usage & invoice generation worker",
-          pending: 0,
-          claimed: 0,
-          published: 1420,
-          failed: 0,
-          deadLetter: 0,
-          health: "HEALTHY",
-        },
-      ],
+      queues: [{
+        name: "transactional-outbox",
+        description: "Authoritative outbox repository status counts",
+        pending: stats.pending,
+        claimed: stats.claimed,
+        published: stats.published,
+        failed: stats.failed,
+        deadLetter: stats.deadLetter,
+        health: stats.deadLetter > 0 ? "DEGRADED" : "HEALTHY",
+      }],
       aggregated: stats,
     };
   }
 
-  /**
-   * Lists Dead Letter Queue records for investigation.
-   */
   async listDeadLetters(platformContext: PlatformAuthorizationContext, limit = 50): Promise<any[]> {
     this.platformAuthService.require(platformContext, PLATFORM_PERMISSIONS.PLATFORM_JOB_READ);
 
@@ -291,27 +188,16 @@ export class PlatformOperationsService {
     platformContext: PlatformAuthorizationContext
   ): Promise<DomainDiagnosticRecord[]> {
     this.platformAuthService.require(platformContext, PLATFORM_PERMISSIONS.PLATFORM_DOMAIN_READ);
-
-    const tenants = await this.tenantRepo.listAll();
-    const now = new Date();
-    const sslExp = new Date(now.getTime() + 75 * 24 * 60 * 60 * 1000).toISOString();
-
-    return tenants.map((t) => ({
-      id: `dom-${t.id}`,
-      tenantId: t.id,
-      tenantName: t.name,
-      domain: `${t.slug}.carhireos.com`,
-      status: "SSL_ISSUED",
-      dnsTarget: "cname.carhireos.com",
-      sslProvider: "Let's Encrypt / Cloudflare Edge SSL",
-      sslExpiresAt: sslExp,
-      lastCheckedAt: now.toISOString(),
-    }));
+    // Domain verification/SSL evidence must come from the actual domain service
+    // and certificate provider. No probe is wired into this operations adapter.
+    return [];
   }
 
   /**
-   * Gets platform global configuration.
+   * Gets platform global configuration. Runtime-only until persisted.
    */
+  
+
   getGlobalConfig(): PlatformGlobalConfig {
     return { ...this.globalConfig };
   }
