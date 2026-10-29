@@ -9,6 +9,12 @@ export const ACCESS_SECTIONS: Record<string, {label:string; permission?:string}>
   platformAnalytics:{label:'Platform analytics',permission:'platform.analytics.read'},
   platformCompliance:{label:'Platform compliance',permission:'platform.compliance.read'},
   platformSettings:{label:'Platform settings',permission:'platform.config.manage'},
+  platformEntitlements:{label:'Feature entitlements',permission:'platform.feature.read'},
+  platformIntegrations:{label:'Integrations',permission:'platform.payment.read'},
+  platformJobs:{label:'Jobs & events',permission:'platform.job.read'},
+  platformIncidents:{label:'Incidents',permission:'platform.job.read'},
+  platformNotifications:{label:'Notifications',permission:'platform.notification.read'},
+  platformAudit:{label:'Security & audit',permission:'platform.audit.read'},
   fleet:{label:'Fleet',permission:'vehicle.read'},
   bookings:{label:'Bookings',permission:'booking.read'},
   handover:{label:'Contract & Handover',permission:'rental.read'},
@@ -30,8 +36,8 @@ export const ACCESS_SECTIONS: Record<string, {label:string; permission?:string}>
 };
 
 export const ROLE_SECTIONS: Record<string,string[]> = {
-  PLATFORM_OWNER:['overview','companies','team','plans','platformBilling','support','platformAnalytics','platformCompliance','platformSettings'],
-  PLATFORM_ADMIN:['overview','companies','team','plans','platformBilling','support','platformAnalytics','platformCompliance'],
+  PLATFORM_OWNER:['overview','companies','team','plans','platformBilling','support','platformAnalytics','platformCompliance','platformSettings','platformEntitlements','platformIntegrations','platformJobs','platformIncidents','platformNotifications','platformAudit'],
+  PLATFORM_ADMIN:['overview','companies','team','plans','platformBilling','support','platformAnalytics','platformCompliance','platformEntitlements','platformIntegrations','platformJobs','platformIncidents','platformNotifications','platformAudit'],
   BILLING_ADMIN:['platformBilling','plans','companies'], SUPPORT_ADMIN:['support','companies'],
   ANALYTICS_ADMIN:['platformAnalytics'], COMPLIANCE_ADMIN:['platformCompliance'],
   COMPANY_OWNER:['overview','fleet','bookings','handover','availability','customers','rentals','returns','inspections','maintenance','compliance','owners','pricing','finance','settlements','website','team','settings'],
