@@ -359,21 +359,15 @@ async function runTestSuite() {
   console.log("\n[TEST 6] Platform Operations & Gateway Telemetry...");
 
   const providerStatuses = await operationsService.getProviderHealth(adminAuthContext);
-  assert(providerStatuses.length >= 6, "Must monitor at least 6 infrastructure gateways");
-
-  const stripeHealth = providerStatuses.find((p) => p.providerId === "stripe_connect");
-  assert(stripeHealth !== undefined, "Stripe Connect must be present in provider telemetry");
-  assert(stripeHealth!.status === "OPERATIONAL", "Stripe Connect status must be OPERATIONAL");
-
-  const mpesaHealth = providerStatuses.find((p) => p.providerId === "mpesa_daraja");
-  assert(mpesaHealth !== undefined, "M-Pesa Daraja must be present in provider telemetry");
-  assert(mpesaHealth!.status === "OPERATIONAL", "M-Pesa status must be OPERATIONAL");
+  assert(providerStatuses.length === 0, "Providers without real probe evidence must not appear as OPERATIONAL");
 
   const queueStats = await operationsService.getQueueStats(adminAuthContext);
-  assert(queueStats.queues !== undefined, "Queue stats must include queues breakdown");
-  assert(queueStats.queues.length >= 3, "Must include transactional-outbox, notification, and billing queues");
-
-  console.log("  ✓ Provider telemetry and queue diagnostics validated");
+  assert(queueStats.queues.length === 1, "Only the authoritative transactional outbox queue is certified");
+  assert(queueStats.queues[0].name === "transactional-outbox", "Queue status must come from outbox repository");
+  assert(queueStats.aggregated !== null, "Outbox repository must provide authoritative counts");
+  const domainDiagnostics = await operationsService.listDomainDiagnostics(adminAuthContext);
+  assert(domainDiagnostics.length === 0, "SSL diagnostics must not invent verification dates");
+  console.log("  ✓ Unverified provider/SSL data excluded and authoritative outbox measured");
 
   // --------------------------------------------------------------------------
   // TEST SUITE 7: Platform Global Configuration Management
