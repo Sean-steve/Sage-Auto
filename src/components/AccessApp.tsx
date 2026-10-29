@@ -35,6 +35,8 @@ export default function AccessApp({site}:{site?:string}) {
   useEffect(()=>{if(inviteToken) call(`/access/invitation?token=${encodeURIComponent(inviteToken)}`).then(setInvite).catch(e=>setError(e.message));},[inviteToken]);
   useEffect(()=>{if(context?.reviewMode&&!context.user.emailVerified) call('/access/review-mail').then(setMail).catch(()=>{});else setMail([]);},[context?.reviewMode,context?.user.id,context?.user.emailVerified]);
   const portal=context?.portals.find(p=>p.id===portalId);
+  // A saved platform portal must never retain a tenant header from another workspace.
+  useEffect(()=>{if(portal?.kind==='platform')apiClient.clearTenantId();},[portal?.id,portal?.kind]);
   const clearPortalContext=()=>{apiClient.clearTenantId();sessionStorage.removeItem('access_portal');setPortalId('');setSection('');};
   useEffect(()=>{setSection(portal?.sections[0]?.id||'');},[portalId,context?.portals.map(p=>p.roles.join(',')).join('|')]);
   useEffect(()=>{if(context&&portalId&&!portal)clearPortalContext();},[context,portalId,portal]);
