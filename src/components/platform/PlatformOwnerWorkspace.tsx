@@ -167,8 +167,9 @@ export function PlatformOwnerWorkspace({ context, portal, section, onSection, on
 
   async function write(path: string, body: unknown, permission: string, method: "POST" | "PUT" = "POST") {
     if (!platformCan(portal, permission)) throw new Error("Your platform role does not allow this operation.");
-    await platformRequest(path, method, body);
+    const result = await platformRequest(path, method, body);
     setRevision(v => v + 1);
+    return result;
   }
 
   async function execute(work: () => Promise<void>, success: string) {
@@ -272,18 +273,24 @@ export function PlatformOwnerWorkspace({ context, portal, section, onSection, on
                 <button onClick={() => command("reactivateTenant", tenantDetail.tenant.id, tenantDetail.tenant.name, "platform.tenant.suspend")} className="platform-primary">Reactivate company</button>}
               {tenantDetail.tenant?.status !== "DECOMMISSIONED" &&
                 <button onClick={() => command("offboardTenant", tenantDetail.tenant.id, tenantDetail.tenant.name, "platform.tenant.suspend")} className="platform-outline">Offboard company</button>}
+              {platformCan(portal, "platform.tenant.provision") && <button className="platform-outline" disabled={busy} onClick={() => void execute(async () => {
+                await write("/platform/tenants/" + encodeURIComponent(tenantDetail.tenant.id) + "/owner-invitation/retry", {}, "platform.tenant.provision");
+              }, "Initial company-owner invitation sent again. The invitation must still be accepted.")}>Retry first-owner invitation</button>}
             </div>
           </Panel>}
         </>}
-        {activeTab === "provision" && <Panel title="Provision a rental company" subtitle="The backend provisions a saved company and subscription. It does not yet send or link a company-owner invitation.">
-          <div className="platform-warning"><CircleAlert size={18}/> Company-owner identity activation must be completed separately. Do not tell the company its login is ready until an owner membership is verified.</div>
+        {activeTab === "provision" && <Panel title="Provision a rental company" subtitle="The backend provisions the company and subscription, then requests an invitation for the nominated first owner.">
+          <div className="platform-warning"><CircleAlert size={18}/> The invitation does not automatically grant access. The nominated owner must verify their account and accept the invitation before the workspace is active for them.</div>
           {platformCan(portal, "platform.tenant.provision") ? <form className="platform-form" onSubmit={event => {
             event.preventDefault();
             const form = event.currentTarget; const formData = Object.fromEntries(new FormData(form));
             void execute(async () => {
-              await write("/platform/tenants/provision", { ...formData, name: String(formData.name).trim(), slug: String(formData.slug).trim().toLowerCase() }, "platform.tenant.provision");
+              const result = await write("/platform/tenants/provision", { ...formData, name: String(formData.name).trim(), slug: String(formData.slug).trim().toLowerCase() }, "platform.tenant.provision");
               form.reset(); setTab("list");
-            }, "Company workspace provisioned. Complete the owner invitation and verify access before onboarding.");
+              if(result.ownerInvitation?.status !== "SENT") {
+                throw new Error("Company workspace was saved, but the owner invitation was not sent. Open the company details and retry delivery.");
+              }
+            }, "Company saved. Invitation sent to the nominated owner; activation requires that person to accept it.");
           }}>
             <label>Company name<input name="name" required minLength={2}/></label>
             <label>Workspace slug<input name="slug" required pattern="[a-z0-9-]+" title="Use lowercase letters, numbers and hyphens."/></label>
