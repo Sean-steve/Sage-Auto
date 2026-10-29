@@ -121,10 +121,23 @@ export class AccessService {
     if([...this.invitations.values()].some(i=>i.provisionedByPlatform&&i.tenantId===tenantId&&i.status!=='REVOKED')) {
       return fail('This company already has an initial owner invitation',409);
     }
+    if(!claimRecord('access:provisioned-owner-claims',tenantId,{email:normalized,createdBy:userId})) {
+      return fail('Initial company owner is already nominated',409);
+    }
     const invitation:Invitation={id:crypto.randomUUID(),scope:'tenant',tenantId,email:normalized,role:'COMPANY_OWNER',createdBy:userId,
       tokenHash:'',expiresAt:now(),status:'PENDING',delivery:'PENDING',provisionedByPlatform:true};
     this.invitations.set(invitation.id,invitation);
     return this.deliver(invitation);
+  }
+  async getProvisionedOwnerInvitation(userId:string,tenantId:string) {
+    const portal=await this.portal(userId,'platform');
+    if(!portal.permissions.includes('*')&&!portal.permissions.includes('platform.tenant.read')) {
+      return fail('Platform tenant read permission required',403);
+    }
+    const tenant=await this.tenants.findById(tenantId);
+    if(!tenant)return fail('Company not found',404);
+    const invite=[...this.invitations.values()].find(i=>i.provisionedByPlatform&&i.tenantId===tenantId);
+    return invite?{id:invite.id,status:invite.status,delivery:invite.delivery,email:invite.email,expiresAt:invite.expiresAt,acceptedBy:invite.acceptedBy}:{status:'NOT_ISSUED'};
   }
   async retryProvisionedOwnerInvitation(userId:string,tenantId:string) {
     await this.requireProvisioningAuthority(userId,tenantId);
