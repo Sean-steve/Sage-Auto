@@ -40,7 +40,10 @@ const resources: Record<string, Resource[]> = {
     { key: "subscriptions", path: "/platform/subscriptions", permission: "platform.subscription.read" },
     { key: "analytics", path: "/platform/analytics/overview", permission: "platform.analytics.read" },
   ],
-  companies: [{ key: "tenants", path: "/platform/tenants", permission: "platform.tenant.read" }],
+  companies: [
+    { key: "tenants", path: "/platform/tenants", permission: "platform.tenant.read" },
+    { key: "plans", path: "/platform/plans", permission: "platform.plan.read" },
+  ],
   plans: [
     { key: "plans", path: "/platform/plans", permission: "platform.plan.read" },
     { key: "subscriptions", path: "/platform/subscriptions", permission: "platform.subscription.read" },
