@@ -117,7 +117,7 @@ export class AccessService {
   async inviteProvisionedOwner(userId:string,tenantId:string,email:string) {
     await this.requireProvisioningAuthority(userId,tenantId);
     const normalized=email?.trim().toLowerCase();
-    if(!normalized || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(normalized))return fail('A valid nominated company owner email is required');
+    if(!normalized || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized))return fail('A valid nominated company owner email is required');
     if([...this.invitations.values()].some(i=>i.provisionedByPlatform&&i.tenantId===tenantId&&i.status!=='REVOKED')) {
       return fail('This company already has an initial owner invitation',409);
     }
