@@ -119,6 +119,7 @@ export function PlatformOwnerWorkspace({ context, portal, section, onSection, on
   const [mobileMenu, setMobileMenu] = useState(false);
   const [action, setAction] = useState<Action | null>(null);
   const [reason, setReason] = useState("");
+  const [confirmation, setConfirmation] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [failure, setFailure] = useState("");
@@ -178,7 +179,10 @@ export function PlatformOwnerWorkspace({ context, portal, section, onSection, on
   }
 
   async function confirmAction() {
-    if (!action || reason.trim().length < 8) return;
+    if (!action) return;
+    const requiresReason = !["archivePlan", "retryDeadLetter"].includes(action.kind);
+    if (requiresReason && reason.trim().length < 8) return;
+    if (action.kind === "offboardTenant" && confirmation !== action.name) return;
     const request = action;
     const command = {
       suspendTenant: { url: "/platform/tenants/" + encodeURIComponent(request.id) + "/suspend", body: { reason: reason.trim() } },
@@ -191,7 +195,7 @@ export function PlatformOwnerWorkspace({ context, portal, section, onSection, on
     }[request.kind];
     await execute(async () => {
       await write(command.url, command.body, request.permission);
-      setAction(null); setReason(""); setTenantDetail(null);
+      setAction(null); setReason(""); setConfirmation(""); setTenantDetail(null);
     }, "The server accepted the action. Updated records have been requested.");
   }
 
@@ -209,7 +213,7 @@ export function PlatformOwnerWorkspace({ context, portal, section, onSection, on
   const readOnly = (title: string, reason: string) => <Unavailable title={title} reason={reason}/>;
   const command = (kind: Action["kind"], id: string, name: string, permission: string, version?: number) => {
     if (platformCan(portal, permission)) {
-      setAction({ kind, id, name, permission, version }); setReason(""); setFailure("");
+      setAction({ kind, id, name, permission, version }); setReason(""); setConfirmation(""); setFailure("");
     }
   };
 
@@ -473,11 +477,12 @@ export function PlatformOwnerWorkspace({ context, portal, section, onSection, on
     {action && <div className="platform-modal-backdrop" role="presentation" onClick={() => { if (!busy) setAction(null); }}>
       <section role="dialog" aria-modal="true" aria-labelledby="platform-dialog-title" className="platform-modal" onClick={event => event.stopPropagation()}>
         <header><h2 id="platform-dialog-title">Confirm {action.kind.replace(/([A-Z])/g, " $1").toLowerCase()}</h2><button aria-label="Close dialog" disabled={busy} onClick={() => setAction(null)}><X size={20}/></button></header>
-        <p>Target: <strong>{action.name}</strong>. This command will be submitted to the server with your authenticated platform role.</p>
+        <p>Target: <strong>{action.name}</strong>. The action will be checked by the server against your authenticated platform role. Only supported audit fields are recorded.</p>
         {action.kind === "offboardTenant" && <div className="platform-warning">Offboarding can decommission a company workspace. Confirm the commercial and data-retention implications first.</div>}
-        <label>Business reason (minimum 8 characters)<textarea value={reason} minLength={8} required onChange={event => setReason(event.target.value)} placeholder="Explain why this action is necessary…"/></label>
+        {!["archivePlan", "retryDeadLetter"].includes(action.kind) && <label>Business reason (minimum 8 characters)<textarea value={reason} minLength={8} required onChange={event => setReason(event.target.value)} placeholder="Explain why this action is necessary…"/></label>}
+        {action.kind === "offboardTenant" && <label>Type the company's full name to confirm<input value={confirmation} onChange={event => setConfirmation(event.target.value)} placeholder={action.name}/></label>}
         <div className="platform-action-row"><button disabled={busy} className="platform-outline" onClick={() => setAction(null)}>Cancel</button>
-          <button disabled={busy || reason.trim().length < 8} className="platform-primary" onClick={() => void confirmAction()}>{busy ? "Submitting…" : "Submit audited command"}</button>
+          <button disabled={busy || (!["archivePlan", "retryDeadLetter"].includes(action.kind) && reason.trim().length < 8) || (action.kind === "offboardTenant" && confirmation !== action.name)} className="platform-primary" onClick={() => void confirmAction()}>{busy ? "Submitting…" : "Submit audited command"}</button>
         </div>
       </section>
     </div>}
