@@ -10,7 +10,7 @@ export const fail = (message:string,statusCode=400):never => {throw Object.assig
 const now=()=>new Date().toISOString();
 const digest=(value:string)=>createHash('sha256').update(value).digest('hex');
 export type AccountState={intent?:'company'|'renter';site?:string;name?:string;companyName?:string;phone?:string;completedAt?:string};
-type Invitation={id:string;scope:'platform'|'tenant';tenantId?:string;email:string;role:string;linkedRecordId?:string;createdBy:string;tokenHash:string;expiresAt:string;status:'PENDING'|'ACCEPTED'|'REVOKED';delivery:'PENDING'|'SENT'|'FAILED';acceptedBy?:string};
+type Invitation={id:string;scope:'platform'|'tenant';tenantId?:string;email:string;role:string;linkedRecordId?:string;createdBy:string;tokenHash:string;expiresAt:string;status:'PENDING'|'ACCEPTED'|'REVOKED';delivery:'PENDING'|'SENT'|'FAILED';acceptedBy?:string;provisionedByPlatform?:boolean};
 type Link={userId:string;tenantId:string;kind:'RENTER'|'DRIVER'|'VEHICLE_OWNER';recordId?:string;phone?:string};
 export class AccessService {
   readonly accounts=createRecordStore<string,AccountState>('access:accounts');
@@ -99,7 +99,40 @@ export class AccessService {
     const invitation:Invitation={...data,email:data.email.trim().toLowerCase(),id:crypto.randomUUID(),createdBy:userId,tokenHash:'',expiresAt:now(),status:'PENDING',delivery:'PENDING'};
     this.invitations.set(invitation.id,invitation); return this.deliver(invitation);
   }
-  async deliver(invitation:Invitation) {
+  /**
+   * Only a verified platform provisioner may bootstrap the FIRST owner of a
+   * newly provisioned, unclaimed tenant. Normal tenant invitations still
+   * require an existing company owner and cannot use this exception.
+   */
+  async requireProvisioningAuthority(userId:string,tenantId:string) {
+    const portal=await this.portal(userId,'platform');
+    if(!portal.permissions.includes('*')&&!portal.permissions.includes('platform.tenant.provision')) {
+      return fail('Tenant provisioning permission required',403);
+    }
+    const tenant=await this.tenants.findById(tenantId);
+    if(!tenant || tenant.status!=='ACTIVE') return fail('Provisioned company is not active',403);
+    const memberships=await this.memberships.listByTenantId(tenantId);
+    if(memberships.length>0) return fail('Initial owner invitation is only allowed before company membership activation',409);
+  }
+  async inviteProvisionedOwner(userId:string,tenantId:string,email:string) {
+    await this.requireProvisioningAuthority(userId,tenantId);
+    const normalized=email?.trim().toLowerCase();
+    if(!normalized || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(normalized))return fail('A valid nominated company owner email is required');
+    if([...this.invitations.values()].some(i=>i.provisionedByPlatform&&i.tenantId===tenantId&&i.status!=='REVOKED')) {
+      return fail('This company already has an initial owner invitation',409);
+    }
+    const invitation:Invitation={id:crypto.randomUUID(),scope:'tenant',tenantId,email:normalized,role:'COMPANY_OWNER',createdBy:userId,
+      tokenHash:'',expiresAt:now(),status:'PENDING',delivery:'PENDING',provisionedByPlatform:true};
+    this.invitations.set(invitation.id,invitation);
+    return this.deliver(invitation);
+  }
+  async retryProvisionedOwnerInvitation(userId:string,tenantId:string) {
+    await this.requireProvisioningAuthority(userId,tenantId);
+    const pending=[...this.invitations.values()].find(i=>i.provisionedByPlatform&&i.tenantId===tenantId&&i.status==='PENDING');
+    if(!pending) return fail('No pending initial owner invitation exists',404);
+    return this.deliver(pending);
+  }
+    async deliver(invitation:Invitation) {
     const token=randomBytes(32).toString('hex');
     const updated={...invitation,tokenHash:digest(token),expiresAt:new Date(Date.now()+72*3600000).toISOString(),delivery:'PENDING' as const};
     this.invitations.set(updated.id,updated);
@@ -117,7 +150,8 @@ export class AccessService {
   }
   async changeInvitation(userId:string,id:string,action:'revoke'|'resend') {
     let invitation=this.invitations.get(id) || fail('Invitation not found',404);
-    await this.canInvite(userId,invitation.scope,invitation.tenantId,invitation.role);
+    if(invitation.provisionedByPlatform) await this.requireProvisioningAuthority(userId,invitation.tenantId!);
+    else await this.canInvite(userId,invitation.scope,invitation.tenantId,invitation.role);
     invitation=this.invitations.get(id) || fail('Invitation not found',404);
     if(invitation.status!=='PENDING') return fail('Invitation is no longer pending',409);
     if(action==='resend') return this.deliver(invitation);
@@ -135,7 +169,10 @@ export class AccessService {
     const user=await this.user(userId,true); const invitation=this.inspect(token);
     if(user.email.trim().toLowerCase()!==invitation.email) return fail('Sign in with the invited email address',403);
     // Recheck the inviter: revoked administrators cannot leave live privilege grants.
-    await this.canInvite(invitation.createdBy,invitation.scope,invitation.tenantId,invitation.role);
+    if(invitation.provisionedByPlatform) {
+      if(invitation.scope!=='tenant'||invitation.role!=='COMPANY_OWNER'||!invitation.tenantId) return fail('Invalid initial owner invitation',403);
+      await this.requireProvisioningAuthority(invitation.createdBy,invitation.tenantId);
+    } else await this.canInvite(invitation.createdBy,invitation.scope,invitation.tenantId,invitation.role);
     // Re-read after authorization awaits: revoke/resend may have invalidated this token.
     this.inspect(token);
     const existing=invitation.scope==='platform'
