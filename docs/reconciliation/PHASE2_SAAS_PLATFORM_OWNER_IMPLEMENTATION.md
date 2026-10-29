@@ -26,7 +26,7 @@
 | S02-01 | Platform health dashboard | **Partial**: tenant/subscription counts and canonical SaaS analytics | Real provider/worker telemetry |
 | S02-02 | Company directory | **Connected**: saved tenant registry | Browser UX signoff |
 | S02-03 | Company account profile | **Connected**: tenant details and fleet/booking summaries | Deep tenant history |
-| S02-04 | Provision tenant | **Partial**: persisted tenant and subscription | Owner membership/invitation activation contract |
+| S02-04 | Provision tenant | **Connected**: persisted tenant/subscription and nominated first-owner invitation, activation and retry | Real mailbox delivery and staging browser certification |
 | S02-05 | Subscription catalog | **Connected**: plan list/create/archive; subscription state actions | Full tier editing and approval lifecycle |
 | S02-06 | Tenant billing operations | **Connected read-only** | Governed billing commands |
 | S02-07 | Platform payment ledger | **Connected read-only** | Independent verified receipt reconciliation before action controls |
@@ -52,7 +52,7 @@
 2. All mutation endpoints apply backend RBAC. Client permission filtering is additional UI prevention, never authority.
 3. No front-end invoice "mark paid" action; a provider intent, screenshot or simulated callback cannot establish cash receipt.
 4. No provider gateway can appear healthy without an actual probe. No SSL certificate or notification delivery may be claimed from constructed data.
-5. Tenant provisioning creates a workspace and subscription but **does not yet activate an invited company owner**. UI explicitly discloses this before submitting.
+5. Platform provisioning now creates a workspace/subscription and nominates the first company owner using a guarded email invitation. The nominated owner must verify/sign in and accept; a failed email delivery is visible and retriable without provisioning a duplicate tenant.
 6. Company status and subscription transitions use canonical server routes; all require an explicit reason entered in the portal, and existing backend mutation audit is retained.
 7. Global config is currently runtime-only, so this control center deliberately does not offer persistent settings mutation.
 8. No financial totals are added across currencies; all payment and invoice figures display their own source currency.
@@ -62,8 +62,16 @@
 
 Dedicated GitHub Actions Phase 2 acceptance runs: TypeScript/lint, role access \`pnpm test:platform-portal\`, complete access onboarding/role tests, platform-admin contract test, SaaS analytics test and production frontend build.
 
-**Not performed in this scope:** real staging deployment, browser accessibility/visual parity certification for all twenty S02 contracts, certified provider sandbox billing, full platform incident/policy/notification service, new owner-invitation onboarding. PR remains draft until these exit gates are satisfied.
+**Additional closure work:** First-owner invitation/acceptance, retry/status and negative access tests, deduplicated nomination, and real-staging-only smoke test plus protected manual workflow. **Not certified:** real staging deployment, browser accessibility/visual parity for all twenty S02 contracts, certified provider sandbox billing, live provider/SSL probes, durable platform config, or full incident/policy/notification services. PR remains draft and unmerged; GitHub issue #29 tracks external release gates.
 
 ## Next safe action
 
-Close the remaining P0 platform production blockers, then run a two-account browser acceptance for \`PLATFORM_OWNER\` and \`COMPANY_OWNER\` on staging, plus suspended user and limited \`BILLING_ADMIN\` role. Phase 3 should then resolve owner identity/guard conflicts and connect the Independent Vehicle Owner workspace.
+Configure the genuine staging deployment and protected credentials, then run a two-account browser acceptance for \`PLATFORM_OWNER\` and \`COMPANY_OWNER\` on staging, plus suspended user and limited \`BILLING_ADMIN\` role. Phase 3 should then resolve owner identity/guard conflicts and connect the Independent Vehicle Owner workspace.
+
+## Release certification (2026-10-29)
+
+- New first-owner invitation endpoint is part of platform provisioning; failure is reported explicitly and the saved tenant is retained for a scoped resend. Owner activation requires acceptance of the token, not merely sending it.
+- `scripts/platform-owner-staging-smoke.mjs` and `.github/workflows/platform-owner-staging-certification.yml` require actual remote staging user tokens; absent staging config fails closed.
+- Current PR workflows test review-mode, isolated data and simulator providers. They do **not** prove a deployed site, HTTPS, real M-Pesa/Stripe events, real customer email, or a rollback rehearsal.
+- Main repo has no `infrastructure/deployment/adapters/staging.sh`; `scripts/release-preflight.mjs staging` necessarily rejects promotion. Do not fabricate this adapter to greenwash CI.
+- Release blocker issue: [#29](https://github.com/Sean-steve/Sage-Auto/issues/29). Do not claim 20/20 production-certified screens or merge PR #28 until linked staging and field evidence is present.
