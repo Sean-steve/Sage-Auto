@@ -7,11 +7,13 @@ import { Router, Request, Response } from "express";
 import { PLATFORM_PERMISSIONS } from "@carhire/constants";
 import type { PlatformTenantLifecycleService } from "../application/services/platform-tenant-lifecycle.service";
 import type { PlatformAuthorizationService } from "../../authorization/application/services/platform-authorization.service";
+import type { AccessService } from "../../access/access.service";
 import { createRequirePlatformPermissionGuard } from "../../authorization/presentation/guards/platform-permission.guard";
 
 export function createPlatformTenantsController(
   tenantLifecycleService: PlatformTenantLifecycleService,
-  platformAuthService: PlatformAuthorizationService
+  platformAuthService: PlatformAuthorizationService,
+  accessService?: AccessService
 ): Router {
   const router = Router();
 
@@ -68,9 +70,24 @@ export function createPlatformTenantsController(
           req.platformContext!,
           req.body
         );
+        // Tenant creation and owner activation are separate durable steps.
+        // Delivery failure never rolls back or duplicates a saved tenant.
+        let ownerInvitation:{status:"SENT"|"DELIVERY_FAILED"|"NOT_CONFIGURED";id?:string;message?:string}={status:"NOT_CONFIGURED"};
+        if(accessService) {
+          try {
+            const invited=await accessService.inviteProvisionedOwner(
+              req.platformContext!.userId,result.tenant.id,req.body.ownerEmail
+            );
+            ownerInvitation={status:"SENT",id:invited.id};
+          } catch(error:any) {
+            ownerInvitation={status:"DELIVERY_FAILED",message:"Company saved, but the first owner invitation could not be delivered. Retry from company details."};
+          }
+        }
         res.status(201).json({
-          data: result,
-          message: `Tenant '${result.tenant.name}' provisioned successfully`,
+          data:{...result,ownerInvitation},
+          message:ownerInvitation.status==="SENT"
+            ? `Tenant '${result.tenant.name}' provisioned; owner invitation requested`
+            : `Tenant '${result.tenant.name}' provisioned; owner activation requires attention`,
         });
       } catch (err: any) {
         res.status(err.statusCode || 500).json({
@@ -80,7 +97,22 @@ export function createPlatformTenantsController(
     }
   );
 
-  // 4. POST /api/v1/platform/tenants/:id/suspend - Suspend tenant workspace
+  // Retry the first-owner invitation for the originally nominated email.
+  router.post(
+    "/:id/owner-invitation/retry",
+    createRequirePlatformPermissionGuard(platformAuthService, PLATFORM_PERMISSIONS.PLATFORM_TENANT_PROVISION),
+    async (req:Request,res:Response) => {
+      if(!accessService) {res.status(503).json({error:{code:"OWNER_INVITATION_UNAVAILABLE",message:"Owner onboarding service is not configured"}});return;}
+      try {
+        const invited=await accessService.retryProvisionedOwnerInvitation(req.platformContext!.userId,req.params.id);
+        res.json({data:{id:invited.id,status:invited.status,delivery:invited.delivery}});
+      } catch(err:any) {
+        res.status(err.statusCode||500).json({error:{code:err.code||"OWNER_INVITATION_FAILED",message:err.message}});
+      }
+    }
+  );
+
+    // 4. POST /api/v1/platform/tenants/:id/suspend - Suspend tenant workspace
   router.post(
     "/:id/suspend",
     createRequirePlatformPermissionGuard(platformAuthService, PLATFORM_PERMISSIONS.PLATFORM_TENANT_SUSPEND),
