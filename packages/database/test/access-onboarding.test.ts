@@ -59,6 +59,9 @@ async function main() {
       ownerName:'Provisioned Company Owner',country:'KE',currency:'KES'
     },'POST',201);
     assert.equal(provisioned.ownerInvitation.status,'SENT','The platform must request a first owner invitation');
+    const companyBefore=await req('/platform/tenants/'+provisioned.tenant.id,platform);
+    assert.equal(companyBefore.ownerInvitation.status,'PENDING','Company detail must show pending activation');
+    await req('/platform/tenants/'+provisioned.tenant.id,owner,undefined,'GET',403);
     assert.equal((await req('/access/context',nominatedOwner)).portals.length,0,'An unaccepted invitation grants no tenancy');
     const firstOwnerMail=await req('/access/review-mail',nominatedOwner);
     const firstOwnerToken=firstOwnerMail.filter((m:any)=>m.type==='INVITATION').at(-1).token;
@@ -67,6 +70,8 @@ async function main() {
     const firstOwnerContext=await req('/access/context',nominatedOwner);
     assert.ok(firstOwnerContext.portals.some((p:any)=>p.id===provisioned.tenant.id && p.roles.includes('COMPANY_OWNER')),
       'Only the nominated owner may activate the provisioned company');
+    const companyAfter=await req('/platform/tenants/'+provisioned.tenant.id,platform);
+    assert.equal(companyAfter.ownerInvitation.status,'ACCEPTED','Company detail must report accepted owner');
     await req('/platform/tenants/' + provisioned.tenant.id + '/owner-invitation/retry',platform,{},'POST',409);
     await req('/access/accept',nominatedOwner,{token:firstOwnerToken},'POST',410);
 
