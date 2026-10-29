@@ -264,6 +264,8 @@ export function PlatformOwnerWorkspace({ context, portal, section, onSection, on
                 "Subscription": tenantDetail.subscription?.status || tenantDetail.subscription?.state,
                 "Total vehicles": tenantDetail.fleetSummary?.total,
                 "Active bookings": tenantDetail.bookingsSummary?.active,
+                "First owner invitation": tenantDetail.ownerInvitation?.status,
+                "Invitation delivery": tenantDetail.ownerInvitation?.delivery,
               }).map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{displayValue(value)}</dd></div>)}
             </dl>
             <div className="platform-action-row">
@@ -273,7 +275,7 @@ export function PlatformOwnerWorkspace({ context, portal, section, onSection, on
                 <button onClick={() => command("reactivateTenant", tenantDetail.tenant.id, tenantDetail.tenant.name, "platform.tenant.suspend")} className="platform-primary">Reactivate company</button>}
               {tenantDetail.tenant?.status !== "DECOMMISSIONED" &&
                 <button onClick={() => command("offboardTenant", tenantDetail.tenant.id, tenantDetail.tenant.name, "platform.tenant.suspend")} className="platform-outline">Offboard company</button>}
-              {platformCan(portal, "platform.tenant.provision") && <button className="platform-outline" disabled={busy} onClick={() => void execute(async () => {
+              {platformCan(portal, "platform.tenant.provision") && tenantDetail.ownerInvitation?.status === "PENDING" && <button className="platform-outline" disabled={busy} onClick={() => void execute(async () => {
                 await write("/platform/tenants/" + encodeURIComponent(tenantDetail.tenant.id) + "/owner-invitation/retry", {}, "platform.tenant.provision");
               }, "Initial company-owner invitation sent again. The invitation must still be accepted.")}>Retry first-owner invitation</button>}
             </div>
