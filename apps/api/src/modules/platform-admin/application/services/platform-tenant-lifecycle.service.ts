@@ -127,12 +127,12 @@ export class PlatformTenantLifecycleService {
         status: (tenant.status as any) || "ACTIVE",
         country: tenant.country || "KE",
         currency: tenant.currency || "KES",
-        planName: plan?.name || "Standard Starter",
-        planTier: plan?.code || "STARTER",
-        subscriptionStatus: sub?.status || sub?.state || "ACTIVE",
+        planName: plan?.name || "Unassigned",
+        planTier: plan?.code || "UNASSIGNED",
+        subscriptionStatus: sub?.status || sub?.state || "NOT_SUBSCRIBED",
         fleetCount,
         activeBookingsCount,
-        monthlyRevenueEst: plan ? (plan.monthlyPrice || 0) : 15000,
+        monthlyRevenueEst: plan ? (plan.monthlyPrice || 0) : 0,
         createdAt: tenant.createdAt || new Date().toISOString(),
       });
     }
