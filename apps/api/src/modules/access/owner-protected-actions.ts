@@ -123,7 +123,7 @@ export class OwnerProtectedActions {
 
   async confirmPayoutChange(userId:string,input:unknown) {
     const data=confirmPayoutSchema.parse(input);
-    return withRecordTransaction(async()=>{
+    const outcome=await withRecordTransaction(async()=>{
       const {owner,tenantId}=await this.owner(userId,data.portal);
       const id=keyFor(userId,tenantId),pending=payoutChanges.get(id);
       if(!pending||pending.ownerId!==owner.id)return fail("No active payout destination verification request",409);
@@ -132,7 +132,9 @@ export class OwnerProtectedActions {
       const expected=Buffer.from(pending.codeHash,"hex"),actual=Buffer.from(sha(`${id}:${data.code}`),"hex");
       if(!timingSafeEqual(expected,actual)){
         payoutChanges.set(id,{...pending,attempts:pending.attempts+1});
-        return fail("Invalid verification code",403);
+        // Commit the failed attempt before returning 403. Throwing here
+        // would roll the failed attempt back and allow unlimited guessing.
+        return {verified:false as const};
       }
       const change=decrypt(pending.payload);
       const updates=change.kind==="MPESA"
@@ -145,7 +147,9 @@ export class OwnerProtectedActions {
         resourceType:"VehicleOwner",resourceId:owner.id,
         metadata:{destinationType:change.kind,verifiedAt:new Date().toISOString()},
       });
-      return {verified:true,destinationType:change.kind};
+      return {verified:true as const,destinationType:change.kind};
     });
+    if(!outcome.verified)return fail("Invalid verification code",403);
+    return outcome;
   }
 }
