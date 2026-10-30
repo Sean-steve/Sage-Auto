@@ -144,6 +144,7 @@ async function main() {
         id,tenantId,ownerId:person,ownerName:person,settlementNumber:id,
         periodStart:'2026-10-01',periodEnd:'2026-10-31',currency:'KES',
         status:'CALCULATED',calculatedAt:new Date().toISOString(),grossRevenue:'1000.0000',
+        termsSnapshot:{ownershipId:'own-agreement',ownerId:person,revenueSharePercent:70},
         totalEligibleRentalRevenue:'1000.0000',totalExcludedRevenue:'0.0000',
         ownerGrossRevenueShare:'700.0000',operatorGrossRevenueShare:'300.0000',
         totalDeductions:'0.0000',totalAdjustments:'0.0000',netPayoutAmount:'700.0000',
@@ -164,7 +165,12 @@ async function main() {
     const ownerProfileResponse=await req(ownerPath+'profile?portal='+tenantId,ownerActor);
     assert.equal(ownerProfileResponse.payoutMethodConfigured,true);
     assert.equal(ownerProfileResponse.payoutAccountNumber,undefined,'Never expose raw payout account details');
-    await req(ownerPath+'settlements/other-settlement/statement?portal='+tenantId,ownerActor,undefined,'GET',403);
+    const ownStatement=await req(ownerPath+'settlements/owner-settlement/statement?portal='+tenantId,ownerActor);
+    assert.equal(ownStatement.owner.id,'linked-person');
+    assert.equal(ownStatement.owner.payoutAccountNumber,undefined,'Owner statement must redact banking details');
+    assert.equal(ownStatement.owner.taxPin,undefined,'Owner statement must redact ID and tax details');
+    assert.equal(ownStatement.financialSummary.netPayoutAmount,'700.0000');
+        await req(ownerPath+'settlements/other-settlement/statement?portal='+tenantId,ownerActor,undefined,'GET',403);
     await req(ownerPath+'settlements/other-settlement/dispute',ownerActor,{portal:tenantId,reason:'This amount was allocated to the wrong owner'},'POST',403);
     await req(ownerPath+'overview?portal='+tenantId,owner,undefined,'GET',403);
     await req(ownerPath+'overview?portal='+tenantId,renter,undefined,'GET',403);
