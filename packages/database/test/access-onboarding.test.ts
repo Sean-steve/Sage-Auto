@@ -237,7 +237,7 @@ async function main() {
     await req(ownerPath+'agreements/own-agreement/sign',renter,consent,'POST',403);
     assert.equal((await req(ownerPath+'agreements?portal='+tenantId,ownerActor))[0].signature.termsHash,ownAgreement.termsHash);
     const linkedSigned=(await req(operatorConnections,owner)).items.find((x:any)=>x.id==='linked-person');
-    assert.equal(linkedSigned.signedAgreements,1,'Operator must see the owner's persisted signature without refresh-state duplication');
+    assert.equal(linkedSigned.signedAgreements,1,"Operator must see the owner\u0027s persisted signature without refresh-state duplication");
     assert.equal(linkedSigned.agreements[0].signatureStatus,'SIGNED');
     // An altered agreement invalidates the current acceptance in both portals.
     const priorTerms=ownerships.get('own-agreement');
