@@ -125,7 +125,7 @@ export function createOwnerSelfController(access: AccessService, settlements: Ow
     for(const rental of rentals)for(const inspection of await inspectionRepo.findByRentalId(rental.id,tenantId)) {
       result.push({
         id:inspection.id,reference:rental.rentalNumber,registration:vehicleMap.get(rental.vehicleId),
-        status:inspection.status,type:inspection.type,createdAt:inspection.createdAt,
+        status:inspection.status,type:inspection.inspectionType,createdAt:inspection.createdAt,
       });
     }
     return result;
