@@ -91,11 +91,11 @@ class Cdp {
     await waitFor(()=>this.evaluate('document.readyState==="complete" && Boolean(document.body)'),'page load');
   }
   async clickSection(label) {
-    const expr=`(()=>{const labels=document.querySelectorAll('button.sage-nav-item, nav[aria-label="Workspace navigation"] button');
+    const expr=`(()=>{const labels=document.querySelectorAll('button.sage-nav-item, nav[aria-label="Workspace navigation"] button, nav[aria-label="Vehicle owner sections"] button');
       const button=[...labels].find(node=>node.textContent.trim()===${JSON.stringify(label)});
       if(!button)return false;button.click();return true;})()`;
     await waitFor(()=>this.evaluate(expr),'Navigation item '+label+' rendered and clickable',20000);
-    await waitFor(()=>this.evaluate(`(()=>{const sidebar=[...document.querySelectorAll('button.sage-nav-item, nav[aria-label="Workspace navigation"] button')];
+    await waitFor(()=>this.evaluate(`(()=>{const sidebar=[...document.querySelectorAll('button.sage-nav-item, nav[aria-label="Workspace navigation"] button, nav[aria-label="Vehicle owner sections"] button')];
       return sidebar.some(button=>button.textContent.trim()===${JSON.stringify(label)} && button.getAttribute('aria-current')==='page')
     })()`),'active section '+label);
     await waitFor(()=>this.evaluate(`(()=>{const root=document.querySelector('main');
@@ -190,14 +190,14 @@ try {
       return true;
     })()`);
     await cdp.call('Page.reload',{ignoreCache:true});
-    const shellClass=['DRIVER','VEHICLE_OWNER','RENTER'].includes(spec.role)?'.access-workspace':'.saas-workspace';
+    const shellClass=spec.role==='VEHICLE_OWNER'?'.owner-shell':['DRIVER','RENTER'].includes(spec.role)?'.access-workspace':'.saas-workspace';
     await waitFor(()=>cdp.evaluate(`Boolean(document.querySelector(${JSON.stringify(shellClass)}))`),
       spec.role+' authenticated workspace',35000);
-    await waitFor(()=>cdp.evaluate(`([...document.querySelectorAll('button.sage-nav-item, nav[aria-label="Workspace navigation"] button')]
+    await waitFor(()=>cdp.evaluate(`([...document.querySelectorAll('button.sage-nav-item, nav[aria-label="Workspace navigation"] button, nav[aria-label="Vehicle owner sections"] button')]
       .some(n=>n.textContent.trim()===${JSON.stringify(portal.sections[0]?.label||'')}))`),
       spec.role+' own permission-scoped sidebar',35000);
     const allowed=new Set(portal.sections.map(item=>item.label));
-    const uiLabels=await cdp.evaluate(`([...document.querySelectorAll('button.sage-nav-item, nav[aria-label="Workspace navigation"] button')].map(n=>n.textContent.trim()))`);
+    const uiLabels=await cdp.evaluate(`([...document.querySelectorAll('button.sage-nav-item, nav[aria-label="Workspace navigation"] button, nav[aria-label="Vehicle owner sections"] button')].map(n=>n.textContent.trim()))`);
     for(const sectionLabel of uiLabels) {
       assert.ok(allowed.has(sectionLabel),spec.role+' is rendered unauthorized section '+sectionLabel);
     }
