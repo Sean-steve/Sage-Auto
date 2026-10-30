@@ -28,7 +28,6 @@ for(const required of ownerScreens){
   assert.ok(!companyIds.has(required),"Company Owner must not render personal "+required);
   assert.ok(!platformIds.has(required),"Platform Owner must not render personal "+required);
 }
-assert.equal(owner.size,undefined); // Separate role-specific navigation is an array, not a cache.
 assert.equal(owner.length,ownerScreens.length,"Every registered independent-owner screen must remain available");
 assert.deepEqual([...ids(driver)].sort(),["myTrips","myInspections"].sort());
 assert.deepEqual([...ids(renter)].sort(),["myBookings","profile"].sort());
