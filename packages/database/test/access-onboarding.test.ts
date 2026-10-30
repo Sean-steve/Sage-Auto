@@ -152,6 +152,29 @@ async function main() {
     }
     const ownerActor=actors.VEHICLE_OWNER;
     const ownerPath='/access/owner/';
+    // Phase 4: operator / external-owner synchronization must be derived
+    // from the same canonical records, not local UI state or shared emails.
+    const operatorConnections='/access/owner-connections?portal='+tenantId;
+    const initialConnections=await req(operatorConnections,owner);
+    assert.equal(initialConnections.total,2);
+    assert.equal(initialConnections.items.length,2);
+    const linkedInitial=initialConnections.items.find((x:any)=>x.id==='linked-person');
+    assert.equal(linkedInitial.portalConnection,'ACTIVE');
+    assert.equal(linkedInitial.activeAgreements,1);
+    assert.equal(linkedInitial.signedAgreements,0);
+    assert.equal(linkedInitial.agreements[0].signatureStatus,'AWAITING_OWNER');
+    assert.equal(linkedInitial.payoutMethodConfigured,true);
+    assert.equal(linkedInitial.payoutAccountNumber,undefined,'Never expose bank account to operator connection panel');
+    assert.equal(linkedInitial.payoutMpesaNumber,undefined,'Never expose M-Pesa destination to operator connection panel');
+    await req(operatorConnections,actors.VEHICLE_OWNER,undefined,'GET',403);
+    await req(operatorConnections,renter,undefined,'GET',403);
+    await req(operatorConnections,platform,undefined,'GET',403);
+    await req('/access/owner-connections?portal='+otherContext.portals[0].id,owner,undefined,'GET',403);
+    const limitedConnections=await req(operatorConnections+'&page=2&limit=1',owner);
+    assert.equal(limitedConnections.items.length,1);
+    assert.equal(limitedConnections.hasMore,false);
+    await req(operatorConnections+'&page=0',owner,undefined,'GET',400);
+
     const records=await req(ownerPath+'overview?portal='+tenantId,ownerActor);
     assert.equal(records.fleetCount,1,'Owner dashboard counts active linked vehicles only');
     const personalVehicles=await req(ownerPath+'vehicles?portal='+tenantId,ownerActor);
@@ -213,6 +236,20 @@ async function main() {
     await req(ownerPath+'agreements/own-agreement/sign',ownerActor,{...consent,termsHash:'f'.repeat(64)},'POST',409);
     await req(ownerPath+'agreements/own-agreement/sign',renter,consent,'POST',403);
     assert.equal((await req(ownerPath+'agreements?portal='+tenantId,ownerActor))[0].signature.termsHash,ownAgreement.termsHash);
+    const linkedSigned=(await req(operatorConnections,owner)).items.find((x:any)=>x.id==='linked-person');
+    assert.equal(linkedSigned.signedAgreements,1,"Operator must see the owner\u0027s persisted signature without refresh-state duplication");
+    assert.equal(linkedSigned.agreements[0].signatureStatus,'SIGNED');
+    // An altered agreement invalidates the current acceptance in both portals.
+    const priorTerms=ownerships.get('own-agreement');
+    ownerships.set('own-agreement',{...priorTerms,termsSnapshot:'Revised owner share',version:2});
+    const changed=(await req(operatorConnections,owner)).items.find((x:any)=>x.id==='linked-person');
+    assert.equal(changed.signedAgreements,0);
+    assert.equal(changed.staleAgreementAcceptances,1);
+    assert.equal(changed.agreements[0].signatureStatus,'STALE_TERMS');
+    await req(ownerPath+'agreements/own-agreement/sign',ownerActor,consent,'POST',409);
+    ownerships.set('own-agreement',priorTerms);
+    assert.equal((await req(operatorConnections,owner)).items.find((x:any)=>x.id==='linked-person').signedAgreements,1);
+
     // Payout changes require out-of-band email verification and may not be
     // confirmed with only an authenticated session or an owner ID.
     const originalOwnerBank=ownerProfiles.get('linked-person').payoutAccountNumber;
@@ -226,6 +263,10 @@ async function main() {
     assert.equal((await req(ownerPath+'payout/verify-change',ownerActor,{portal:tenantId,code:emailed.token})).verified,true);
     assert.equal(ownerProfiles.get('linked-person').payoutMpesaNumber,'+254700001234');
     assert.equal(ownerProfiles.get('linked-person').payoutAccountNumber,undefined,'Verified method change clears prior bank destination');
+    const linkedPayout=(await req(operatorConnections,owner)).items.find((x:any)=>x.id==='linked-person');
+    assert.equal(linkedPayout.payoutMethodConfigured,true,'Operator sees verified destination setup from the same owner record');
+    assert.equal(JSON.stringify(linkedPayout).includes('+254700001234'),false,'No sensitive destination in operator status payload');
+
     await req(ownerPath+'payout/verify-change',ownerActor,{portal:tenantId,code:emailed.token},'POST',409);
     await req(ownerPath+'payout/request-change',renter,{portal:tenantId,kind:'MPESA',mpesaNumber:'+254700001234'},'POST',403);
     // Full owner history must page over >1000 saved rentals with historical
@@ -248,9 +289,19 @@ async function main() {
     // Link removal must invalidate the same unexpired login token immediately.
     const ownerMember=(await req('/access/team?scope=tenant&tenantId='+tenantId,owner)).find((x:any)=>x.email===ownerActor.email);
     await req('/access/team/'+ownerMember.id,owner,{scope:'tenant',tenantId,linkedRecordId:null},'PATCH');
+    assert.equal((await req(operatorConnections,owner)).items.find((x:any)=>x.id==='linked-person').portalConnection,'NOT_CONNECTED');
     await req(ownerPath+'overview?portal='+tenantId,ownerActor,undefined,'GET',403);
     await req('/access/team/'+ownerMember.id,owner,{scope:'tenant',tenantId,linkedRecordId:'linked-person'},'PATCH');
     assert.equal((await req(ownerPath+'overview?portal='+tenantId,ownerActor)).fleetCount,1,'Relinking requires fresh server authorization');
+    assert.equal((await req(operatorConnections,owner)).items.find((x:any)=>x.id==='linked-person').portalConnection,'ACTIVE');
+    const activeOwnerRecord=ownerProfiles.get('linked-person');
+    ownerProfiles.set('linked-person',{...activeOwnerRecord,status:'SUSPENDED'});
+    assert.equal((await req(operatorConnections,owner)).items.find((x:any)=>x.id==='linked-person').ownerStatus,'SUSPENDED');
+    await req(ownerPath+'overview?portal='+tenantId,ownerActor,undefined,'GET',403);
+    await req('/access/records?portal='+tenantId+'&section=myVehicles',ownerActor,undefined,'GET',403);
+    await req('/access/records?portal='+tenantId+'&section=mySettlements',ownerActor,undefined,'GET',403);
+    ownerProfiles.set('linked-person',activeOwnerRecord);
+
     for(const [role,section] of [['DRIVER','myTrips'],['DRIVER','myInspections'],['VEHICLE_OWNER','myVehicles']]) {
       const data=await req(`/access/records?portal=${tenantId}&section=${section}`,actors[role]);
       assert.deepEqual(data.rows.map((r:any)=>r.id),['own'],`${role} ${section} linked-only records`);

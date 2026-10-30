@@ -9,61 +9,108 @@ function date(v?:string){if(!v)return "—";const d=new Date(v);return Number.is
 function human(v?:string){return String(v||"").replaceAll("_"," ").toLowerCase().replace(/\b\w/g,c=>c.toUpperCase());}
 
 export const VehicleOwnersView:React.FC=()=>{
-  const {restoration,vehicleOwners,vehicleOwnerships,vehicles,activeTenant,activeTenantId,setIsNewOwnerOpen,setSelectedOwnerId,setCurrentView,showNotification}=useApp();
-  const [ownerships,setOwnerships]=useState<any[]>(vehicleOwnerships);
+  const {restoration,vehicleOwners,vehicles,activeTenant,activeTenantId,setIsNewOwnerOpen,setSelectedOwnerId,setCurrentView,showNotification}=useApp();
+  const [ownerships,setOwnerships]=useState<any[]>([]);
   const [liveOwners,setLiveOwners]=useState<any[]>([]);
   const [liveVehicles,setLiveVehicles]=useState<any[]>([]);
+  const [connections,setConnections]=useState<any[]>([]);
+  const [loading,setLoading]=useState(true);
+  const [error,setError]=useState("");
+  const [connectionError,setConnectionError]=useState("");
+  const [revision,setRevision]=useState(0);
   const [managingOwnerId,setManagingOwnerId]=useState<string|null>(null);
   const [editingOwnerId,setEditingOwnerId]=useState<string|null>(null);
 
   useEffect(()=>{
     let cancelled=false;
-    (async()=>{
-      const [ownerResponse,vehicleResponse]=await Promise.all([
-        apiClient.vehicleOwners.listOwners(),
-        apiClient.fleet.listVehicles({limit:1000}),
-      ]);
-      if(cancelled)return;
-      const ownerRows=!ownerResponse.error?(ownerResponse.data as any[]||[]):vehicleOwners.filter(o=>o.tenantId===activeTenantId);
-      const vehicleRows=!vehicleResponse.error?(vehicleResponse.data as any[]||[]):vehicles.filter(v=>v.tenantId===activeTenantId);
-      setLiveOwners(ownerRows);setLiveVehicles(vehicleRows);
-      const histories=await Promise.all(vehicleRows.filter((v:any)=>v.ownerId).map(async(v:any)=>{
-        const response=await apiClient.vehicleOwners.getOwnershipHistory(v.id);
-        return response.error?[]:(response.data as any[]||[]);
-      }));
-      if(!cancelled)setOwnerships(histories.flat().length?histories.flat():vehicleOwnerships);
-    })().catch(()=>{if(!cancelled){setLiveOwners(vehicleOwners.filter(o=>o.tenantId===activeTenantId));setLiveVehicles(vehicles.filter(v=>v.tenantId===activeTenantId));setOwnerships(vehicleOwnerships);}});
-    return()=>{cancelled=true;};
-  },[activeTenantId,vehicleOwners.length,vehicles.length]);
-
-  const tenantVehicles=(liveVehicles.length?liveVehicles:vehicles.filter(v=>v.tenantId===activeTenantId));
-  const rawOwners=(liveOwners.length?liveOwners:vehicleOwners.filter(o=>o.tenantId===activeTenantId));
-  const tenantOwners=useMemo(()=>{
-    const groups=new Map<string,any>();
-    for(const owner of rawOwners){
-      const key=(owner.email||"").trim().toLowerCase()||String(owner.phone||"").replace(/[^0-9]/g,"")||owner.id;
-      const existing=groups.get(key);
-      if(!existing)groups.set(key,{...owner,_aliasIds:[owner.id]});
-      else existing._aliasIds.push(owner.id);
+    setLoading(true);setError("");setConnectionError("");
+    setLiveOwners([]);setLiveVehicles([]);setOwnerships([]);setConnections([]);
+    async function allOwners(){
+      const items:any[]=[];
+      for(let page=1;page<=1000;page++){
+        const r=await apiClient.vehicleOwners.listOwners({page,limit:100});
+        if(r.error)throw new Error(r.error.message);
+        if(!Array.isArray(r.data))throw new Error("Vehicle-owner API returned an invalid saved-records list.");
+        items.push(...r.data);
+        if(items.length>=(r.meta?.total??items.length))return items;
+      }
+      throw new Error("Vehicle-owner list exceeds the supported paging boundary; narrow your results.");
     }
-    return [...groups.values()];
-  },[rawOwners]);
-  const aliasIds=(owner:any)=>owner._aliasIds||[owner.id];
-  const activeForOwner=(owner:any)=>ownerships.filter((o:any)=>aliasIds(owner).includes(o.ownerId)&&o.isActive);
+    async function allVehicles(){
+      const items:any[]=[];
+      for(let page=1;page<=1000;page++){
+        const r=await apiClient.fleet.listVehicles({page,limit:100});
+        if(r.error)throw new Error(r.error.message);
+        if(!Array.isArray(r.data))throw new Error("Fleet API returned an invalid saved-records list.");
+        items.push(...r.data);
+        if(items.length>=(r.meta?.total??items.length))return items;
+      }
+      throw new Error("Fleet results exceed supported paging boundary.");
+    }
+    async function allConnections(){
+      const rows:any[]=[];
+      for(let page=1;page<=1000;page++){
+        const r=await apiClient.vehicleOwners.listPortalConnections(activeTenantId,page,100);
+        if(r.error)throw new Error(r.error.message);
+        if(!Array.isArray(r.data?.items))throw new Error("Owner connection API returned invalid records.");
+        rows.push(...r.data.items);
+        if(!r.data.hasMore)return rows;
+      }
+      throw new Error("Owner-connection records exceeded supported paging boundary.");
+    }
+    (async()=>{
+      const [ownerRows,vehicleRows]=await Promise.all([allOwners(),allVehicles()]);
+      if(cancelled)return;
+      setLiveOwners(ownerRows);setLiveVehicles(vehicleRows);
+      // A genuinely empty response remains empty. No local/mock fallback.
+      const ownerVehicles=vehicleRows.filter((v:any)=>v.ownerId);
+      const histories=await Promise.all(ownerVehicles.map(async(v:any)=>{
+        const response=await apiClient.vehicleOwners.getOwnershipHistory(v.id);
+        if(response.error)throw new Error(response.error.message);
+        if(!Array.isArray(response.data))throw new Error("Ownership-history API returned invalid saved data.");
+        return response.data;
+      }));
+      if(!cancelled)setOwnerships(histories.flat());
+      try{
+        const synced=await allConnections();
+        if(!cancelled)setConnections(synced);
+      }catch(e:any){if(!cancelled)setConnectionError(e.message||"Owner-portal connection status could not be loaded.");}
+    })().catch(e=>{if(!cancelled)setError(e.message||"Saved vehicle-owner records could not be loaded.");})
+      .finally(()=>{if(!cancelled)setLoading(false);});
+    return()=>{cancelled=true;};
+  },[activeTenantId,vehicleOwners.length,vehicles.length,revision]);
+
+  // Canonical record IDs are authoritative: two owner profiles are never
+  // merged because they happen to share a contact name, phone or email.
+  const tenantVehicles=liveVehicles;
+  const tenantOwners=liveOwners;
+  const aliasIds=(owner:any)=>[owner.id];
+  const activeForOwner=(owner:any)=>ownerships.filter((o:any)=>o.ownerId===owner.id&&o.isActive);
+  const byOwner=useMemo(()=>new Map(connections.map(c=>[c.id,c])),[connections]);
 
   return <div id="vehicle-owners-view" className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6">
     <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-xs font-black uppercase tracking-[.18em] text-emerald-600">Owner economics</p><h1 className="mt-1 text-2xl font-black text-slate-950">Vehicle Owners & Revenue Agreements</h1><p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">Every owner sees the active commercial terms for each attached vehicle. Revenue share is vehicle-agreement specific—there is no hidden global “default” percentage that silently overrides a vehicle contract.</p></div><button disabled={restoration} onClick={()=>setIsNewOwnerOpen(true)} className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-black text-white disabled:opacity-50"><Plus size={16}/>Add Vehicle Owner</button></header>
 
-    <section className="grid gap-3 sm:grid-cols-3"><Metric label="Registered owners" value={tenantOwners.length}/><Metric label="Active agreements" value={ownerships.filter((o:any)=>o.tenantId===activeTenantId&&o.isActive).length}/><Metric label="Partner vehicles" value={tenantVehicles.filter(v=>Boolean(v.ownerId)).length}/></section>
+    {loading&&<div role="status" className="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-600">Loading saved vehicle-owner and agreement records…</div>}
+    {error&&<div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">{error} <button className="ml-2 font-bold underline" onClick={()=>setRevision(n=>n+1)}>Retry</button></div>}
+    {connectionError&&<div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">Partner portal status unavailable: {connectionError}. No connected status is assumed.</div>}
+    {!loading&&!error&&<section className="grid gap-3 sm:grid-cols-3"><Metric label="Registered owners" value={tenantOwners.length}/><Metric label="Active agreements" value={ownerships.filter((o:any)=>o.tenantId===activeTenantId&&o.isActive).length}/><Metric label="Partner vehicles" value={tenantVehicles.filter(v=>Boolean(v.ownerId)).length}/></section>}
 
-    <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">{tenantOwners.map(owner=>{
+    {!loading&&!error&&<div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">{tenantOwners.map(owner=>{
       const ownedVehicles=tenantVehicles.filter(v=>aliasIds(owner).includes(v.ownerId));
       const agreements=activeForOwner(owner);
       const primary=agreements[0];
+      const connection=byOwner.get(owner.id);
       return <article key={owner.id} className="flex flex-col justify-between rounded-3xl border bg-white p-5 shadow-sm">
         <div>
           <div className="flex items-start justify-between gap-3"><div className="flex min-w-0 items-center gap-3"><div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-emerald-50 text-sm font-black text-emerald-700">{owner.name.slice(0,2).toUpperCase()}</div><div className="min-w-0"><h2 className="truncate font-black text-slate-950">{owner.name}</h2><p className="truncate text-xs text-slate-500">{owner.companyName||human(owner.ownerType)||"Vehicle owner"}</p></div></div><span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-black text-emerald-700">{owner.status}</span></div>
-          <div className="mt-4 space-y-2 text-xs text-slate-600"><Contact icon={<Mail size={14}/>} value={owner.email}/><Contact icon={<Phone size={14}/>} value={owner.phone}/>{owner.payoutBank&&<Contact icon={<CreditCard size={14}/>} value={`${owner.payoutBank} · ${owner.payoutAccountNumber||"Account on file"}`}/>}</div>
+          <div className="mt-4 space-y-2 text-xs text-slate-600"><Contact icon={<Mail size={14}/>} value={owner.email}/><Contact icon={<Phone size={14}/>} value={owner.phone}/>{(owner.payoutBank||owner.payoutMpesaNumber)&&<Contact icon={<CreditCard size={14}/>} value="Payout destination on file (details hidden)"/>}</div>
+          <div className="mt-3 flex flex-wrap gap-1.5" aria-label="Owner portal synchronization">
+            <span className="rounded-full border border-slate-200 px-2.5 py-1 text-[10px] font-bold text-slate-700">{!connection?"Portal state unavailable":connection.portalConnection==="ACTIVE"?"Personal portal connected":"Personal portal not connected"}</span>
+            {connection&&<span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[10px] font-bold text-emerald-800">{connection.signedAgreements}/{connection.activeAgreements} agreements signed</span>}
+            {connection?.staleAgreementAcceptances>0&&<span className="rounded-full bg-amber-100 px-2.5 py-1 text-[10px] font-bold text-amber-900">Agreement changed; new acceptance needed</span>}
+            {connection&&<span className="rounded-full border px-2.5 py-1 text-[10px] font-bold">{connection.payoutMethodConfigured?"Payout method configured":"Payout method missing"}</span>}
+          </div>
 
           <div className="mt-5 rounded-2xl bg-slate-950 p-4 text-white"><div className="flex items-center justify-between gap-3"><div><p className="text-[10px] font-black uppercase tracking-[.15em] text-slate-400">Current owner agreement</p><p className="mt-1 text-lg font-black">{primary?`${Number(primary.revenueSharePercent||0).toLocaleString()}% owner share`:"No revenue-share agreement"}</p></div><Percent size={20} className="text-emerald-300"/></div><p className="mt-3 text-xs leading-5 text-slate-300">{primary?.termsSnapshot||"This owner has no active external revenue agreement. Attach a vehicle agreement to define owner economics."}</p>{primary&&<div className="mt-3 flex flex-wrap gap-2 text-[10px]"><span className="rounded-full bg-white/10 px-2 py-1">Deductions {primary.allowableExpenseDeductions?"allowed":"not allowed"}</span>{primary.fixedMonthlyPayout!=null&&<span className="rounded-full bg-white/10 px-2 py-1">Fixed {money(primary.fixedMonthlyPayout,activeTenant.currency||"KES")}</span>}</div>}</div>
 
@@ -71,12 +118,12 @@ export const VehicleOwnersView:React.FC=()=>{
         </div>
         <div className="mt-5 flex flex-wrap items-center justify-between gap-2 border-t pt-4"><button disabled={restoration} onClick={()=>{setSelectedOwnerId(owner.id);setCurrentView("settlements");}} className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-700"><FileSpreadsheet size={14}/>Statements</button><div className="flex flex-wrap gap-2"><button disabled={restoration} onClick={()=>setEditingOwnerId(owner.id)} className="inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-black text-slate-700 disabled:opacity-40"><Pencil size={13}/>Edit Owner</button><button disabled={restoration||!ownedVehicles.length} onClick={()=>setManagingOwnerId(owner.id)} className="rounded-xl border px-3 py-2 text-xs font-black text-slate-700 disabled:opacity-40">Manage Terms</button></div></div>
       </article>;
-    })}</div>
+    })}</div>}
 
-    {!tenantOwners.length&&<div className="rounded-3xl border border-dashed bg-white p-12 text-center"><WalletCards className="mx-auto text-slate-300"/><h2 className="mt-3 font-black">No vehicle owners registered</h2><p className="mt-1 text-sm text-slate-500">Add an owner when a vehicle is investor-owned, leased, managed or under a revenue-share agreement.</p></div>}
+    {!loading&&!error&&!tenantOwners.length&&<div className="rounded-3xl border border-dashed bg-white p-12 text-center"><WalletCards className="mx-auto text-slate-300"/><h2 className="mt-3 font-black">No vehicle owners registered</h2><p className="mt-1 text-sm text-slate-500">Add an owner when a vehicle is investor-owned, leased, managed or under a revenue-share agreement.</p></div>}
 
-    {managingOwnerId&&<TermsModal owner={tenantOwners.find(o=>o.id===managingOwnerId)} vehicles={tenantVehicles.filter(v=>aliasIds(tenantOwners.find(o=>o.id===managingOwnerId)||{id:managingOwnerId}).includes(v.ownerId))} ownerships={ownerships} currency={activeTenant.currency||"KES"} onClose={()=>setManagingOwnerId(null)} onSaved={(agreement:any)=>{setOwnerships(prev=>[agreement,...prev.map((o:any)=>o.vehicleId===agreement.vehicleId&&o.id!==agreement.id?{...o,isActive:false}:o)]);showNotification("Owner agreement terms updated.");}}/>}
-    {editingOwnerId&&<EditOwnerModal owner={tenantOwners.find(o=>o.id===editingOwnerId)} vehicles={tenantVehicles.filter(v=>aliasIds(tenantOwners.find(o=>o.id===editingOwnerId)||{id:editingOwnerId}).includes(v.ownerId))} allVehicles={tenantVehicles} onClose={()=>setEditingOwnerId(null)} onSaved={(updated:any)=>{setLiveOwners(prev=>prev.map(o=>o.id===updated.id?updated:o));if(updated._attachedVehicleId)setLiveVehicles(prev=>prev.map(v=>v.id===updated._attachedVehicleId?{...v,ownerId:updated.id,activeOwnershipId:updated._assignment?.id}:v));showNotification(updated._attachedVehicleId?"Owner updated and vehicle attached.":"Vehicle owner details updated.");}}/>}
+    {managingOwnerId&&<TermsModal owner={tenantOwners.find(o=>o.id===managingOwnerId)} vehicles={tenantVehicles.filter(v=>aliasIds(tenantOwners.find(o=>o.id===managingOwnerId)||{id:managingOwnerId}).includes(v.ownerId))} ownerships={ownerships} currency={activeTenant.currency||"KES"} onClose={()=>setManagingOwnerId(null)} onSaved={(_agreement:any)=>{setRevision(n=>n+1);showNotification("Owner agreement updated. Both portals are refreshing saved terms.");}}/>}
+    {editingOwnerId&&<EditOwnerModal owner={tenantOwners.find(o=>o.id===editingOwnerId)} vehicles={tenantVehicles.filter(v=>aliasIds(tenantOwners.find(o=>o.id===editingOwnerId)||{id:editingOwnerId}).includes(v.ownerId))} allVehicles={tenantVehicles} onClose={()=>setEditingOwnerId(null)} onSaved={(updated:any)=>{setLiveOwners(prev=>prev.map(o=>o.id===updated.id?updated:o));if(updated._attachedVehicleId)setLiveVehicles(prev=>prev.map(v=>v.id===updated._attachedVehicleId?{...v,ownerId:updated.id,activeOwnershipId:updated._assignment?.id}:v));setRevision(n=>n+1);showNotification(updated._attachedVehicleId?"Owner updated and vehicle attached.":"Vehicle owner details updated.");}}/>}
   </div>;
 };
 

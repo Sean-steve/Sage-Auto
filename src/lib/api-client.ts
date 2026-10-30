@@ -257,7 +257,12 @@ class ApiClient {
 
   // 4. Vehicle Owners & Revenue Shares Context
   public vehicleOwners = {
-    listOwners: () => this.get<any[]>('/vehicle-owners'),
+    listOwners: (params?: {page?:number;limit?:number}) =>
+      this.get<any[]>(`/vehicle-owners${params?("?"+new URLSearchParams(Object.entries(params).map(([key,value])=>[key,String(value)]))):""}`),
+    listPortalConnections: (tenantId: string, page = 1, limit = 100) =>
+      this.get<{items:any[];total:number;page:number;limit:number;hasMore:boolean}>(
+        `/access/owner-connections?portal=${encodeURIComponent(tenantId)}&page=${page}&limit=${limit}`
+      ),
     getOwner: (id: string) => this.get(`/vehicle-owners/${id}`),
     createOwner: (dto: any) => this.post('/vehicle-owners', dto),
     updateOwner: (id: string, dto: any) => this.patch(`/vehicle-owners/${id}`, dto),
