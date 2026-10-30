@@ -5,6 +5,7 @@ import { PLATFORM_ROLES, TENANT_SYSTEM_ROLES } from '@carhire/constants';
 import { withRecordTransaction } from '../../../../../packages/database/src/record-store';
 import { AccessService, fail } from './access.service';
 import { createOwnerSelfController } from './owner-self.controller';
+import { createOwnerConnectionsController } from './owner-connections.controller';
 import type { OwnerSettlementsService } from '../owner-settlements/application/owner-settlements.service';
 import type { FileAccessService } from '../files/application/services/file-access.service';
 import type { IdentityModule } from '../identity/identity.module';
@@ -21,6 +22,7 @@ export function accessController(service:AccessService,identity:IdentityModule,o
   router.get('/invitation',run(req=>{const i=service.inspect(z.string().min(32).parse(req.query.token));return {email:i.email,role:i.role,expiresAt:i.expiresAt};}));
   router.use(identity.authGuard);
   if(ownerSettlements&&fileAccess)router.use('/owner',createOwnerSelfController(service,ownerSettlements,fileAccess));
+  router.use('/owner-connections',createOwnerConnectionsController(service));
   router.get('/context',run(req=>service.context(req.auth.userId)));
   router.put('/profile',run(req=>service.saveProfile(req.auth.userId,profile.parse(req.body))));
   router.post('/complete',run(req=>service.complete(req.auth.userId)));
@@ -97,6 +99,11 @@ export function accessController(service:AccessService,identity:IdentityModule,o
   router.get('/records',run(async req=>{
     const portal=await service.portal(req.auth.userId,String(req.query.portal||''));
     const section=String(req.query.section||'');
+    // Legacy read facade still exists for compatibility. It must not bypass
+    // the canonical active/linked Vehicle Owner guard if an owner is suspended.
+    if(section==='myVehicles'||section==='mySettlements') {
+      await service.vehicleOwnerSelf(req.auth.userId,String(req.query.portal||''));
+    }
     if(!portal.sections.some((s:any)=>s.id===section)) return fail('You do not have access to this section',403);
     const tenantId=portal.tenantId;
     let rows:any[]=[];
