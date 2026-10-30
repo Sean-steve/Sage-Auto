@@ -4,6 +4,7 @@
 
 export interface IEmailDeliveryPort {
   sendInvitationEmail(recipientEmail: string, token: string): Promise<void>;
+  sendOwnerPayoutVerificationEmail(recipientEmail:string, code:string): Promise<void>;
   sendPasswordResetEmail(recipientEmail: string, resetToken: string, recipientName?: string): Promise<void>;
   sendEmailVerificationEmail(recipientEmail: string, verificationToken: string, recipientName?: string): Promise<void>;
 }

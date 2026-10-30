@@ -57,6 +57,8 @@ import type { FinanceService } from "../../finance/application/finance.service";
 export interface SettlementActor {
   userId: string;
   email?: string;
+  /** Verified tenant-linked owner ID, resolved by AccessService (not client input). */
+  ownerRecordId?: string;
 }
 
 export class OwnerSettlementsService {
@@ -785,14 +787,22 @@ export class OwnerSettlementsService {
   // --------------------------------------------------------------------------
 
   private async resolveOwnerSelf(tenantId: string, actor: SettlementActor): Promise<VehicleOwner> {
-    if (!actor.email) {
-      const err: any = new Error("Vehicle Owner self-service requires a linked membership email.");
+    // Email matching is never an authorization mechanism. Only the currently
+    // linked owner record from AccessService may unlock owner self-service.
+    if (!actor.ownerRecordId) {
+      const err: any = new Error("Use the verified Vehicle Owner personal portal.");
       err.statusCode = 403;
       throw err;
     }
-    const owner = await this.ownerRepo.findByEmail(actor.email, tenantId);
-    if (!owner) {
-      const err: any = new Error("No Vehicle Owner record is linked to this user.");
+    let owner: VehicleOwner | null = null;
+    try { owner = await this.ownerRepo.findById(actor.ownerRecordId, tenantId); }
+    catch {
+      const err: any = new Error("Linked owner record is not available in this company.");
+      err.statusCode = 403;
+      throw err;
+    }
+    if (!owner || owner.status !== "ACTIVE") {
+      const err: any = new Error("The linked Vehicle Owner record is not active.");
       err.statusCode = 403;
       throw err;
     }

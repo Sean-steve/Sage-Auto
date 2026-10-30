@@ -269,7 +269,7 @@ export function createApiApp(): Express {
     authorizationModule.authorizationService
   );
   const accessService = new AccessService(authorizationModule,tenancyModule,identityModule.emailDelivery);
-  app.use("/api/v1/access",accessController(accessService,identityModule));
+  app.use("/api/v1/access",accessController(accessService,identityModule,ownerSettlementsModule.settlementService,filesModule.fileAccessService));
   // Legacy operational routes require verified accounts. Self-service identities
   // use the record-scoped access endpoints, never broad staff collection APIs.
   app.use("/api/v1", async (req,res,next)=>{

@@ -4,12 +4,15 @@ import { TenantRepository, BookingRepository, VehicleRepository, CustomerReposit
 import { PLATFORM_ROLES, TENANT_SYSTEM_ROLES } from '@carhire/constants';
 import { withRecordTransaction } from '../../../../../packages/database/src/record-store';
 import { AccessService, fail } from './access.service';
+import { createOwnerSelfController } from './owner-self.controller';
+import type { OwnerSettlementsService } from '../owner-settlements/application/owner-settlements.service';
+import type { FileAccessService } from '../files/application/services/file-access.service';
 import type { IdentityModule } from '../identity/identity.module';
 import type { DevelopmentEmailDeliveryAdapter } from '../identity/application/services/email-delivery.service';
 import { BookingService } from '../bookings/application/booking.service';
 const profile=z.object({intent:z.enum(['company','renter']).optional(),site:z.string().regex(/^[a-z0-9-]+$/).max(100).optional(),companyName:z.string().trim().min(2).max(120).optional(),phone:z.string().trim().max(30).optional()}).strict();
 const invitation=z.object({scope:z.enum(['platform','tenant']),tenantId:z.string().min(1).optional(),email:z.string().email(),role:z.string(),linkedRecordId:z.string().optional()}).strict();
-export function accessController(service:AccessService,identity:IdentityModule): Router {
+export function accessController(service:AccessService,identity:IdentityModule,ownerSettlements?:OwnerSettlementsService,fileAccess?:FileAccessService): Router {
   const router=Router();
   const run=(handler:(req:any)=>Promise<any>|any)=>(req:any,res:any,next:any)=>Promise.resolve().then(()=>handler(req)).then(async data=>{
     if(req.auth && !['GET','HEAD'].includes(req.method)) await new AuditRepository().record({tenantId:req.body.tenantId||'platform-control-plane',actorId:req.auth.userId,actorType:'USER',action:`ACCESS_${req.method}_${req.path}`,resourceType:'Access',resourceId:req.params.id||req.auth.userId,metadata:{}});
@@ -17,6 +20,7 @@ export function accessController(service:AccessService,identity:IdentityModule):
   }).catch(next);
   router.get('/invitation',run(req=>{const i=service.inspect(z.string().min(32).parse(req.query.token));return {email:i.email,role:i.role,expiresAt:i.expiresAt};}));
   router.use(identity.authGuard);
+  if(ownerSettlements&&fileAccess)router.use('/owner',createOwnerSelfController(service,ownerSettlements,fileAccess));
   router.get('/context',run(req=>service.context(req.auth.userId)));
   router.put('/profile',run(req=>service.saveProfile(req.auth.userId,profile.parse(req.body))));
   router.post('/complete',run(req=>service.complete(req.auth.userId)));

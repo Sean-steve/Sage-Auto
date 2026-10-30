@@ -1,0 +1,42 @@
+name: Phase 3 — Independent Vehicle Owner Acceptance
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "apps/api/src/modules/access/**"
+      - "apps/api/src/modules/owner-settlements/**"
+      - "src/components/owner/**"
+      - "src/components/AccessApp.tsx"
+      - "packages/constants/src/access.ts"
+      - "packages/database/test/access-onboarding.test.ts"
+      - ".github/workflows/phase3-vehicle-owner.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  owner-boundaries:
+    name: Owner identity, tenant isolation, finance safety and frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 9.15.9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - name: Verify owner access and role revocation
+        run: pnpm test:access
+      - name: Verify settlement lineage and four-eyes rules
+        run: pnpm test:owner-settlements
+      - name: Verify platform/company role isolation is unchanged
+        run: pnpm test:platform-portal
+      - name: Compile portal
+        run: pnpm build

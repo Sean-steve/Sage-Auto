@@ -8,7 +8,7 @@ import { IEmailDeliveryPort } from "../../domain/ports";
 export interface CapturedEmail {
   to: string;
   subject: string;
-  type: "PASSWORD_RESET" | "EMAIL_VERIFICATION" | "INVITATION";
+  type: "PASSWORD_RESET" | "EMAIL_VERIFICATION" | "INVITATION" | "OWNER_PAYOUT_VERIFICATION";
   token: string;
   sentAt: string;
 }
@@ -57,11 +57,15 @@ export class DevelopmentEmailDeliveryAdapter implements IEmailDeliveryPort {
     this.capturedEmails.push({to:recipientEmail,subject:"Your Car Hire OS invitation",type:"INVITATION",token,sentAt:new Date().toISOString()});
   }
 
+  async sendOwnerPayoutVerificationEmail(email:string,code:string):Promise<void> {
+    this.capturedEmails.push({to:email,subject:"Verify Vehicle Owner payout destination change",type:"OWNER_PAYOUT_VERIFICATION",token:code,sentAt:new Date().toISOString()});
+  }
+
   getCapturedEmails(): CapturedEmail[] {
     return [...this.capturedEmails];
   }
 
-  getLatestTokenFor(email: string, type: "PASSWORD_RESET" | "EMAIL_VERIFICATION" | "INVITATION"): string | null {
+  getLatestTokenFor(email: string, type: "PASSWORD_RESET" | "EMAIL_VERIFICATION" | "INVITATION" | "OWNER_PAYOUT_VERIFICATION"): string | null {
     const match = [...this.capturedEmails]
       .reverse()
       .find((e) => e.to.toLowerCase() === email.toLowerCase() && e.type === type);
