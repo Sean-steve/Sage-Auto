@@ -18,7 +18,7 @@ const disputeBody = z.object({
  * Does not pass through the generic tenant-wide router and never grants
  * access to fleet, company finance, settlement approval or payment mutation.
  */
-export function createOwnerSelfController(access: AccessService, settlements: OwnerSettlementsService) {
+export function createOwnerSelfController(access: AccessService, settlements: OwnerSettlementsService): Router {
   const router = Router();
   type Request = any;
   const run = (handler:(req:Request)=>Promise<unknown>) => (req:Request,res:any,next:any) =>
