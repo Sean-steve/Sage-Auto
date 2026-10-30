@@ -5,7 +5,7 @@
  * uses the existing review-mode provisioned accounts, never production data.
  * Requires Node 24+ (native WebSocket) and a local Chrome/Chromium executable.
  *
- * Coverage: login token -> real browser render -> tenant/renter/owner/driver
+ * Coverage: login token -> real browser render -> platform/tenant/renter/owner/driver
  * portals -> permission-scoped nav -> feature opening -> browser refresh ->
  * negative Finance authorization via real HTTP.
  *
@@ -24,6 +24,7 @@ const profileDir = mkdtempSync(join(tmpdir(),'sage-stage4-browser-'));
 const credentialsFile = process.env.STAGE4_CREDENTIALS_FILE || '.review/access/accounts.json';
 const accounts = JSON.parse(readFileSync(credentialsFile,'utf8'));
 const roles = [
+  {role:'PLATFORM_OWNER',sections:['companies','plans','platformBilling','platformAnalytics','platformAudit']},
   {role:'COMPANY_OWNER', sections:['returns','finance','settlements','bookings','rentals']},
   {role:'FINANCE_MANAGER',sections:['returns','finance','settlements']},
   {role:'BOOKING_AGENT',sections:['bookings','rentals','returns']},
@@ -91,11 +92,11 @@ class Cdp {
     await waitFor(()=>this.evaluate('document.readyState==="complete" && Boolean(document.body)'),'page load');
   }
   async clickSection(label) {
-    const expr=`(()=>{const labels=document.querySelectorAll('button.sage-nav-item, nav[aria-label="Workspace navigation"] button, nav[aria-label="Vehicle owner sections"] button');
+    const expr=`(()=>{const labels=document.querySelectorAll('button.sage-nav-item, nav[aria-label="Workspace navigation"] button, nav[aria-label="Vehicle owner sections"] button, nav[aria-label="Platform navigation"] button');
       const button=[...labels].find(node=>node.textContent.trim()===${JSON.stringify(label)});
       if(!button)return false;button.click();return true;})()`;
     await waitFor(()=>this.evaluate(expr),'Navigation item '+label+' rendered and clickable',20000);
-    await waitFor(()=>this.evaluate(`(()=>{const sidebar=[...document.querySelectorAll('button.sage-nav-item, nav[aria-label="Workspace navigation"] button, nav[aria-label="Vehicle owner sections"] button')];
+    await waitFor(()=>this.evaluate(`(()=>{const sidebar=[...document.querySelectorAll('button.sage-nav-item, nav[aria-label="Workspace navigation"] button, nav[aria-label="Vehicle owner sections"] button, nav[aria-label="Platform navigation"] button')];
       return sidebar.some(button=>button.textContent.trim()===${JSON.stringify(label)} && button.getAttribute('aria-current')==='page')
     })()`),'active section '+label);
     await waitFor(()=>this.evaluate(`(()=>{const root=document.querySelector('main');
@@ -154,7 +155,7 @@ try {
     const token=login.tokens.accessToken;
     const context=await getJson(await req('/access/context',token),spec.role+' context');
     const portal=context.portals.find(entry=>spec.role==='RENTER'?
-      entry.kind==='renter':entry.kind==='tenant'&&entry.roles.includes(spec.role));
+      entry.kind==='renter':spec.role==='PLATFORM_OWNER'?entry.kind==='platform':entry.kind==='tenant'&&entry.roles.includes(spec.role));
     assert.ok(portal,'Missing portal for '+spec.role);
     const tenantId=portal.tenantId||'';
 
@@ -162,7 +163,7 @@ try {
     const finance=await req('/finance/invoices',token,tenantId);
     // Front desk has limited invoice READ, but no Finance workspace or
     // authority to seal settlements; test the actual permission matrix.
-    const financeAllowed=portal.permissions.includes('*') || portal.permissions.includes('invoice.read');
+    const financeAllowed=portal.kind==='tenant' && (portal.permissions.includes('*') || portal.permissions.includes('invoice.read'));
     assert.equal(finance.status,financeAllowed?200:403,
       spec.role+' invoice.read authorization must be server-side');
     checks++;
@@ -178,6 +179,23 @@ try {
       assert.equal(rentals.status,403,'Renter must not see tenant rental operations');
       checks++;
     }
+    if(spec.role==='COMPANY_OWNER') {
+      const status=await req('/access/owner-connections?portal='+tenantId,token);
+      assert.equal(status.status,200,'Company Owner must see saved owner portal connection state');
+      const payload=await status.json();
+      assert.ok(Array.isArray(payload.data?.items),'Owner-connection data must not be mocked');
+      checks++;
+    }
+    if(spec.role==='VEHICLE_OWNER') {
+      const connections=await req('/access/owner-connections?portal='+tenantId,token);
+      assert.equal(connections.status,403,'External owner must not list operator-wide owner accounts');
+      checks++;
+    }
+    if(spec.role==='PLATFORM_OWNER') {
+      const tenantOperational=await req('/vehicle-owners',token);
+      assert.equal(tenantOperational.status,403,'Platform staff are not tenant operators');
+      checks++;
+    }
 
     // Reuse one isolated browser with a clean role session between actors.
     await cdp.navigate(web+'/login');
@@ -190,14 +208,14 @@ try {
       return true;
     })()`);
     await cdp.call('Page.reload',{ignoreCache:true});
-    const shellClass=spec.role==='VEHICLE_OWNER'?'.owner-shell':['DRIVER','RENTER'].includes(spec.role)?'.access-workspace':'.saas-workspace';
+    const shellClass=spec.role==='PLATFORM_OWNER'?'.platform-portal':spec.role==='VEHICLE_OWNER'?'.owner-shell':['DRIVER','RENTER'].includes(spec.role)?'.access-workspace':'.saas-workspace';
     await waitFor(()=>cdp.evaluate(`Boolean(document.querySelector(${JSON.stringify(shellClass)}))`),
       spec.role+' authenticated workspace',35000);
-    await waitFor(()=>cdp.evaluate(`([...document.querySelectorAll('button.sage-nav-item, nav[aria-label="Workspace navigation"] button, nav[aria-label="Vehicle owner sections"] button')]
+    await waitFor(()=>cdp.evaluate(`([...document.querySelectorAll('button.sage-nav-item, nav[aria-label="Workspace navigation"] button, nav[aria-label="Vehicle owner sections"] button, nav[aria-label="Platform navigation"] button')]
       .some(n=>n.textContent.trim()===${JSON.stringify(portal.sections[0]?.label||'')}))`),
       spec.role+' own permission-scoped sidebar',35000);
     const allowed=new Set(portal.sections.map(item=>item.label));
-    const uiLabels=await cdp.evaluate(`([...document.querySelectorAll('button.sage-nav-item, nav[aria-label="Workspace navigation"] button, nav[aria-label="Vehicle owner sections"] button')].map(n=>n.textContent.trim()))`);
+    const uiLabels=await cdp.evaluate(`([...document.querySelectorAll('button.sage-nav-item, nav[aria-label="Workspace navigation"] button, nav[aria-label="Vehicle owner sections"] button, nav[aria-label="Platform navigation"] button')].map(n=>n.textContent.trim()))`);
     for(const sectionLabel of uiLabels) {
       assert.ok(allowed.has(sectionLabel),spec.role+' is rendered unauthorized section '+sectionLabel);
     }
