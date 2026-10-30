@@ -58,6 +58,15 @@ export function agreementDigest(agreement:{
 export class OwnerProtectedActions {
   constructor(private readonly access:AccessService){}
   private async owner(userId:string,tenantId:string){return this.access.vehicleOwnerSelf(userId,tenantId);}
+  /**
+   * Operator-only read model helper. Authentication and tenant owner-read
+   * permission MUST be enforced by the caller, never by email matching.
+   */
+  signaturesForOperator(tenantId:string,ownerId:string) {
+    return [...signatures.values()].filter(s=>s.ownerId===ownerId&&s.tenantId===tenantId)
+      .map(({agreementId,termsHash,typedName,acceptedAt,agreementVersion})=>({agreementId,termsHash,typedName,acceptedAt,agreementVersion}));
+  }
+
   async signaturesFor(userId:string,portal:string) {
     const {owner,tenantId}=await this.owner(userId,portal);
     return [...signatures.values()].filter(s=>s.ownerId===owner.id&&s.tenantId===tenantId)
