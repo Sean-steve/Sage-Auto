@@ -22,6 +22,7 @@ const SUITE_CATEGORIES: Record<string, TestSuiteResult["category"]> = {
   "authorization.test.ts": "SECURITY",
   "tenancy.test.ts": "SECURITY",
   "secure-files-and-document-storage.test.ts": "SECURITY",
+  "phase4-cross-portal-contract.test.ts": "SECURITY",
 
   // Contracts & Validation
   "api-contract-and-validation.test.ts": "CONTRACT",
