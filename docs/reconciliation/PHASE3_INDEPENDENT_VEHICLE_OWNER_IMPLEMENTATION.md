@@ -38,20 +38,20 @@ A `COMPANY_OWNER` owns a *rental business*, while a `VEHICLE_OWNER` owns vehicle
 | S06-03 | Performance | Owner cars' rental lifecycle status; *not* financial estimate |
 | S06-04 | Condition | Owner rental inspection status; media/maintenance details still to scope |
 | S06-05 | Agreements | Historical linked terms and effective dates |
-| S06-06 | Agreement details | Terms summary, share, fixed payout and deductions; actual signatures/documents not yet connected |
+| S06-06 | Agreement details | Historical terms and owner-signed SHA-256 terms-bound acceptance evidence |
 | S06-07 | Earnings | Canonical settlement periods and owner net obligations |
 | S06-08 | Statements | Owner-scoped statement/detail, balances and expense breakdown |
 | S06-09 | Payouts | Distinguishes true payable PAID from merely APPROVED |
 | S06-10 | Disputes | Existing settlement engine, guarded owner-only written disputes |
-| S06-11 | Documents | Explicitly unavailable until owner-safe file download policy |
-| S06-12 | Profile | Identity/contact and only whether payout method is configured; edits disabled pending verification |
+| S06-11 | Documents | Verified, scanned private vehicle files; owner-bound signed URLs valid for 60 seconds |
+| S06-12 | Profile | Identity/contact, payout setup status and email-verified encrypted beneficiary update |
 | S06-13 | Operator connections | Current authorized operator and invitation status; no unauthorized cross-company rollup |
 
 ## Remaining Phase 3 release blocks
 
-1. Full multi-owner browser end-to-end test with multi-tenant live records, 403/404/409 handling, role changes and suspension.
-2. Owner-visible files/maintenance, verified payout-method edit and owner document signature acceptance. Never expose tenant-global file endpoints.
-3. Owner rental listing currently caps at 1000 recent company rentals; proper owner-specific indexed pagination is required before claiming full history.
+1. Full multi-owner browser end-to-end test with independently provisioned live tenant records and legal/compliance sign-off; isolated review browser tests and negative API tests pass.
+2. Additional owner-visible maintenance evidence and operator-countersigned agreement PDF workflows remain a separate product milestone; document downloads, owner signatures and encrypted verified payout editing are implemented.
+3. Historical owner-only rental pagination is complete functionally (>1000 regression) using record-store filtering; dedicated indexed SQL pagination remains a scalability/performance enhancement.
 4. Individual currency-aware payout summaries and provider payout evidence validation still need backend QA; there are no mocked payout actions.
 5. Parent Phase 2 staging configuration is deferred by user request; merging code is not deploying or certifying the product.
 
