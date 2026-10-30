@@ -157,7 +157,7 @@ async function main() {
     const personalVehicles=await req(ownerPath+'vehicles?portal='+tenantId,ownerActor);
     assert.deepEqual(personalVehicles.map((x:any)=>x.id),['own'],'Personal fleet cannot include a different owner');
     const personalRentals=await req(ownerPath+'rentals?portal='+tenantId,ownerActor);
-    assert.deepEqual(personalRentals.map((x:any)=>x.id),['own'],'Rental activity cannot include another owner');
+    assert.deepEqual(personalRentals.items.map((x:any)=>x.id),['own'],'Rental activity cannot include another owner');
     const personalSettlements=await req(ownerPath+'settlements?portal='+tenantId,ownerActor);
     assert.deepEqual(personalSettlements.map((x:any)=>x.id),['owner-settlement'],'Owner earnings are linked-record scoped');
     const personalAgreements=await req(ownerPath+'agreements?portal='+tenantId,ownerActor);
