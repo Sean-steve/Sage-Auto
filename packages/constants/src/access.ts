@@ -33,6 +33,12 @@ export const ACCESS_SECTIONS: Record<string, {label:string; permission?:string}>
   leads:{label:'Leads & quotes',permission:'lead.read'}, drivers:{label:'Drivers',permission:'driver.read'},
   myTrips:{label:'My trips'}, myInspections:{label:'My inspections'}, myVehicles:{label:'My vehicles'}, mySettlements:{label:'My settlements'},
   myBookings:{label:'My bookings'}, profile:{label:'My profile'},
+  ownerOverview:{label:'Owner dashboard'},ownerPerformance:{label:'Rental performance'},
+  ownerCondition:{label:'Vehicle condition'},ownerAgreements:{label:'Ownership agreements'},
+  ownerAgreementDetails:{label:'Agreement details'},ownerStatements:{label:'Statements'},
+  ownerPayouts:{label:'Payout history'},ownerDisputes:{label:'Requests & disputes'},
+  ownerDocuments:{label:'Documents'},ownerAccount:{label:'Owner account'},
+  ownerOperators:{label:'Connected operators'},
 };
 
 export const ROLE_SECTIONS: Record<string,string[]> = {
@@ -52,7 +58,7 @@ export const ROLE_SECTIONS: Record<string,string[]> = {
   DRIVER_MANAGER:['drivers','rentals','returns','compliance'],
   DRIVER:['myTrips','myInspections'],
   CUSTOMER_SERVICE:['customers','bookings','rentals','returns','finance'],
-  VEHICLE_OWNER:['myVehicles','mySettlements'],
+  VEHICLE_OWNER:['ownerOverview','myVehicles','ownerPerformance','ownerCondition','ownerAgreements','ownerAgreementDetails','mySettlements','ownerStatements','ownerPayouts','ownerDisputes','ownerDocuments','ownerAccount','ownerOperators'],
   RENTER:['myBookings','profile'],
 };
 export function accessSections(roles:string[], permissions:string[]) {
