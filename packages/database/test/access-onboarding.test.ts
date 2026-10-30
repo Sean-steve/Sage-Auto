@@ -161,9 +161,9 @@ async function main() {
     assert.deepEqual(personalSettlements.map((x:any)=>x.id),['owner-settlement'],'Owner earnings are linked-record scoped');
     const personalAgreements=await req(ownerPath+'agreements?portal='+tenantId,ownerActor);
     assert.deepEqual(personalAgreements.map((x:any)=>x.id),['own-agreement'],'Only the nominated owner terms are exposed');
-    const account=await req(ownerPath+'profile?portal='+tenantId,ownerActor);
-    assert.equal(account.payoutMethodConfigured,true);
-    assert.equal(account.payoutAccountNumber,undefined,'Never expose raw payout account details');
+    const ownerProfileResponse=await req(ownerPath+'profile?portal='+tenantId,ownerActor);
+    assert.equal(ownerProfileResponse.payoutMethodConfigured,true);
+    assert.equal(ownerProfileResponse.payoutAccountNumber,undefined,'Never expose raw payout account details');
     await req(ownerPath+'settlements/other-settlement/statement?portal='+tenantId,ownerActor,undefined,'GET',403);
     await req(ownerPath+'settlements/other-settlement/dispute',ownerActor,{portal:tenantId,reason:'This amount was allocated to the wrong owner'},'POST',403);
     await req(ownerPath+'overview?portal='+tenantId,owner,undefined,'GET',403);
