@@ -50,6 +50,28 @@ export class AccessService {
     await this.user(userId,true);
     return (await this.context(userId)).portals.find(p=>p.id===id) || fail('This portal is not available to your account',403);
   }
+  /**
+   * Authoritative independent vehicle-owner identity: server verified membership,
+   * active external-owner role, currently linked record and tenant-bound active
+   * owner profile. Neither request owner IDs nor matching emails confer access.
+   */
+  async vehicleOwnerSelf(userId:string,tenantId:string) {
+    if(!tenantId) return fail('Select a rental company workspace',400);
+    const portal=await this.portal(userId,tenantId);
+    if(portal.kind!=='tenant'||portal.tenantId!==tenantId||!portal.roles.includes('VEHICLE_OWNER')) {
+      return fail('An active Vehicle Owner workspace is required',403);
+    }
+    const linked=this.links.get(`${userId}:${tenantId}:VEHICLE_OWNER`);
+    if(!linked?.recordId) return fail('Your company has not connected an owner record to this account',403);
+    let owner;
+    try { owner=await new VehicleOwnerRepository().findById(linked.recordId,tenantId); }
+    catch {return fail('Your owner record is not available in this company',403);}
+    if(!owner || owner.status!=='ACTIVE')return fail('A linked active owner profile is required',403);
+    const tenant=await this.tenants.findById(tenantId);
+    if(!tenant||tenant.status!=='ACTIVE')return fail('Rental company is not active',403);
+    return {tenantId,owner,tenant};
+  }
+
   async saveProfile(userId:string,data:AccountState) {
     await this.user(userId);
     const saved={...this.accounts.get(userId),...data}; this.accounts.set(userId,saved); return saved;
