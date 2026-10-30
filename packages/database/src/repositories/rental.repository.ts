@@ -372,6 +372,32 @@ export class RentalRepository implements IRentalRepository {
     return { items: JSON.parse(JSON.stringify(paginated)), total };
   }
 
+  /**
+   * Complete tenant- and owner-ownership-period constrained rental history.
+   * Filtering happens BEFORE pagination; no global 1000-row truncation.
+   * Historical ownership ends exclude future renters and later owners.
+   */
+  async findOwnerHistory(
+    tenantId:string,
+    ownershipPeriods: Array<{vehicleId:string;startDate:string;endDate?:string}>,
+    page:{offset:number;limit:number}
+  ):Promise<{items:Rental[];total:number;hasMore:boolean}> {
+    const groups=new Map<string,Array<{start:number;end:number}>>();
+    for(const p of ownershipPeriods){
+      const start=Date.parse(p.startDate),end=p.endDate?Date.parse(p.endDate):Number.POSITIVE_INFINITY;
+      if(!Number.isFinite(start)||!(end>start))continue;
+      const periods=groups.get(p.vehicleId)||[];periods.push({start,end});groups.set(p.vehicleId,periods);
+    }
+    const filtered=[...RentalRepository.rentalStore.values()].filter(r=>{
+      if(r.tenantId!==tenantId)return false;
+      const periods=groups.get(r.vehicleId);if(!periods?.length)return false;
+      const when=Date.parse(r.scheduledStart||r.actualStart||r.createdAt);
+      return Number.isFinite(when)&&periods.some(p=>when>=p.start&&when<p.end);
+    }).sort((a,b)=>Date.parse(b.createdAt)-Date.parse(a.createdAt)||b.id.localeCompare(a.id));
+    const items=filtered.slice(page.offset,page.offset+page.limit);
+    return {items:JSON.parse(JSON.stringify(items)),total:filtered.length,hasMore:page.offset+items.length<filtered.length};
+  }
+
   async listByTenant(tenantId: string): Promise<Rental[]> {
     const res = await this.findMany(tenantId, { limit: 1000 });
     return res.items;
