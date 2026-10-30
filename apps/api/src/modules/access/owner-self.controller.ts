@@ -48,7 +48,7 @@ export function createOwnerSelfController(access: AccessService, settlements: Ow
         status:s.status,currency:s.currency,eligibleRevenue:s.totalEligibleRentalRevenue,
         grossRevenue:s.grossRevenue,ownerGrossShare:s.ownerGrossRevenueShare,
         deductions:s.totalDeductions,netPayable:s.netPayoutAmount,
-        payableStatus:payable?.status||null,paidAt:payable?.paidAt||null,
+        payableStatus:payable?.status||null,paidAt:payable?.payoutCompletedAt||null,
         disputedAt:s.disputedAt||null,disputeReason:s.disputeReason||null,
       };
     }));
@@ -138,9 +138,13 @@ export function createOwnerSelfController(access: AccessService, settlements: Ow
 
   router.get("/settlements/:id/statement",run(async req=>{
     const {tenantId,owner}=await resolve(req,fromQuery(req));
-    return settlements.getMyStatement(tenantId,req.params.id,{
+    const statement=await settlements.getMyStatement(tenantId,req.params.id,{
       userId:req.auth.userId,ownerRecordId:owner.id,
     });
+    // Only expose account-safe information. The owner is not offered raw
+    // destination bank details, identity numbers or tax identifiers.
+    const {id,name,companyName,email,phone}=statement.owner;
+    return {...statement,owner:{id,name,companyName,email,phone}};
   }));
 
   router.post("/settlements/:id/dispute",run(async req=>{
