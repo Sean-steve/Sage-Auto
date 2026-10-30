@@ -125,6 +125,57 @@ async function main() {
       customers.set(id,{id,tenantId:company,email:id==='other'?'different@example.test':renter.email,fullName:id});
       bookings.set(id,{id,tenantId:company,customerId:id,bookingNumber:`REF-${id}`,status:'CONFIRMED',createdAt:new Date().toISOString()});
     }
+    // Phase 3 owner identity and finance isolation. Deliberately use a record
+    // email different from the login: only the active linked record grants access.
+    const ownerProfiles=createRecordStore<string,any>('vehicle-owner.repository:ownerStore');
+    ownerProfiles.set('linked-person',{id:'linked-person',tenantId,name:'Linked vehicle partner',email:'not-the-login@example.test',phone:'+254700000088',status:'ACTIVE',createdAt:new Date().toISOString(),payoutAccountNumber:'PRIVATE-BANK-ACCOUNT'});
+    ownerProfiles.set('other-person',{id:'other-person',tenantId,name:'Another partner',email:'other-partner@example.test',phone:'+254700000099',status:'ACTIVE',createdAt:new Date().toISOString()});
+    const ownerships=createRecordStore<string,any>('vehicle-ownership.repository:ownershipStore');
+    ownerships.set('own-agreement',{id:'own-agreement',tenantId,ownerId:'linked-person',vehicleId:'own',isActive:true,ownershipType:'THIRD_PARTY_OWNED',revenueSharePercent:70,
+      allowableExpenseDeductions:true,termsSnapshot:'Owner share 70%',startDate:'2026-10-01',createdAt:new Date().toISOString()});
+    ownerships.set('other-agreement',{id:'other-agreement',tenantId,ownerId:'other-person',vehicleId:'other',isActive:true,ownershipType:'THIRD_PARTY_OWNED',revenueSharePercent:50,
+      allowableExpenseDeductions:true,termsSnapshot:'Other partner agreement',startDate:'2026-10-01',createdAt:new Date().toISOString()});
+    vehicles.set('own',{...vehicles.get('own'),availabilityStatus:'AVAILABLE'});
+    rentals.set('own',{...rentals.get('own'),vehicleId:'own',scheduledStart:'2026-10-01',scheduledEnd:'2026-10-02'});
+    rentals.set('other',{...rentals.get('other'),vehicleId:'other'});
+    const settlementStore=createRecordStore<string,any>('owner-settlement.repository:store');
+    for(const [id,person] of [['owner-settlement','linked-person'],['other-settlement','other-person']]) {
+      settlementStore.set(id,{
+        id,tenantId,ownerId:person,ownerName:person,settlementNumber:id,
+        periodStart:'2026-10-01',periodEnd:'2026-10-31',currency:'KES',
+        status:'CALCULATED',calculatedAt:new Date().toISOString(),grossRevenue:'1000.0000',
+        totalEligibleRentalRevenue:'1000.0000',totalExcludedRevenue:'0.0000',
+        ownerGrossRevenueShare:'700.0000',operatorGrossRevenueShare:'300.0000',
+        totalDeductions:'0.0000',totalAdjustments:'0.0000',netPayoutAmount:'700.0000',
+      });
+    }
+    const ownerActor=actors.VEHICLE_OWNER;
+    const ownerPath='/access/owner/';
+    const records=await req(ownerPath+'overview?portal='+tenantId,ownerActor);
+    assert.equal(records.fleetCount,1,'Owner dashboard counts active linked vehicles only');
+    const personalVehicles=await req(ownerPath+'vehicles?portal='+tenantId,ownerActor);
+    assert.deepEqual(personalVehicles.map((x:any)=>x.id),['own'],'Personal fleet cannot include a different owner');
+    const personalRentals=await req(ownerPath+'rentals?portal='+tenantId,ownerActor);
+    assert.deepEqual(personalRentals.map((x:any)=>x.id),['own'],'Rental activity cannot include another owner');
+    const personalSettlements=await req(ownerPath+'settlements?portal='+tenantId,ownerActor);
+    assert.deepEqual(personalSettlements.map((x:any)=>x.id),['owner-settlement'],'Owner earnings are linked-record scoped');
+    const personalAgreements=await req(ownerPath+'agreements?portal='+tenantId,ownerActor);
+    assert.deepEqual(personalAgreements.map((x:any)=>x.id),['own-agreement'],'Only the nominated owner terms are exposed');
+    const account=await req(ownerPath+'profile?portal='+tenantId,ownerActor);
+    assert.equal(account.payoutMethodConfigured,true);
+    assert.equal(account.payoutAccountNumber,undefined,'Never expose raw payout account details');
+    await req(ownerPath+'settlements/other-settlement/statement?portal='+tenantId,ownerActor,undefined,'GET',403);
+    await req(ownerPath+'settlements/other-settlement/dispute',ownerActor,{portal:tenantId,reason:'This amount was allocated to the wrong owner'},'POST',403);
+    await req(ownerPath+'overview?portal='+tenantId,owner,undefined,'GET',403);
+    await req(ownerPath+'overview?portal='+tenantId,renter,undefined,'GET',403);
+    await req(ownerPath+'overview?portal='+otherContext.portals[0].id,ownerActor,undefined,'GET',403);
+    await req('/owner-settlements/mine',ownerActor,undefined,'GET',403,tenantId);
+    // Link removal must invalidate the same unexpired login token immediately.
+    const ownerMember=(await req('/access/team?scope=tenant&tenantId='+tenantId,owner)).find((x:any)=>x.email===ownerActor.email);
+    await req('/access/team/'+ownerMember.id,owner,{scope:'tenant',tenantId,linkedRecordId:null},'PATCH');
+    await req(ownerPath+'overview?portal='+tenantId,ownerActor,undefined,'GET',403);
+    await req('/access/team/'+ownerMember.id,owner,{scope:'tenant',tenantId,linkedRecordId:'linked-person'},'PATCH');
+    assert.equal((await req(ownerPath+'overview?portal='+tenantId,ownerActor)).fleetCount,1,'Relinking requires fresh server authorization');
     for(const [role,section] of [['DRIVER','myTrips'],['DRIVER','myInspections'],['VEHICLE_OWNER','myVehicles']]) {
       const data=await req(`/access/records?portal=${tenantId}&section=${section}`,actors[role]);
       assert.deepEqual(data.rows.map((r:any)=>r.id),['own'],`${role} ${section} linked-only records`);
