@@ -94,9 +94,9 @@ export const VehicleOwnersView:React.FC=()=>{
     {loading&&<div role="status" className="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-600">Loading saved vehicle-owner and agreement records…</div>}
     {error&&<div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">{error} <button className="ml-2 font-bold underline" onClick={()=>setRevision(n=>n+1)}>Retry</button></div>}
     {connectionError&&<div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">Partner portal status unavailable: {connectionError}. No connected status is assumed.</div>}
-    <section className="grid gap-3 sm:grid-cols-3"><Metric label="Registered owners" value={tenantOwners.length}/><Metric label="Active agreements" value={ownerships.filter((o:any)=>o.tenantId===activeTenantId&&o.isActive).length}/><Metric label="Partner vehicles" value={tenantVehicles.filter(v=>Boolean(v.ownerId)).length}/></section>
+    {!loading&&!error&&<section className="grid gap-3 sm:grid-cols-3"><Metric label="Registered owners" value={tenantOwners.length}/><Metric label="Active agreements" value={ownerships.filter((o:any)=>o.tenantId===activeTenantId&&o.isActive).length}/><Metric label="Partner vehicles" value={tenantVehicles.filter(v=>Boolean(v.ownerId)).length}/></section>}
 
-    <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">{tenantOwners.map(owner=>{
+    {!loading&&!error&&<div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">{tenantOwners.map(owner=>{
       const ownedVehicles=tenantVehicles.filter(v=>aliasIds(owner).includes(v.ownerId));
       const agreements=activeForOwner(owner);
       const primary=agreements[0];
@@ -118,7 +118,7 @@ export const VehicleOwnersView:React.FC=()=>{
         </div>
         <div className="mt-5 flex flex-wrap items-center justify-between gap-2 border-t pt-4"><button disabled={restoration} onClick={()=>{setSelectedOwnerId(owner.id);setCurrentView("settlements");}} className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-700"><FileSpreadsheet size={14}/>Statements</button><div className="flex flex-wrap gap-2"><button disabled={restoration} onClick={()=>setEditingOwnerId(owner.id)} className="inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-black text-slate-700 disabled:opacity-40"><Pencil size={13}/>Edit Owner</button><button disabled={restoration||!ownedVehicles.length} onClick={()=>setManagingOwnerId(owner.id)} className="rounded-xl border px-3 py-2 text-xs font-black text-slate-700 disabled:opacity-40">Manage Terms</button></div></div>
       </article>;
-    })}</div>
+    })}</div>}
 
     {!loading&&!error&&!tenantOwners.length&&<div className="rounded-3xl border border-dashed bg-white p-12 text-center"><WalletCards className="mx-auto text-slate-300"/><h2 className="mt-3 font-black">No vehicle owners registered</h2><p className="mt-1 text-sm text-slate-500">Add an owner when a vehicle is investor-owned, leased, managed or under a revenue-share agreement.</p></div>}
 
