@@ -132,6 +132,10 @@ export class ProductionEmailDeliveryAdapter implements IEmailDeliveryPort {
     );
   }
 
+  async sendOwnerPayoutVerificationEmail(email:string,code:string):Promise<void> {
+    await this.send(email,"Verify payout destination change",`Someone requested a change to your Sage Auto vehicle-owner payout destination.\n\nVerification code: ${code}\nExpires in 10 minutes. This code is only for this change. If you did not request it, do not share it and contact your rental company.\n\nSage Auto will never ask for your M-Pesa PIN or bank password.`);
+  }
+
   async sendInvitationEmail(email:string,token:string):Promise<void> {
     await this.send(
       email,
