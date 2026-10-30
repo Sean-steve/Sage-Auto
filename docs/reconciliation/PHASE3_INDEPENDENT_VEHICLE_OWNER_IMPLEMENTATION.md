@@ -54,3 +54,33 @@ A `COMPANY_OWNER` owns a *rental business*, while a `VEHICLE_OWNER` owns vehicle
 3. Owner rental listing currently caps at 1000 recent company rentals; proper owner-specific indexed pagination is required before claiming full history.
 4. Individual currency-aware payout summaries and provider payout evidence validation still need backend QA; there are no mocked payout actions.
 5. Parent Phase 2 staging configuration is deferred by user request; merging code is not deploying or certifying the product.
+
+## Phase 3 completion — secure owner operations (2026-10-30)
+
+### Secure documents
+- The owner documents index uses `VehicleDocumentRepository` metadata for **currently assigned** owner vehicles and only permits verified documents with `fileId` pointing to an `ACTIVE`, malware-scanned `CLEAN`, private file in the same tenant.
+- The private document download route reauthorizes the exact owner-to-vehicle link and delegates to the canonical `FileAccessService` audit plus object storage driver. Download URLs expire in **60 seconds**. Arbitrary file URLs, storage keys, unverified/quarantined/restricted files and other owners' records are never published.
+- Operator upload and malware scanning continue using the existing Files module. No separate owner-side unscanned upload bypass has been added.
+
+### E-signature for vehicle ownership agreements
+- Owner signs the **exact existing** contract snapshot and version using explicit electronic-consent checkbox and typed legal name. The server verifies name, current owner, active historical agreement, nonempty terms, SHA-256 terms digest and the logged-in owner membership.
+- Consent receipt is stored durably with actor, time, hash and agreement version; replay is idempotent, signature cannot be modified through the owner API, and altered/stale terms are refused. Existing agreements are not re-priced or modified by signing.
+- This is owner acceptance evidence, **not** a claim that a counterpart operator e-signature or regulator-qualified signature platform has been implemented.
+
+### Verified payout destination changes
+- `POST /api/v1/access/owner/payout/request-change` stores an encrypted pending beneficiary change and sends an out-of-band six-digit email challenge to the **verified login account**, never to a client-provided address.
+- `POST .../payout/verify-change` is bound to the same current owner/tenant/user, has **10-minute expiry**, maximum **five** attempts, an atomic one-time commit and a non-sensitive audit trail. It does not create a payment, mark obligations PAID or release a payout.
+- Configure `OWNER_PAYOUT_ENCRYPTION_KEY` with a **unique, random, 32+ character secret** in the runtime environment. A missing or unsuitable key fails closed. The pending payload is AES-256-GCM encrypted; the OTP is SHA-256 hashed. Postmark and SendGrid send real verification emails outside review mode.
+- Bank and M-Pesa destinations are never returned in the API response; account details in a statement are redacted.
+
+### Historical rental pagination
+- New repository `findOwnerHistory` applies **tenant and owner-specific historical vehicle agreement windows before pagination**. It returns `{items,total,offset,limit,hasMore}` at the owner API boundary with max page size 100.
+- A former owner must not see rentals after an agreement ended; a current owner must not see another owner's earlier rentals just because the vehicle was reassigned. No hidden 1000-rental limit.
+- The owner UI has previous/next controls; inspections are requested in owner-authorized rental-page batches.
+
+### Automated acceptance
+- `packages/database/test/access-onboarding.test.ts` verifies legitimate owner access and negative other-owner/tenant access, masked payout details, agreement signing and tamper replay, payout email challenge, secure file authorization, and a >1000-rental paginated history.
+- CI pipelines include Phase 3 tests, restoration regressions, SaaS owner regression, Stage 4–7 browser/integration gates, finance safety and the main canonical suite. Staging and production remain intentionally undeployed.
+
+### Future production obligations
+- Production encryption key, actual mailbox delivery, legal policy acceptance/countersign options and private S3/MinIO/malware scanner must be configured and verified before production release; do **not** treat the merge to main as production deployment certification.
