@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 async function main() {
   const dir=mkdtempSync(join(tmpdir(),'carhire-access-'));
-  Object.assign(process.env,{SQLITE_PATH:join(dir,'test.sqlite'),NODE_ENV:'test',REDIS_SIMULATED:'true',ACCESS_REVIEW_MODE:'true',PLATFORM_SETUP_TOKEN:'isolated-test-setup-key-with-32-characters'});
+  Object.assign(process.env,{SQLITE_PATH:join(dir,'test.sqlite'),NODE_ENV:'test',REDIS_SIMULATED:'true',ACCESS_REVIEW_MODE:'true',PLATFORM_SETUP_TOKEN:'isolated-test-setup-key-with-32-characters',OWNER_PAYOUT_ENCRYPTION_KEY:'OwnerPayoutTestEncryptionKey-IncrediblyLong_2026-DoNotUseInProduction'});
   const {createApiApp}=await import('../../../apps/api/src/app.module');
   const {PLATFORM_ROLES,TENANT_SYSTEM_ROLES}=await import('@carhire/constants');
   const {createRecordStore}=await import('../src/record-store');
@@ -176,6 +176,75 @@ async function main() {
     await req(ownerPath+'overview?portal='+tenantId,renter,undefined,'GET',403);
     await req(ownerPath+'overview?portal='+otherContext.portals[0].id,ownerActor,undefined,'GET',403);
     await req('/owner-settlements/mine',ownerActor,undefined,'GET',403,tenantId);
+    // Secure owner-only documents: never list or sign unrelated documents,
+    // unverified files, infected objects or arbitrary external file URLs.
+    const files=createRecordStore<string,any>('file.repository:store');
+    const docs=createRecordStore<string,any>('vehicle-document.repository:documentStore');
+    const nowIso=new Date().toISOString();
+    for(const [id,vehicleId] of [['owner-file','own'],['foreign-owner-file','other'],['quarantined-file','own']]){
+      files.set(id,{id,tenantId,storageProvider:'s3',bucket:'review-files',objectKey:id,
+        originalFilename:id+'.pdf',sanitizedFilename:id+'.pdf',contentType:'application/pdf',sizeBytes:128,
+        checksumAlgorithm:'sha256',checksum:'review',uploadedBy:owner.id,createdAt:nowIso,version:1,
+        status:id==='quarantined-file'?'QUARANTINED':'ACTIVE',
+        scanStatus:id==='quarantined-file'?'PENDING':'CLEAN',classification:'PRIVATE'});
+      docs.set('doc-'+id,{id:'doc-'+id,tenantId,vehicleId,documentType:'LEASE_AGREEMENT',fileId:id,
+        verificationStatus:'VERIFIED',status:'VALID',createdAt:nowIso});
+    }
+    const verifiedDocs=await req(ownerPath+'documents?portal='+tenantId,ownerActor);
+    assert.deepEqual(verifiedDocs.map((x:any)=>x.id),['doc-owner-file']);
+    assert.equal(verifiedDocs[0].fileId,undefined,'Storage keys and file IDs are never disclosed in owner list');
+    const ticket=await req(ownerPath+'documents/doc-owner-file/download?portal='+tenantId,ownerActor);
+    assert.ok(ticket.downloadUrl&&Date.parse(ticket.expiresAt)>Date.now(),'Owner can request short-lived private link');
+    assert.ok(Date.parse(ticket.expiresAt)<=Date.now()+61000,'Download URL must expire in at most 60 seconds');
+    await req(ownerPath+'documents/doc-foreign-owner-file/download?portal='+tenantId,ownerActor,undefined,'GET',403);
+    await req(ownerPath+'documents/doc-quarantined-file/download?portal='+tenantId,ownerActor,undefined,'GET',403);
+    await req(ownerPath+'documents/doc-owner-file/download?portal='+tenantId,renter,undefined,'GET',403);
+    // Signed ownership acknowledgment binds authenticated principal and terms
+    // hash, and cannot be forged for another person or stale terms revision.
+    const agreementsForSigning=await req(ownerPath+'agreements?portal='+tenantId,ownerActor);
+    const ownAgreement=agreementsForSigning.find((a:any)=>a.id==='own-agreement');
+    assert.match(ownAgreement.termsHash,/^[0-9a-f]{64}$/);
+    const consent={portal:tenantId,typedName:'Linked vehicle partner',consent:true,termsHash:ownAgreement.termsHash};
+    const signature=await req(ownerPath+'agreements/own-agreement/sign',ownerActor,consent);
+    assert.equal(signature.alreadyAccepted,false);
+    const replay=await req(ownerPath+'agreements/own-agreement/sign',ownerActor,consent);
+    assert.equal(replay.alreadyAccepted,true,'Agreement acceptance must be idempotent');
+    await req(ownerPath+'agreements/other-agreement/sign',ownerActor,consent,'POST',403);
+    await req(ownerPath+'agreements/own-agreement/sign',ownerActor,{...consent,termsHash:'f'.repeat(64)},'POST',409);
+    await req(ownerPath+'agreements/own-agreement/sign',renter,consent,'POST',403);
+    assert.equal((await req(ownerPath+'agreements?portal='+tenantId,ownerActor))[0].signature.termsHash,ownAgreement.termsHash);
+    // Payout changes require out-of-band email verification and may not be
+    // confirmed with only an authenticated session or an owner ID.
+    const originalOwnerBank=ownerProfiles.get('linked-person').payoutAccountNumber;
+    const request=await req(ownerPath+'payout/request-change',ownerActor,{portal:tenantId,kind:'MPESA',mpesaNumber:'+254700001234'});
+    assert.equal(request.verificationSent,true);
+    assert.equal(request.code,undefined,'Never return OTP to the browser');
+    assert.equal(ownerProfiles.get('linked-person').payoutAccountNumber,originalOwnerBank,'Request alone must not change beneficiary');
+    await req(ownerPath+'payout/verify-change',ownerActor,{portal:tenantId,code:'999999'},'POST',403);
+    const emailed=(await req('/access/review-mail',ownerActor)).filter((mail:any)=>mail.type==='OWNER_PAYOUT_VERIFICATION').at(-1);
+    assert.ok(emailed?.token,'Verification challenge goes to linked login email, not the owner record email');
+    assert.equal((await req(ownerPath+'payout/verify-change',ownerActor,{portal:tenantId,code:emailed.token})).verified,true);
+    assert.equal(ownerProfiles.get('linked-person').payoutMpesaNumber,'+254700001234');
+    assert.equal(ownerProfiles.get('linked-person').payoutAccountNumber,undefined,'Verified method change clears prior bank destination');
+    await req(ownerPath+'payout/verify-change',ownerActor,{portal:tenantId,code:emailed.token},'POST',409);
+    await req(ownerPath+'payout/request-change',renter,{portal:tenantId,kind:'MPESA',mpesaNumber:'+254700001234'},'POST',403);
+    // Full owner history must page over >1000 saved rentals with historical
+    // ownership filtering BEFORE pagination. Reassignment ends visibility.
+    for(let i=0;i<1010;i++){
+      rentals.set('history-'+i,{id:'history-'+i,tenantId,vehicleId:'own',rentalNumber:'OWNER-'+i,state:'COMPLETED',
+        scheduledStart:'2026-10-14',scheduledEnd:'2026-10-15',createdAt:new Date(Date.now()-i*1000).toISOString()});
+    }
+    rentals.set('later-owner',{id:'later-owner',tenantId,vehicleId:'other',rentalNumber:'LATER-OWNER',state:'COMPLETED',
+      scheduledStart:'2026-10-14',scheduledEnd:'2026-10-15',createdAt:nowIso});
+    const firstPage=await req(ownerPath+'rentals?portal='+tenantId+'&offset=0&limit=100',ownerActor);
+    assert.equal(firstPage.total,1011);
+    assert.equal(firstPage.items.length,100);
+    assert.equal(firstPage.hasMore,true);
+    const lastPage=await req(ownerPath+'rentals?portal='+tenantId+'&offset=1000&limit=100',ownerActor);
+    assert.equal(lastPage.items.length,11,'Late pages must not vanish after first thousand rentals');
+    assert.ok(lastPage.items.every((item:any)=>item.registration==='own'));
+    await req(ownerPath+'rentals?portal='+tenantId+'&offset=-1&limit=100',ownerActor,undefined,'GET',400);
+
     // Link removal must invalidate the same unexpired login token immediately.
     const ownerMember=(await req('/access/team?scope=tenant&tenantId='+tenantId,owner)).find((x:any)=>x.email===ownerActor.email);
     await req('/access/team/'+ownerMember.id,owner,{scope:'tenant',tenantId,linkedRecordId:null},'PATCH');
