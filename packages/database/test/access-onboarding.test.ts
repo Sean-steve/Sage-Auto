@@ -128,7 +128,7 @@ async function main() {
     // Phase 3 owner identity and finance isolation. Deliberately use a record
     // email different from the login: only the active linked record grants access.
     const ownerProfiles=createRecordStore<string,any>('vehicle-owner.repository:ownerStore');
-    ownerProfiles.set('linked-person',{id:'linked-person',tenantId,name:'Linked vehicle partner',email:'not-the-login@example.test',phone:'+254700000088',status:'ACTIVE',createdAt:new Date().toISOString(),payoutAccountNumber:'PRIVATE-BANK-ACCOUNT'});
+    ownerProfiles.set('linked-person',{id:'linked-person',tenantId,name:'Linked vehicle partner',email:'not-the-login@example.test',phone:'+254700000088',status:'ACTIVE',createdAt:new Date().toISOString(),payoutBank:'TEST BANK',payoutAccountNumber:'PRIVATE-BANK-ACCOUNT'});
     ownerProfiles.set('other-person',{id:'other-person',tenantId,name:'Another partner',email:'other-partner@example.test',phone:'+254700000099',status:'ACTIVE',createdAt:new Date().toISOString()});
     const ownerships=createRecordStore<string,any>('vehicle-ownership.repository:ownershipStore');
     ownerships.set('own-agreement',{id:'own-agreement',tenantId,ownerId:'linked-person',vehicleId:'own',isActive:true,ownershipType:'THIRD_PARTY_OWNED',revenueSharePercent:70,
