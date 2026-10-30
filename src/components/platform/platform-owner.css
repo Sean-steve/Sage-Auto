@@ -1,0 +1,104 @@
+/* Sage Auto SaaS control plane — premium, responsive, and deliberately truthful. */
+.access-app.platform-workspace-active {
+  --platform-navy:#101c2d;
+  --platform-teal:#047f79;
+  --platform-border:#e3eaf0;
+  --platform-muted:#657487;
+  background:#f4f7fa;
+}
+.access-app.platform-workspace-active>.access-header{padding:9px 3%;min-height:54px}
+.platform-portal{display:grid;grid-template-columns:264px minmax(0,1fr);min-height:calc(100dvh - 54px);font-family:Manrope,"DM Sans",Inter,"Segoe UI",Arial,sans-serif;font-size:14px;color:#172538}
+.platform-portal *{box-sizing:border-box}
+.platform-sidebar{background:#101c2d;color:#dbe5ed;display:flex;flex-direction:column;min-height:100%;padding:24px 16px 18px;position:sticky;top:0;max-height:calc(100dvh - 54px);overflow-y:auto}
+.platform-brand{display:flex;align-items:center;gap:12px;padding:3px 12px 25px;border-bottom:1px solid #29394b;margin-bottom:18px}
+.platform-brand-mark{width:38px;height:38px;border-radius:12px;background:#159b91;color:white;display:grid;place-items:center;font-size:22px;font-weight:800}
+.platform-brand strong{display:block;color:white;font-size:16px;letter-spacing:-.035em}
+.platform-brand small{display:block;font-size:11px;opacity:.75;letter-spacing:.06em;text-transform:uppercase}
+.platform-sidebar nav{flex:1}
+.platform-sidebar nav section{margin:0 0 16px}
+.platform-sidebar nav section>p{margin:0;padding:0 13px 9px;color:#92a5b7!important;text-transform:uppercase;letter-spacing:.11em;font-size:10px;font-weight:800}
+.platform-sidebar nav button,.platform-switch{display:flex;align-items:center;gap:13px;border:0;background:transparent;color:#c8d5e2;border-radius:10px;padding:11px 13px;min-height:41px;width:100%;text-align:left;font-size:13px;font-weight:600;line-height:1.2;transition:background .15s}
+.platform-sidebar nav button svg{width:17px;height:17px;flex:none;color:#9aafc1}
+.platform-sidebar nav button:hover,.platform-switch:hover{background:#20344a;color:white}
+.platform-sidebar nav button[aria-current="page"]{background:#1c827e;color:white;box-shadow:0 2px 9px #081a2650}
+.platform-sidebar nav button[aria-current="page"] svg{color:white}
+.platform-switch{margin-top:auto;border-top:1px solid #29394b;border-radius:0;padding-top:19px;cursor:pointer}
+.platform-main{min-width:0;background:#f4f7fa}
+.platform-toolbar{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:27px clamp(18px,3.5vw,48px) 23px;background:white;border-bottom:1px solid var(--platform-border)}
+.platform-toolbar h1,.access-app.platform-workspace-active .platform-toolbar h1{font-size:clamp(22px,2.3vw,31px);font-weight:800;line-height:1.12;letter-spacing:-.05em;margin:7px 0 7px;color:#142238}
+.platform-toolbar p{font-size:12px;margin:0;color:var(--platform-muted)}
+.platform-overline{text-transform:uppercase;font-weight:800;font-size:10px;letter-spacing:.18em;color:#0a8c84}
+.platform-toolbar-actions{display:flex;align-items:center;gap:9px}
+.platform-toolbar-actions button{background:white;border:1px solid var(--platform-border);border-radius:9px;padding:9px 12px;min-height:39px;display:inline-flex;gap:8px;align-items:center}
+.platform-toolbar-actions button:hover{background:#eef8f7}
+.platform-role{display:flex;align-items:center;gap:7px;font-size:11px;font-weight:750;color:#036c60;background:#e6f7f2;border-radius:20px;padding:9px 12px}
+.platform-content{max-width:1540px;margin:auto;padding:24px clamp(16px,3.5vw,48px) 60px}
+.platform-stack{display:grid;gap:19px}
+.platform-facts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+.platform-fact{min-height:126px;border:1px solid var(--platform-border);border-radius:14px;background:white;box-shadow:0 2px 12px #102b3e08;padding:18px}
+.platform-fact>span{display:block;text-transform:uppercase;font-size:10px;color:#748394;letter-spacing:.09em;font-weight:800;line-height:1.5}
+.platform-fact>strong{display:block;font-size:clamp(23px,2vw,30px);color:#142b3c;font-weight:800;letter-spacing:-.055em;padding-top:10px;line-height:1.15}
+.platform-fact>small{color:#7a8798;display:block;font-size:11px;padding-top:8px}
+.platform-panel{background:white;border:1px solid var(--platform-border);border-radius:14px;overflow:hidden;box-shadow:0 2px 18px #0e24370a}
+.platform-panel-head{padding:21px 24px 18px;display:flex;gap:16px;align-items:center;justify-content:space-between;border-bottom:1px solid #edf0f4}
+.access-app.platform-workspace-active .platform-panel h2{font-size:17px;font-weight:800;letter-spacing:-.03em;line-height:1.3;margin:0 0 4px}
+.platform-panel-head p{font-size:12px;color:#798798!important;max-width:70ch;margin:0!important}
+.platform-panel-head input{width:min(100%,250px);margin:0;min-height:37px}
+.platform-table-wrap{overflow-x:auto}
+.platform-table-wrap table{width:100%;border-collapse:collapse;min-width:650px;text-align:left}
+.platform-table-wrap th{text-transform:uppercase;font-size:10px;letter-spacing:.095em;font-weight:800;color:#718092;padding:13px 20px;background:#f7f9fb;white-space:nowrap}
+.platform-table-wrap td{padding:15px 20px;border-top:1px solid #edf0f4;color:#344255;font-size:12px;line-height:1.45;vertical-align:middle}
+.platform-table-wrap tbody tr:hover td{background:#fafdfd}
+.platform-table-wrap td strong{font-size:12px;display:block;color:#162b3e}
+.platform-table-wrap td small{display:block;color:#8291a0;margin-top:4px;overflow-wrap:anywhere;font-size:11px}
+.platform-badge{font-size:10px;display:inline-flex;align-items:center;font-weight:750;padding:5px 9px;border-radius:18px;letter-spacing:.035em}
+.platform-badge.success{background:#e1f5ec;color:#087b53}
+.platform-badge.danger{background:#fff0f0;color:#ac3442}
+.platform-badge.neutral{background:#edf2f7;color:#536477}
+.platform-inline{background:transparent!important;border:0!important;padding:4px 0!important;color:#05867e!important;font-size:12px;font-weight:800!important;display:inline-flex;gap:4px;align-items:center;white-space:nowrap;min-height:auto!important}
+.platform-inline:hover{text-decoration:underline}
+.platform-empty{padding:24px;color:#718092;font-size:13px}
+.platform-tabs{display:flex;gap:4px;flex-wrap:wrap;border-bottom:1px solid var(--platform-border);margin:0 0 19px}
+.platform-tabs button{border:0;border-bottom:2px solid transparent;background:transparent;font-size:12px;color:#758496;padding:11px 15px 14px;font-weight:750}
+.platform-tabs button[aria-selected="true"]{color:#047f79;border-bottom-color:#047f79}
+.platform-loading,.platform-state{padding:50px 24px;display:flex;align-items:center;justify-content:center;gap:14px;color:#6c7a8c}
+.platform-state{flex-direction:column;text-align:center;min-height:260px}
+.platform-state svg{color:#b26c27}
+.platform-state h3{font-size:17px;font-weight:800;margin:0}
+.platform-state p{max-width:60ch;margin:0;color:#657487;font-size:13px;line-height:1.55}
+.platform-error,.platform-success,.platform-warning{display:flex;align-items:center;gap:10px;border-radius:10px;border:1px solid #f4cdcd;background:#fff6f6;color:#a42e35;padding:14px 16px;margin-bottom:18px;font-weight:650;font-size:12px}
+.platform-success{background:#eaf8f3;color:#06704e;border-color:#a8dfcc}
+.platform-warning{background:#fff9ed;color:#885411;border-color:#f0d8aa}
+.platform-kv{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));margin:0;padding:12px 24px;gap:0 28px}
+.platform-kv>div{padding:14px 0;border-bottom:1px solid #eef1f5;min-width:0}
+.platform-kv dt{font-size:11px;color:#748394;font-weight:700;text-transform:capitalize}
+.platform-kv dd{font-size:14px;font-weight:750;color:#20354b;margin:5px 0 0;overflow-wrap:anywhere}
+.platform-form{padding:24px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 18px}
+.platform-form label,.platform-modal label,.platform-small-label{display:block;font-size:12px;font-weight:750;color:#475569}
+.platform-form input,.platform-form select,.platform-modal textarea,.platform-small-label select{margin-top:6px;width:100%;min-height:40px;border:1px solid #cbd5df;border-radius:8px;background:white;padding:9px 11px;font:inherit;color:#263847}
+.platform-form .platform-primary{grid-column:1/-1;justify-self:start}
+.platform-small-label{padding:20px 24px;max-width:420px}
+.platform-primary,.platform-outline,.platform-danger{border:1px solid #0c827b;border-radius:9px;background:#0c827b;color:white;font-weight:800;font-size:12px;min-height:39px;padding:9px 14px;display:inline-flex;align-items:center;justify-content:center;gap:7px;cursor:pointer}
+.platform-outline{border-color:#d1dae2;background:white;color:#263847}
+.platform-danger{background:#a72f3c;border-color:#a72f3c}
+.platform-primary:hover{background:#076a64}
+.platform-outline:hover{background:#f2f6f8}
+.platform-action-row{display:flex;flex-wrap:wrap;gap:10px;padding:18px 24px}
+.platform-fine-print{font-size:11px!important;color:#7c8795!important;line-height:1.5;max-width:none!important;padding:16px 24px;margin:0!important}
+.platform-shortcuts{padding:17px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.platform-shortcuts button{display:flex;align-items:center;gap:11px;min-height:65px;border-radius:10px;border:1px solid #e5eaef;background:#fbfcfd;padding:14px;text-align:left;font-size:13px;font-weight:800;color:#203146}
+.platform-shortcuts button svg{width:18px;flex:none;color:#087f79}
+.platform-shortcuts button span{flex:1}
+.platform-shortcuts button:hover{border-color:#0c9f92;background:#f1f9f7}
+.platform-modal-backdrop{position:fixed;inset:0;background:#0c1e30ab;z-index:250;display:flex;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(4px)}
+.platform-modal{background:white;border-radius:16px;box-shadow:0 32px 80px #041c2840;max-width:520px;width:100%;padding:24px;color:#23344a}
+.platform-modal header{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.platform-modal h2{font-size:21px!important;margin:0!important}
+.platform-modal header button{border:0;background:none}
+.platform-modal p{font-size:13px;color:#657487}
+.platform-modal textarea{min-height:100px;margin-top:7px}
+.platform-modal .platform-action-row{padding:19px 0 0;justify-content:flex-end}
+.platform-mobile-toggle{display:none}
+@media(max-width:1100px){.platform-portal{grid-template-columns:222px minmax(0,1fr)}.platform-facts{grid-template-columns:repeat(2,minmax(0,1fr))}.platform-role{display:none}}
+@media(max-width:760px){.platform-portal{display:block}.platform-mobile-toggle{display:flex;align-items:center;gap:9px;background:#101c2d;color:white;border:0;width:100%;padding:12px 18px;font-weight:750;text-align:left}.platform-sidebar{position:absolute;z-index:90;top:auto;left:0;width:min(310px,88vw);max-height:75dvh;box-shadow:12px 18px 32px #05192a30;display:none}.platform-sidebar.open{display:flex}.platform-toolbar{padding:20px 16px;align-items:flex-start;flex-direction:column}.platform-toolbar-actions{width:100%;justify-content:flex-end}.platform-content{padding:18px 12px 40px}.platform-facts{gap:9px}.platform-fact{padding:14px;min-height:110px}.platform-fact>strong{font-size:24px}.platform-panel-head{padding:17px;flex-wrap:wrap}.platform-kv{grid-template-columns:1fr;padding:12px 17px}.platform-form{grid-template-columns:1fr;padding:17px}.platform-shortcuts{grid-template-columns:1fr}.platform-modal{padding:18px}}
+@media(prefers-reduced-motion:reduce){.platform-portal *{scroll-behavior:auto!important;transition:none!important;animation:none!important}}

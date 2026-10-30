@@ -330,6 +330,7 @@ export function createApiApp(): Express {
     outboxRepo,
     userRepo: new UserRepository(),
     platformAuthService: authorizationModule.platformAuthorizationService,
+    accessService,
   });
   app.use("/api/v1/platform", authGuard, platformAdminModule.router);
 

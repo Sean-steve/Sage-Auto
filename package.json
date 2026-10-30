@@ -42,6 +42,7 @@
     "test:analytics": "tsx packages/database/test/analytics-and-reporting.test.ts",
     "test:saas-analytics": "tsx packages/database/test/platform-saas-analytics.test.ts",
     "test:platform-admin": "tsx packages/database/test/platform-admin-command-center.test.ts",
+    "test:platform-portal": "tsx packages/database/test/phase2-platform-portal-navigation.test.ts",
     "test:sprint39": "tsx packages/database/test/run-all-sprint39-tests.ts",
     "test:sprint41": "tsx packages/database/test/deployment-and-cicd-architecture.test.ts",
     "test:sprint42": "tsx packages/observability/test/observability-and-operations.test.ts",

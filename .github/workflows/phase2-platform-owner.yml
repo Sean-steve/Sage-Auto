@@ -1,0 +1,47 @@
+name: SaaS Platform Owner — Phase 2 Acceptance
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "src/components/AccessApp.tsx"
+      - "src/components/platform/**"
+      - "packages/constants/src/access.ts"
+      - "packages/database/test/phase2-platform-portal-navigation.test.ts"
+      - "apps/api/src/modules/platform-admin/**"
+      - "package.json"
+      - ".github/workflows/phase2-platform-owner.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  portal-contract-and-authorization:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9.15.9
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Typecheck React and backend
+        run: pnpm typecheck
+      - name: Verify platform portal navigation and permissions
+        run: pnpm test:platform-portal
+      - name: Verify role onboarding and tenant isolation
+        run: pnpm test:access
+      - name: Verify platform tenant and operations contracts
+        run: pnpm test:platform-admin
+      - name: Verify SaaS metrics and revenue contracts
+        run: pnpm test:saas-analytics
+      - name: Build production frontend
+        run: pnpm build

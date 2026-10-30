@@ -16,6 +16,7 @@ import type {
   IUserRepository,
 } from "@carhire/database";
 import type { PlatformAuthorizationService } from "../authorization/application/services/platform-authorization.service";
+import type { AccessService } from "../access/access.service";
 import { PlatformTenantLifecycleService } from "./application/services/platform-tenant-lifecycle.service";
 import { PlatformOperationsService } from "./application/services/platform-operations.service";
 import { createPlatformTenantsController } from "./presentation/platform-tenants.controller";
@@ -31,6 +32,7 @@ export interface PlatformAdminModuleDependencies {
   outboxRepo: IOutboxRepository;
   userRepo: IUserRepository;
   platformAuthService: PlatformAuthorizationService;
+  accessService?: AccessService;
 }
 
 export interface PlatformAdminModule {
@@ -63,7 +65,8 @@ export function createPlatformAdminModule(
 
   const tenantsRouter = createPlatformTenantsController(
     tenantLifecycleService,
-    deps.platformAuthService
+    deps.platformAuthService,
+    deps.accessService
   );
 
   const operationsRouter = createPlatformOperationsController(

@@ -1,0 +1,25 @@
+name: SaaS Owner — Real Staging Certification
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-staging:
+    name: Live staging owner, company and billing role checks
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Fail closed if real staging is not configured
+        env:
+          SAGE_STAGING_API_URL: ${{ secrets.SAGE_STAGING_API_URL }}
+          SAGE_STAGING_PLATFORM_OWNER_TOKEN: ${{ secrets.SAGE_STAGING_PLATFORM_OWNER_TOKEN }}
+          SAGE_STAGING_COMPANY_OWNER_TOKEN: ${{ secrets.SAGE_STAGING_COMPANY_OWNER_TOKEN }}
+          SAGE_STAGING_BILLING_ADMIN_TOKEN: ${{ secrets.SAGE_STAGING_BILLING_ADMIN_TOKEN }}
+        run: node scripts/platform-owner-staging-smoke.mjs
