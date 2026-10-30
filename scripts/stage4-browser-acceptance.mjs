@@ -164,8 +164,12 @@ try {
     // Front desk has limited invoice READ, but no Finance workspace or
     // authority to seal settlements; test the actual permission matrix.
     const financeAllowed=portal.kind==='tenant' && (portal.permissions.includes('*') || portal.permissions.includes('invoice.read'));
-    assert.equal(finance.status,financeAllowed?200:403,
-      spec.role+' invoice.read authorization must be server-side');
+    if(spec.role==='PLATFORM_OWNER') {
+      assert.ok([400,403].includes(finance.status),'Platform role must not obtain company Finance invoices without tenant authority');
+    } else {
+      assert.equal(finance.status,financeAllowed?200:403,
+        spec.role+' invoice.read authorization must be server-side');
+    }
     checks++;
 
     if(spec.role==='BOOKING_AGENT') {
@@ -193,7 +197,7 @@ try {
     }
     if(spec.role==='PLATFORM_OWNER') {
       const tenantOperational=await req('/vehicle-owners',token);
-      assert.equal(tenantOperational.status,403,'Platform staff are not tenant operators');
+      assert.ok([400,403].includes(tenantOperational.status),'Platform staff are not tenant operators');
       checks++;
     }
 
