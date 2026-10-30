@@ -1,4 +1,4 @@
-import {createCipheriv,createDecipheriv,createHash,randomBytes,randomInt,timingSafeEqual} from "node:crypto";
+import {createCipheriv,createDecipheriv,createHash,createHmac,randomBytes,randomInt,timingSafeEqual} from "node:crypto";
 import {z} from "zod";
 import {AuditRepository,VehicleOwnerRepository,VehicleOwnershipRepository} from "@carhire/database";
 import {createRecordStore,withRecordTransaction} from "../../../../../packages/database/src/record-store";
@@ -22,6 +22,7 @@ const payoutChanges=createRecordStore<string,PayoutChange>("access:owner-payout-
 const signatures=createRecordStore<string,AgreementSignature>("access:owner-agreement-signatures");
 const sha=(value:string)=>createHash("sha256").update(value).digest("hex");
 const keyFor=(userId:string,tenantId:string)=>`${tenantId}:${userId}`;
+const challengeHash=(id:string,code:string)=>createHmac("sha256",secret()).update(`${id}:${code}`).digest("hex");
 const nameNorm=(name:string)=>name.trim().replace(/\s+/g," ").toLocaleLowerCase("en");
 
 function secret():Buffer {
@@ -108,7 +109,7 @@ export class OwnerProtectedActions {
       {kind:"BANK",bank:data.bank,accountNumber:data.accountNumber};
     const payload=encrypt(candidate);
     const record:PayoutChange={
-      tenantId,ownerId:owner.id,userId,payload,codeHash:sha(`${id}:${code}`),
+      tenantId,ownerId:owner.id,userId,payload,codeHash:challengeHash(id,code),
       expiresAt:new Date(Date.now()+10*60_000).toISOString(),attempts:0,sentAt:new Date().toISOString()
     };
     payoutChanges.set(id,record);
@@ -129,7 +130,7 @@ export class OwnerProtectedActions {
       if(!pending||pending.ownerId!==owner.id)return fail("No active payout destination verification request",409);
       if(Date.now()>Date.parse(pending.expiresAt)){payoutChanges.delete(id);return fail("Verification code expired. Request a new code.",410);}
       if(pending.attempts>=5)return fail("Verification attempts exceeded. Request a new code.",429);
-      const expected=Buffer.from(pending.codeHash,"hex"),actual=Buffer.from(sha(`${id}:${data.code}`),"hex");
+      const expected=Buffer.from(pending.codeHash,"hex"),actual=Buffer.from(challengeHash(id,data.code),"hex");
       if(!timingSafeEqual(expected,actual)){
         payoutChanges.set(id,{...pending,attempts:pending.attempts+1});
         // Commit the failed attempt before returning 403. Throwing here
