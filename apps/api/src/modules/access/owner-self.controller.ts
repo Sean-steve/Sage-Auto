@@ -7,6 +7,7 @@ import {
 import type { AccessService } from "./access.service";
 import {OwnerProtectedActions,agreementDigest} from "./owner-protected-actions";
 import {fail} from "./access.service";
+import type {Vehicle} from "@carhire/types";
 import type {FileAccessService} from "../files/application/services/file-access.service";
 import {FileRepository} from "@carhire/database";
 import type { OwnerSettlementsService } from "../owner-settlements/application/owner-settlements.service";
@@ -38,7 +39,7 @@ export function createOwnerSelfController(access: AccessService, settlements: Ow
   async function ownerAssets(tenantId:string, ownerId:string) {
     const ownershipRepo=new VehicleOwnershipRepository();
     const ownerships=await ownershipRepo.findByOwnerId(ownerId,tenantId);
-    const repo=new VehicleRepository(),vehicles=[];
+    const repo=new VehicleRepository(),vehicles:Vehicle[]=[];
     // Owner-scoped lookup per historic agreement; never truncate at fleet
     // repository default pagination, and never leak reassigned vehicles.
     for(const id of new Set(ownerships.filter(o=>o.isActive).map(o=>o.vehicleId))) {
