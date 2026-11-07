@@ -48,6 +48,9 @@ export class RedisConnectionManager {
   public async initialize(): Promise<RedisStatus> {
     if (this.isSimulatedMode) {
       this.status = "simulated";
+      if (process.env.REDIS_REQUIRE_LIVE === "true") {
+        throw new Error("Real Redis is required for local certification; REDIS_SIMULATED must be false.");
+      }
       return this.status;
     }
 
@@ -102,6 +105,10 @@ export class RedisConnectionManager {
       this.status = "simulated";
     }
 
+    if (process.env.REDIS_REQUIRE_LIVE === "true" && this.status !== "connected") {
+      await this.disconnect();
+      throw new Error("Real Redis connection failed. Local certification cannot silently use a simulated worker queue.");
+    }
     return this.status;
   }
 
