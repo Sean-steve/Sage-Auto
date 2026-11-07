@@ -6,6 +6,20 @@ root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$root"
 dir="infrastructure/database/migrations"
 
+# CI can provide exported DATABASE_URL. Otherwise respect the developer's
+# git-ignored .env.local/.env without printing credentials.
+if [[ -z "${DATABASE_URL:-}" && -z "${PGDATABASE:-}" ]]; then
+  local_env=""
+  if [[ -f ".env.local" ]]; then local_env=".env.local"
+  elif [[ -f ".env" ]]; then local_env=".env"; fi
+  if [[ -n "$local_env" ]]; then
+    set -a
+    # shellcheck disable=SC1090
+    source "$local_env"
+    set +a
+  fi
+fi
+
 if ! command -v psql >/dev/null 2>&1; then
   echo "ERROR: PostgreSQL psql client is required. Install postgresql-client or postgresql-client-17." >&2
   exit 2
