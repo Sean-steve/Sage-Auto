@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
-set -e
-
-echo "==> [CAR HIRE OS] Resetting local database..."
-bash scripts/db-migrate.sh
-bash scripts/db-seed.sh
-echo "==> Database reset and seeded successfully."
+set -euo pipefail
+# Avoid accidental data loss. Database reset is not a synonym for migration.
+echo "ERROR: db:reset is intentionally disabled until a real, local-only, backup-aware reset workflow is implemented." >&2
+echo "Use pnpm db:migrate to apply PostgreSQL schema updates without deleting records." >&2
+exit 2

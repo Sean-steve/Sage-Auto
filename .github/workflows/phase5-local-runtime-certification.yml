@@ -1,0 +1,95 @@
+name: Phase 5 — Local Runtime and Backend Truth Certification
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "scripts/db-migrate.sh"
+      - "scripts/db-seed.sh"
+      - "scripts/db-reset.sh"
+      - "scripts/phase5-*.mjs"
+      - "scripts/phase5-*.ts"
+      - "packages/config/src/env.ts"
+      - "apps/worker/src/infrastructure/redis/redis-client.ts"
+      - "infrastructure/database/migrations/**"
+      - ".github/workflows/phase5-local-runtime-certification.yml"
+      - ".env.example"
+      - "package.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  local-backend-truth:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    name: Live PostgreSQL migrations, real Redis and durable local workflows
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: carhire
+          POSTGRES_PASSWORD: ci_local_only_secret
+          POSTGRES_DB: carhire_platform
+        ports:
+          - 55432:5432
+        options: >-
+          --health-cmd "pg_isready -U carhire -d carhire_platform"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 56379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      NODE_ENV: development
+      APP_ENV: development
+      DATABASE_URL: postgresql://carhire:ci_local_only_secret@127.0.0.1:55432/carhire_platform
+      REDIS_URL: redis://127.0.0.1:56379
+      REDIS_REQUIRE_LIVE: "true"
+      REDIS_SIMULATED: "false"
+      LOCAL_CERTIFICATION_MODE: "true"
+      SQLITE_PATH: /tmp/sage-phase5-ci/records.sqlite
+      APP_PUBLIC_URL: http://127.0.0.1:3000
+      ACCESS_REVIEW_MODE: "false"
+      LOCAL_PAYMENT_WORKER_ENABLED: "false"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 9.15.9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Install real PostgreSQL client
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
+      - name: Execute SQL migrations against PostgreSQL 17
+        run: pnpm db:migrate
+      - name: Re-run migrations to certify checksum and idempotency
+        run: pnpm db:migrate
+      - name: Assert schema ledger is durable and RLS enabled
+        run: |
+          test "$(psql "$DATABASE_URL" -XqAt -c 'SELECT count(*) FROM sage_auto_schema_migrations;')" = "4"
+          test "$(psql "$DATABASE_URL" -XqAt -c "SELECT COUNT(*) FROM pg_class WHERE relname IN ('tenant_settings','tenant_memberships','idempotency_keys') AND relrowsecurity AND relforcerowsecurity;")" = "3"
+          test "$(psql "$DATABASE_URL" -XqAt -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_name IN ('users','tenants','outbox_events','webhook_events');")" = "4"
+      - name: Readiness doctor against live PG and real Redis
+        run: pnpm local:doctor
+      - name: Live Redis BullMQ worker scheduler startup
+        run: pnpm local:worker:smoke
+      - name: Real durable SQLite and end-to-end local API/payment simulations
+        run: pnpm test:phase5
+      - name: Compile complete frontend/backend typings
+        run: pnpm typecheck
+      - name: Prove PostgreSQL application authority is NOT falsely certified
+        run: |
+          if node scripts/phase5-local-doctor.mjs --require-production-backend; then
+            echo "ERROR: Phase 5 incorrectly certified a SQLite-backed API as PostgreSQL authoritative." >&2
+            exit 1
+          else
+            echo "Expected fail-closed result: PG schema ready, API still SQLite backed."
+          fi
