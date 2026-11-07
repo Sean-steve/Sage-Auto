@@ -53,7 +53,15 @@ export function validateEnv(env: Record<string, any> = process.env): EnvConfig {
   const parsed = EnvSchema.safeParse(env);
   if (!parsed.success) {
     console.error("❌ Environment configuration validation failed:", JSON.stringify(parsed.error.format(), null, 2));
-    // Provide safe defaults for development/test
+    // Fail closed during certification and in all production-like environments.
+    // A malformed APP_PUBLIC_URL must never silently switch the queue
+    // connection or database to default settings.
+    if (env.LOCAL_CERTIFICATION_MODE === "true" ||
+        env.REDIS_REQUIRE_LIVE === "true" ||
+        ["production", "staging"].includes(String(env.NODE_ENV || env.APP_ENV || ""))) {
+      throw new Error("Invalid environment configuration. Correct the reported settings before starting the service.");
+    }
+    // Legacy development-only fallback remains for pre-existing tests.
     return EnvSchema.parse({});
   }
   return parsed.data;
