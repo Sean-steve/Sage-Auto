@@ -109,6 +109,20 @@ export class FirstRentalSetupService {
   async getStatus(tenantId: string): Promise<FirstRentalStatus> {
     if (!tenantId) throw Object.assign(new Error("Verified tenant context required"), { statusCode: 403 });
 
+    // A completed first handover is a durable milestone. Once observed, avoid
+    // re-reading six domain repositories on every login or overview refresh.
+    const terminal = this.saved.get(tenantId);
+    if (terminal?.completedAt) {
+      const observed = new Set(terminal.observedSteps);
+      const steps = FIRST_RENTAL_STEP_IDS.map(id => ({ id, ...STEP_METADATA[id], complete: observed.has(id) }));
+      return {
+        tenantId, state: "COMPLETED", visibleOnOverview: false,
+        completedAt: terminal.completedAt, dismissedAt: terminal.dismissedAt || null,
+        completedCount: steps.filter(step => step.complete).length,
+        totalCount: steps.length, calculatedAt: terminal.updatedAt, steps,
+      };
+    }
+
     // Do not silently treat failed repository reads as unfinished setup.
     const checks = await Promise.all([
       this.readers.hasVehicle(tenantId),
