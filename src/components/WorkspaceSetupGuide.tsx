@@ -89,7 +89,7 @@ export function WorkspaceSetupGuide({ portal, mode }: { portal: AccessPortal; mo
           {mode === "overview" ? "New workspace setup" : "Workspace setup guide"}
         </div>
         <h2 className="mt-2 text-xl font-black tracking-tight text-slate-950">
-          {complete ? "Your first rental is underway" : "Prepare your first rental"}
+          {complete ? "First handover completed" : "Prepare your first rental"}
         </h2>
         <p className="mt-1 text-sm leading-6 text-slate-500">
           {complete
