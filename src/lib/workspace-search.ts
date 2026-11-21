@@ -1,7 +1,7 @@
 import { apiClient } from "./api-client";
 import { permits, type AccessPortal } from "./access-context";
 
-export type WorkspaceSearchKind = "MODULE" | "VEHICLE" | "CUSTOMER" | "DRIVER" | "BOOKING" | "RENTAL";
+export type WorkspaceSearchKind = "MODULE" | "VEHICLE" | "CUSTOMER" | "DRIVER" | "BOOKING" | "RENTAL" | "INVOICE" | "PAYMENT";
 type SearchableKind = Exclude<WorkspaceSearchKind, "MODULE">;
 export type WorkspaceSearchItem = {
   kind: WorkspaceSearchKind;
@@ -15,7 +15,7 @@ export type WorkspaceSearchResponse = { items: WorkspaceSearchItem[]; unavailabl
 // Search through each domain's existing server-filtered, tenant-guarded and
 // permission-guarded list endpoint. Never download a complete tenant dataset
 // or use the legacy browser store as a search authority.
-type SearchApi = Pick<typeof apiClient, "fleet" | "customers" | "drivers" | "bookings" | "rentals">;
+type SearchApi = Pick<typeof apiClient, "fleet" | "customers" | "drivers" | "bookings" | "rentals" | "finance" | "payments">;
 
 function safe(value: unknown): string {
   return typeof value === "string" ? value : "";
@@ -31,6 +31,8 @@ export function searchSources(portal: AccessPortal): SearchableKind[] {
     ...(allowed("customers", "driver.read") ? ["DRIVER" as const] : []),
     ...(allowed("bookings", "booking.read") ? ["BOOKING" as const] : []),
     ...(allowed("rentals", "rental.read") ? ["RENTAL" as const] : []),
+    ...(allowed("finance", "invoice.read") ? ["INVOICE" as const] : []),
+    ...(allowed("finance", "payment.read") ? ["PAYMENT" as const] : []),
   ];
 }
 
@@ -49,6 +51,8 @@ export async function searchWorkspaceRecords(
     DRIVER: () => client.drivers.listDrivers({ ...options, page: 1 }),
     BOOKING: () => client.bookings.listBookings({ ...options, offset: 0 }),
     RENTAL: () => client.rentals.listRentals({ ...options, offset: 0 }),
+    INVOICE: () => client.finance.getInvoices(options),
+    PAYMENT: () => client.payments.listPayments(options),
   };
   const results = await Promise.all(sources.map(async kind => {
     try {
@@ -71,16 +75,18 @@ export async function searchWorkspaceRecords(
       const kind = result.kind;
       const section = kind === "VEHICLE" ? "fleet" :
         kind === "CUSTOMER" || kind === "DRIVER" ? "customers" :
-        kind === "BOOKING" ? "bookings" : "rentals";
+        kind === "BOOKING" ? "bookings" : kind === "RENTAL" ? "rentals" : "finance";
       const title = kind === "VEHICLE" ? safe(record.registrationPlate) :
         kind === "CUSTOMER" || kind === "DRIVER" ? safe(record.fullName) :
-        kind === "BOOKING" ? safe(record.bookingNumber) : safe(record.rentalNumber);
+        kind === "BOOKING" ? safe(record.bookingNumber) :
+        kind === "RENTAL" ? safe(record.rentalNumber) :
+        kind === "INVOICE" ? safe(record.invoiceNumber) : safe(record.paymentNumber);
       if (!title) continue;
       const subtitle = kind === "VEHICLE"
         ? [safe(record.make), safe(record.model)].filter(Boolean).join(" ")
         : kind === "CUSTOMER" ? safe(record.customerNumber)
         : kind === "DRIVER" ? safe(record.driverNumber)
-        : kind === "BOOKING" ? safe(record.status).replaceAll("_", " ")
+        : kind === "BOOKING" || kind === "INVOICE" || kind === "PAYMENT" ? safe(record.status).replaceAll("_", " ")
         : safe(record.state).replaceAll("_", " ");
       items.push({ kind, section, id: record.id, title, subtitle });
     }
