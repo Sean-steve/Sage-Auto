@@ -16,20 +16,20 @@ export function createFirstRentalSetupRouter(service = new FirstRentalSetupServi
   const router = Router();
   const auditors = new AuditRepository();
 
-  function requireCompanyManager(req: Request, res: Response, next: NextFunction) {
+  function requireCompanyOwner(req: Request, res: Response, next: NextFunction) {
     if (!req.auth?.userId || !req.tenantContext?.tenantId) {
       res.status(403).json({ error: { code: "TENANT_ACCESS_DENIED", message: "Verified company context required." } });
       return;
     }
     const roles = req.tenantContext.roles || [];
-    if (!roles.some(role => role === "COMPANY_OWNER" || role === "TENANT_ADMIN")) {
-      res.status(403).json({ error: { code: "INSUFFICIENT_PERMISSION", message: "Company owner or tenant administrator access required." } });
+    if (!roles.includes("COMPANY_OWNER")) {
+      res.status(403).json({ error: { code: "INSUFFICIENT_PERMISSION", message: "Company owner access required." } });
       return;
     }
     next();
   }
 
-  router.use(requireCompanyManager);
+  router.use(requireCompanyOwner);
 
   router.get("/", async (req, res, next) => {
     try {
