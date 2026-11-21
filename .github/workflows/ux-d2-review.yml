@@ -1,0 +1,39 @@
+name: UX-D2 First Rental Onboarding Review
+
+on:
+  push:
+    branches: [feature/ux-d2-smart-onboarding-first-rental-20261121]
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'apps/api/src/modules/tenancy/**'
+      - 'apps/api/src/app.module.ts'
+      - 'src/components/WorkspaceSetupGuide.tsx'
+      - 'src/components/CompanyOverviewView.tsx'
+      - 'src/components/RestoredWorkspace.tsx'
+      - 'src/lib/first-rental-setup.ts'
+      - 'packages/database/test/first-rental-onboarding.test.ts'
+      - 'package.json'
+      - '.github/workflows/ux-d2-review.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  onboarding-validation:
+    name: Onboarding typecheck, lifecycle and tenancy tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 9.15.9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm test:ux-d2
+      - run: pnpm test:tenancy
+      - run: pnpm test:access
