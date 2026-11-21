@@ -76,6 +76,7 @@ export const RentalsView: React.FC<{focusRecordId?:string}> = ({focusRecordId}) 
   const [loading, setLoading] = useState(true);
   const [stateFilter, setStateFilter] = useState("ACTIVE");
   const [selectedRentalId, setSelectedRentalId] = useState<string | null>(null);
+  const [focusedRental, setFocusedRental] = useState<Rental | null>(null);
   const [startSnapshot, setStartSnapshot] = useState<any>(null);
   const [actionMode, setActionMode] = useState<ActionMode>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -143,6 +144,7 @@ export const RentalsView: React.FC<{focusRecordId?:string}> = ({focusRecordId}) 
       if (!active || response.error || !response.data) return;
       const record = response.data as Rental;
       if (record.tenantId !== activeTenantId) return;
+      setFocusedRental(record);
       setRentals(current => current.some(r => r.id === record.id) ? current : [...current, record]);
       setStateFilter("ALL");
       setSelectedRentalId(record.id);
@@ -150,7 +152,7 @@ export const RentalsView: React.FC<{focusRecordId?:string}> = ({focusRecordId}) 
     return () => {active = false;};
   }, [focusRecordId, activeTenantId]);
 
-  const selectedRental = rentals.find((r) => r.id === selectedRentalId) || null;
+  const selectedRental = rentals.find((r) => r.id === selectedRentalId) || (focusedRental?.id === selectedRentalId ? focusedRental : null);
 
   const filteredRentals = useMemo(() => {
     return rentals.filter((r) => {
