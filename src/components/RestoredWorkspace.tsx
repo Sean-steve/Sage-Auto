@@ -107,6 +107,7 @@ function Shell({context,portal,section,onSection,onSwitch,onSignOut}:{context:Ac
 
   useEffect(()=>{localStorage.setItem("sage_sidebar_collapsed",sidebarCollapsed?"1":"0");},[sidebarCollapsed]);
   useEffect(()=>{localStorage.setItem("sage_theme",theme);},[theme]);
+  useEffect(()=>{if(focusedRecord&&focusedRecord.section!==section)setFocusedRecord(null);},[section,focusedRecord]);
 
   useEffect(()=>{
     const handler=(event:Event)=>{const id=(event as CustomEvent).detail?.section;if(id&&permitted.has(id)){setFocusedRecord(null);onSection(id);}};
