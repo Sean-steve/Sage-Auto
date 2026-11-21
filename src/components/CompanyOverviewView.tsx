@@ -4,6 +4,7 @@ import {
   Clock3, RefreshCw, ShieldCheck, Sparkles, TrendingUp, WalletCards
 } from "lucide-react";
 import { apiClient } from "../lib/api-client";
+import { WorkspaceSetupGuide } from "./WorkspaceSetupGuide";
 import type { AccessPortal } from "../lib/access-context";
 
 const activeRentalStates=new Set(["ACTIVE_ON_ROAD","OVERDUE","RETURN_SCHEDULED","VEHICLE_RECEIVED","RETURN_INSPECTION_PENDING","INSPECTION","DAMAGE_ASSESSMENT","FINAL_CALCULATION","FINAL_SETTLEMENT_PENDING","DEPOSIT_PROCESSING"]);
@@ -92,6 +93,8 @@ export function CompanyOverviewView({portal}:{portal:AccessPortal}) {
         <div className="mt-1 text-xs text-slate-400">{item.sub}</div>
       </button>})}
     </section>
+
+    <WorkspaceSetupGuide portal={portal} mode="overview"/>
 
     <div className="grid gap-6 xl:grid-cols-[1.35fr_.9fr]">
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
