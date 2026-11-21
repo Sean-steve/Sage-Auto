@@ -71,7 +71,7 @@ export async function searchWorkspaceRecords(
       continue;
     }
     for (const record of result.rows.slice(0, 6)) {
-      if (!safe(record.id)) continue;
+      if (!safe(record.id) || (record.tenantId && record.tenantId !== portal.tenantId)) continue;
       const kind = result.kind;
       const section = kind === "VEHICLE" ? "fleet" :
         kind === "CUSTOMER" || kind === "DRIVER" ? "customers" :
