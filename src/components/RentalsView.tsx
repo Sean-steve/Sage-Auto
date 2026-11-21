@@ -54,7 +54,7 @@ const stateBadgeClass = (state: RentalState) => {
   return "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300";
 };
 
-export const RentalsView: React.FC = () => {
+export const RentalsView: React.FC<{focusRecordId?:string}> = ({focusRecordId}) => {
   const {
     rentals: cachedRentals,
     vehicles,
@@ -135,6 +135,20 @@ export const RentalsView: React.FC = () => {
       if (!response.error) setStartSnapshot(response.data || null);
     });
   }, [selectedRentalId]);
+
+  useEffect(() => {
+    if (!focusRecordId || !hasPermission("rental.read")) return;
+    let active = true;
+    void apiClient.rentals.getRental(focusRecordId).then(response => {
+      if (!active || response.error || !response.data) return;
+      const record = response.data as Rental;
+      if (record.tenantId !== activeTenantId) return;
+      setRentals(current => current.some(r => r.id === record.id) ? current : [...current, record]);
+      setStateFilter("ALL");
+      setSelectedRentalId(record.id);
+    });
+    return () => {active = false;};
+  }, [focusRecordId, activeTenantId]);
 
   const selectedRental = rentals.find((r) => r.id === selectedRentalId) || null;
 
