@@ -109,7 +109,7 @@ function Shell({context,portal,section,onSection,onSwitch,onSignOut}:{context:Ac
   useEffect(()=>{localStorage.setItem("sage_theme",theme);},[theme]);
 
   useEffect(()=>{
-    const handler=(event:Event)=>{const id=(event as CustomEvent).detail?.section;if(id&&permitted.has(id))onSection(id);};
+    const handler=(event:Event)=>{const id=(event as CustomEvent).detail?.section;if(id&&permitted.has(id)){setFocusedRecord(null);onSection(id);}};
     window.addEventListener("sage:navigate",handler);return()=>window.removeEventListener("sage:navigate",handler);
   },[portal.id,portal.sections.map(s=>s.id).join("|")]);
 
