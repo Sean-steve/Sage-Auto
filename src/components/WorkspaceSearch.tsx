@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { ArrowRight, CarFront, CalendarDays, ChevronRight, Search, UserRound, X } from "lucide-react";
 import type { AccessPortal } from "../lib/access-context";
 import {
@@ -131,7 +132,7 @@ export function WorkspaceSearch({
       <span className="hidden flex-1 sm:inline"/>
       <kbd className="hidden rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] font-semibold text-slate-500 lg:inline">Ctrl K</kbd>
     </button>
-    {open && <div className="fixed inset-0 z-[80] flex items-start justify-center bg-slate-950/60 px-3 pt-[7vh] backdrop-blur-sm sm:px-6"
+    {open && createPortal(<div className="fixed inset-0 z-[80] flex items-start justify-center bg-slate-950/60 px-3 pt-[7vh] backdrop-blur-sm sm:px-6"
       onMouseDown={event => { if (event.target === event.currentTarget) setOpen(false); }}>
       <section role="dialog" aria-modal="true" aria-label="Search Sage Auto"
         className="w-full max-w-2xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
@@ -185,6 +186,6 @@ export function WorkspaceSearch({
           <span>↑ ↓ Navigate · Enter Open · Esc Close</span>
         </div>
       </section>
-    </div>}
+    </div>, document.body)}
   </>;
 }
