@@ -14,8 +14,10 @@ const labelByKind: Record<WorkspaceSearchKind, string> = {
   DRIVER: "Drivers",
   BOOKING: "Bookings",
   RENTAL: "Rentals",
+  INVOICE: "Invoices",
+  PAYMENT: "Payments",
 };
-const groupOrder: WorkspaceSearchKind[] = ["MODULE", "VEHICLE", "CUSTOMER", "DRIVER", "BOOKING", "RENTAL"];
+const groupOrder: WorkspaceSearchKind[] = ["MODULE", "VEHICLE", "CUSTOMER", "DRIVER", "BOOKING", "RENTAL", "INVOICE", "PAYMENT"];
 
 export function WorkspaceSearch({
   portal,
@@ -122,10 +124,10 @@ export function WorkspaceSearch({
 
   return <>
     <button type="button" onClick={() => setOpen(true)}
-      aria-label="Search vehicles, customers, bookings and workspaces"
+      aria-label="Search vehicles, customers, bookings, rentals and finance records"
       className="flex h-9 min-w-0 max-w-[410px] flex-1 items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 text-left text-xs font-medium text-slate-500 transition hover:border-emerald-300 hover:bg-white focus-visible:outline-2 focus-visible:outline-emerald-600">
       <Search size={16} className="shrink-0 text-emerald-700" aria-hidden="true"/>
-      <span className="hidden truncate sm:inline">Search vehicles, customers, bookings…</span>
+      <span className="hidden truncate sm:inline">Search vehicles, bookings, payments…</span>
       <span className="hidden flex-1 sm:inline"/>
       <kbd className="hidden rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] font-semibold text-slate-500 lg:inline">Ctrl K</kbd>
     </button>
@@ -139,7 +141,7 @@ export function WorkspaceSearch({
             onChange={event => setQuery(event.target.value)}
             onKeyDown={onInputKeyDown}
             aria-label="Search company records and modules"
-            placeholder="Registration, name, booking or rental number…"
+            placeholder="Registration, customer, booking, invoice, payment…"
             className="h-14 min-w-0 flex-1 border-0 bg-transparent text-sm text-slate-950 outline-none"/>
           <button type="button" onClick={() => setOpen(false)}
             aria-label="Close search" className="rounded-lg p-2 text-slate-500 hover:bg-slate-100">
@@ -156,7 +158,7 @@ export function WorkspaceSearch({
                 const index = visible.indexOf(result);
                 const Icon = result.kind === "VEHICLE" ? CarFront :
                   result.kind === "CUSTOMER" || result.kind === "DRIVER" ? UserRound :
-                  result.kind === "BOOKING" || result.kind === "RENTAL" ? CalendarDays : ArrowRight;
+                  result.kind === "BOOKING" || result.kind === "RENTAL" || result.kind === "INVOICE" || result.kind === "PAYMENT" ? CalendarDays : ArrowRight;
                 return <button key={result.kind + ":" + result.id} type="button"
                   onMouseEnter={() => setActive(index)}
                   onClick={() => choose(result)}
