@@ -15,7 +15,7 @@ export function WorkspaceSetupGuide({ portal, mode }: { portal: AccessPortal; mo
   const [busy, setBusy] = useState(false);
   const [expanded, setExpanded] = useState(mode === "overview");
   const canManage = portal.kind === "tenant" && Boolean(portal.tenantId) &&
-    portal.roles.some(role => role === "COMPANY_OWNER" || role === "TENANT_ADMIN");
+    portal.roles.includes("COMPANY_OWNER");
 
   const refresh = useCallback(async (silent = false) => {
     if (!canManage) return;
