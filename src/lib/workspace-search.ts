@@ -2,6 +2,7 @@ import { apiClient } from "./api-client";
 import { permits, type AccessPortal } from "./access-context";
 
 export type WorkspaceSearchKind = "MODULE" | "VEHICLE" | "CUSTOMER" | "DRIVER" | "BOOKING" | "RENTAL";
+type SearchableKind = Exclude<WorkspaceSearchKind, "MODULE">;
 export type WorkspaceSearchItem = {
   kind: WorkspaceSearchKind;
   id: string;
@@ -20,7 +21,7 @@ function safe(value: unknown): string {
   return typeof value === "string" ? value : "";
 }
 
-export function searchSources(portal: AccessPortal): WorkspaceSearchKind[] {
+export function searchSources(portal: AccessPortal): SearchableKind[] {
   const allowed = (section: string, permission: string) =>
     portal.kind === "tenant" && !!portal.tenantId &&
     portal.sections.some(item => item.id === section) && permits(portal, permission);
