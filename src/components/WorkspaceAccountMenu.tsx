@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { ArrowLeftRight, ChevronRight, KeyRound, LogOut, Settings2, ShieldCheck, UserRound, X } from "lucide-react";
 import type { AccessContext, AccessPortal } from "../lib/access-context";
 import { apiClient } from "../lib/api-client";
@@ -97,7 +98,7 @@ export function WorkspaceAccountMenu({
         <button role="menuitem" type="button" onClick={() => { setOpen(false); onSignOut(); }} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-rose-700 hover:bg-rose-50"><LogOut size={16}/>Sign out</button>
       </div>
     </div>}
-    {panel && <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/55 p-4" onMouseDown={event => { if (event.target === event.currentTarget) setPanel(null); }}>
+    {panel && createPortal(<div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/55 p-4" onMouseDown={event => { if (event.target === event.currentTarget) setPanel(null); }}>
       <section role="dialog" aria-modal="true" aria-label={panel === "profile" ? "My profile" : "Security and sessions"}
         className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl">
         <header className="mb-5 flex items-center justify-between"><h2 className="text-lg font-bold text-slate-950">{panel === "profile" ? "My profile" : "Security & sessions"}</h2>
@@ -125,6 +126,6 @@ export function WorkspaceAccountMenu({
           </div>
         </div>}
       </section>
-    </div>}
+    </div>, document.body)}
   </div>;
 }
