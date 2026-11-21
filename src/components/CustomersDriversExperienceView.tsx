@@ -8,7 +8,7 @@ import { apiClient, type ApiResponse } from "../lib/api-client";
 import { permits, type AccessPortal } from "../lib/access-context";
 import { useApp } from "../lib/store";
 
-type Props={portal:AccessPortal};
+type Props={portal:AccessPortal;focusRecordId?:string;focusKind?:string};
 type Tab="customers"|"drivers"|"corporate";
 type Detail={kind:Tab;id:string}|null;
 
@@ -37,7 +37,7 @@ function Field({label,children}:{label:string;children:React.ReactNode}){return 
 function ErrorBox({text}:{text:string}){return <div role="alert" className="flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0"/><span>{text}</span></div>;}
 function Modal({title,subtitle,onClose,children}:{title:string;subtitle?:string;onClose:()=>void;children:React.ReactNode}){return <div className="fixed inset-0 z-50 bg-slate-950/55 backdrop-blur-sm sm:p-5" role="dialog" aria-modal="true"><div className="ml-auto flex h-full w-full max-w-4xl flex-col overflow-hidden bg-white shadow-2xl sm:rounded-3xl"><header className="flex items-start justify-between border-b border-slate-200 p-5 sm:p-6"><div><h2 className="text-xl font-bold text-slate-950">{title}</h2>{subtitle&&<p className="mt-1 text-sm text-slate-500">{subtitle}</p>}</div><button onClick={onClose} aria-label="Close" className="rounded-full p-2 hover:bg-slate-100"><X size={19}/></button></header><div className="flex-1 overflow-y-auto p-5 sm:p-6">{children}</div></div></div>;}
 
-export function CustomersDriversExperienceView({portal}:Props){
+export function CustomersDriversExperienceView({portal,focusRecordId,focusKind}:Props){
   const {navigateSection}=useApp();
   const can=(p:string)=>permits(portal,p);
   const allowedTabs:Tab[]=[
@@ -61,6 +61,13 @@ export function CustomersDriversExperienceView({portal}:Props){
   const seq=useRef(0);
 
   useEffect(()=>{if(!allowedTabs.includes(tab)&&allowedTabs.length)setTab(allowedTabs[0]);},[portal.id]);
+  useEffect(()=>{
+    if(!focusRecordId)return;
+    const kind:Tab=focusKind==="DRIVER"?"drivers":"customers";
+    if(!allowedTabs.includes(kind))return;
+    setTab(kind);
+    setDetail({kind,id:focusRecordId});
+  },[portal.id,focusRecordId,focusKind]);
   async function refresh(){
     const request=++seq.current;setLoading(true);setError("");
     try{
