@@ -83,6 +83,7 @@
     "test:durable": "tsx packages/database/test/durable-storage.test.ts",
     "test:runtime": "tsx packages/database/test/runtime-flow.test.ts",
     "test:access": "tsx packages/database/test/access-onboarding.test.ts",
+    "test:ux-d1": "tsx packages/database/test/workspace-search-contract.test.ts",
     "review:api": "tsx scripts/access-review.ts",
     "review:web": "VITE_API_PROXY_TARGET=http://127.0.0.1:3511 vite --host 127.0.0.1 --port 3510 --strictPort",
     "test:restoration": "tsx packages/database/test/restoration-hardening.test.ts",
