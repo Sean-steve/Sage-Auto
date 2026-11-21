@@ -7,6 +7,7 @@ import {
 import { AppProvider, useApp } from "../lib/store";
 import { WorkspaceSearch } from "./WorkspaceSearch";
 import { WorkspaceAccountMenu } from "./WorkspaceAccountMenu";
+import { WorkspaceSetupGuide } from "./WorkspaceSetupGuide";
 import type { WorkspaceSearchItem } from "../lib/workspace-search";
 import type { AccessContext, AccessPortal } from "../lib/access-context";
 import { FleetExperienceView } from "./FleetExperienceView";
@@ -89,7 +90,7 @@ function WorkspaceScreen({section,portal,focusedRecord}:{section:string;portal:A
   return <div className="sage-module">
     {workspaceError&&<div role="alert" className="m-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 sm:m-6">{workspaceError}</div>}
     {workspaceLoading&&["inspections","maintenance","compliance","owners","settings"].includes(section)&&<div className="px-6 pt-5 text-xs font-semibold text-slate-400">Syncing workspace records…</div>}
-    <Suspense fallback={<div className="grid min-h-[50vh] place-items-center p-8"><div className="w-full max-w-4xl space-y-4"><div className="sage-skeleton h-7 w-48">Loading</div><div className="grid gap-3 sm:grid-cols-3"><div className="sage-skeleton h-24">Loading</div><div className="sage-skeleton h-24">Loading</div><div className="sage-skeleton h-24">Loading</div></div><div className="sage-skeleton h-72">Loading</div></div></div>}>{section==="rentals"?<RentalsView focusRecordId={focusRecordId}/>:section==="finance"?<FinanceView focusRecordId={focusRecordId} focusKind={focusedRecord?.kind}/>:<View/>}</Suspense>
+    <Suspense fallback={<div className="grid min-h-[50vh] place-items-center p-8"><div className="w-full max-w-4xl space-y-4"><div className="sage-skeleton h-7 w-48">Loading</div><div className="grid gap-3 sm:grid-cols-3"><div className="sage-skeleton h-24">Loading</div><div className="sage-skeleton h-24">Loading</div><div className="sage-skeleton h-24">Loading</div></div><div className="sage-skeleton h-72">Loading</div></div></div>}>{section==="rentals"?<RentalsView focusRecordId={focusRecordId}/>:section==="finance"?<FinanceView focusRecordId={focusRecordId} focusKind={focusedRecord?.kind}/>:section==="settings"?<><div className="mx-auto max-w-[1500px] px-4 pt-6 sm:px-6"><WorkspaceSetupGuide portal={portal} mode="settings"/></div><View/></>:<View/>}</Suspense>
   </div>;
 }
 
