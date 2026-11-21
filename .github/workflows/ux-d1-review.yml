@@ -1,0 +1,46 @@
+name: UX-D1 Universal Search Review
+
+on:
+  push:
+    branches:
+      - feature/ux-d1-universal-search-topbar-account-20261121
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'src/lib/workspace-search.ts'
+      - 'src/components/WorkspaceSearch.tsx'
+      - 'src/components/WorkspaceAccountMenu.tsx'
+      - 'src/components/RestoredWorkspace.tsx'
+      - 'src/components/FleetExperienceView.tsx'
+      - 'src/components/BookingExperienceView.tsx'
+      - 'src/components/CustomersDriversExperienceView.tsx'
+      - 'src/components/RentalsView.tsx'
+      - 'src/components/FinanceView.tsx'
+      - 'packages/database/test/workspace-search-contract.test.ts'
+      - 'packages/database/src/repositories/operational-invoice.repository.ts'
+      - 'packages/database/src/repositories/payment.repository.ts'
+      - 'packages/types/src/payments.ts'
+      - 'apps/api/src/modules/finance/presentation/finance.controller.ts'
+      - 'package.json'
+      - '.github/workflows/ux-d1-review.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  ux-d1-validation:
+    name: Typecheck and Search Contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 9.15.9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm test:ux-d1
+      - run: pnpm test:access
