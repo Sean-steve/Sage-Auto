@@ -15,6 +15,7 @@ import { globalErrorMiddleware } from "./common/filters/http-exception.filter";
 import { AppLoggerService } from "./common/logger/app-logger.service";
 import { IdentityModule } from "./modules/identity/identity.module";
 import { TenancyModule } from "./modules/tenancy/tenancy.module";
+import { createFirstRentalSetupRouter } from "./modules/tenancy/presentation/first-rental-setup.controller";
 import { AuthorizationModule } from "./modules/authorization/authorization.module";
 import { SubscriptionsModule } from "./modules/subscriptions/subscriptions.module";
 import { BillingModule } from "./modules/billing/billing.module";
@@ -297,6 +298,7 @@ export function createApiApp(): Express {
 
   // Authorization & Role Routes (Sprint 5: DEV-005)
   const tenantGuard = tenancyModule.tenantGuard;
+  app.use("/api/v1/tenant/setup-status", authGuard, tenantGuard, createFirstRentalSetupRouter());
   app.use(["/api/v1/roles", "/api/v1/permissions", "/api/v1/memberships"], authGuard, tenantGuard);
   app.use("/api/v1", authorizationModule.createRoleController());
   app.use("/api/v1/authorization", authGuard, tenantGuard);
