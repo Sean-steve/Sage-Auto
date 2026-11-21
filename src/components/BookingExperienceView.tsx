@@ -8,7 +8,7 @@ import { apiClient, type ApiResponse } from "../lib/api-client";
 import { permits, type AccessPortal } from "../lib/access-context";
 import { useApp } from "../lib/store";
 
-type Props={portal:AccessPortal};
+type Props={portal:AccessPortal;focusRecordId?:string};
 type ActionKind="cancel"|"reject"|"expire"|"no-show";
 
 const inputClass="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 disabled:bg-slate-50 disabled:text-slate-400";
@@ -39,7 +39,7 @@ function ErrorBox({text}:{text:string}){return <div role="alert" className="roun
 function Notice({text}:{text:string}){return <div role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{text}</div>;}
 function Modal({title,subtitle,onClose,children,max="max-w-4xl"}:{title:string;subtitle?:string;onClose:()=>void;children:React.ReactNode;max?:string}){return <div className="fixed inset-0 z-50 bg-slate-950/55 backdrop-blur-sm sm:p-5" role="dialog" aria-modal="true"><div className={"ml-auto flex h-full w-full flex-col overflow-hidden bg-white shadow-2xl sm:rounded-3xl "+max}><header className="flex items-start justify-between border-b p-5 sm:p-6"><div><h2 className="text-xl font-bold">{title}</h2>{subtitle&&<p className="mt-1 text-sm text-slate-500">{subtitle}</p>}</div><button onClick={onClose} aria-label="Close" className="rounded-full p-2 hover:bg-slate-100"><X size={19}/></button></header><div className="flex-1 overflow-y-auto p-5 sm:p-6">{children}</div></div></div>;}
 
-export function BookingExperienceView({portal}:Props){
+export function BookingExperienceView({portal,focusRecordId}:Props){
   const {navigateSection}=useApp();
   const can=(p:string)=>permits(portal,p);
   const [bookings,setBookings]=useState<any[]>([]);
@@ -138,6 +138,7 @@ export function BookingExperienceView({portal}:Props){
     return()=>window.clearInterval(timer);
   },[portal.id,status,source,search,selectedId]);
   useEffect(()=>{setSelectedId("");setDetail(null);setReadiness(null);setCreateOpen(false);setEditOpen(false);setQuoteOpen(false);setConfirmOpen(false);setAmendOpen(false);setSubstituteOpen(false);setAction(null);},[portal.id]);
+  useEffect(()=>{if(focusRecordId&&can("booking.read")){setSelectedId(focusRecordId);void loadDetail(focusRecordId);}},[portal.id,focusRecordId]);
 
   async function refreshAll(){
     await Promise.all([loadRegister(),loadAux()]);
