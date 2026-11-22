@@ -48,7 +48,6 @@ export const DashboardView: React.FC = () => {
     rentals,
     complianceDocs,
     maintenance,
-    payments,
     outboxEvents,
     isAuthenticated,
     setCurrentView,
@@ -105,7 +104,6 @@ export const DashboardView: React.FC = () => {
   const tenantVehicles = (vehicles || []).filter((v) => v.tenantId === activeTenantId);
   const tenantBookings = (bookings || []).filter((b) => b.tenantId === activeTenantId);
   const tenantRentals = (rentals || []).filter((r) => r.tenantId === activeTenantId);
-  const tenantPayments = (payments || []).filter((p) => p.tenantId === activeTenantId);
   const tenantCompliance = (complianceDocs || []).filter((c) => c.tenantId === activeTenantId);
   const tenantOutbox = (outboxEvents || []).filter((e) => e.tenantId === activeTenantId);
 
