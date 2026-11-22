@@ -90,7 +90,7 @@ export function buildAuthoritativePeriodSeries(args: {
   const cashCollections = new Map<string, number>();
   const grossInvoiced = new Map<string, number>();
   const bookingVolume = new Map<string, number>();
-  const headers = new Map(journals.filter(tx => tx.tenantId === tenantId && tx.currency === currency)
+  const headers = new Map(journals.filter(tx => tx.tenantId === tenantId)
     .map(tx => [tx.id, tx]));
   let incompletePostedJournals = 0;
 
@@ -101,6 +101,7 @@ export function buildAuthoritativePeriodSeries(args: {
       if (entry.accountCode.startsWith("4")) incompletePostedJournals++;
       continue;
     }
+    if (header.currency !== currency) continue; // Cross-currency journals are valid, not orphaned.
     // Reversed original journals must remain in the original period, while
     // their separately posted reversal offsets them in the reversal period.
     if (header.status !== "POSTED" && header.status !== "REVERSED") continue;
