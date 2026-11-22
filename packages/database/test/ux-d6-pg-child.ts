@@ -18,9 +18,9 @@ async function main() {
       if(claim!=="REPLAY")throw new Error("Idempotency claim not visible across processes");
       return changed;
     });
-    process.stdout.write(JSON.stringify({id:recordId,version:updated.version,status:updated.value.status})+"\\n");
+    process.stdout.write(JSON.stringify({id:recordId,version:updated.version,status:updated.value.status})+"\n");
     return;
   }
-  process.stdout.write(JSON.stringify({id:record.id,version:record.version,tenantId:record.tenantId})+"\\n");
+  process.stdout.write(JSON.stringify({id:record.id,version:record.version,tenantId:record.tenantId})+"\n");
 }
 main().then(()=>closeBusinessPgPool()).catch(error=>{console.error(error);process.exitCode=1;});
