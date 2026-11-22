@@ -429,6 +429,7 @@ export class MetricsService {
         const byCurrency: Record<string, number> = {};
         for (const entry of entries) {
           const header = headers.get(entry.transactionId);
+          if (!header && entry.accountCode.startsWith("4")) throw new Error("Orphan revenue line has no authoritative journal header");
           // Include an originally posted REVERSED journal and its separate
           // posted reversal. Otherwise corrections disappear from history.
           if (!header || (header.status !== "POSTED" && header.status !== "REVERSED") ||
