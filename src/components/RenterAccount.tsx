@@ -1,4 +1,4 @@
-import React,{useEffect,useMemo,useState} from "react";
+import React,{useEffect,useMemo,useRef,useState} from "react";
 import {AlertTriangle,ArrowLeft,CalendarDays,Car,CheckCircle2,Clock3,Fuel,Gauge,RefreshCw,ShieldCheck} from "lucide-react";
 
 async function publicRequest(path:string,body?:unknown){
@@ -21,26 +21,52 @@ export default function RenterAccount({slug}:{slug:string}){
   const [site,setSite]=useState<any>(null),[booking,setBooking]=useState<any>(null);
   const [bookingReference,setBookingReference]=useState(""),[email,setEmail]=useState("");
   const [busy,setBusy]=useState(false),[error,setError]=useState(""),[lastUpdated,setLastUpdated]=useState<string>("");
+  const requestSeq=useRef(0),requestInFlight=useRef(false);
   const base=`/site/${encodeURIComponent(slug)}`;
 
   useEffect(()=>{let active=true;publicRequest(`website/resolve?subdomain=${encodeURIComponent(slug)}`).then(data=>active&&setSite(data)).catch(()=>{});try{const saved=JSON.parse(localStorage.getItem(storageKey)||"null");if(saved?.bookingReference&&saved?.email){setBookingReference(saved.bookingReference);setEmail(saved.email);void load(saved.bookingReference,saved.email,false);}}catch{}return()=>{active=false;};},[slug]);
 
-  async function load(ref=bookingReference,mail=email,remember=true){
+  async function load(ref=bookingReference,mail=email,remember=true,background=false){
     if(!ref.trim()||!mail.trim())return;
-    setBusy(true);setError("");
+    if(background&&requestInFlight.current)return;
+    const request=++requestSeq.current;
+    requestInFlight.current=true;
+    if(!background){setBusy(true);setError("");}
     try{
       const data=await publicRequest(`booking/account/booking?site=${encodeURIComponent(slug)}`,{bookingReference:ref.trim(),email:mail.trim()});
-      setBooking(data);setLastUpdated(new Date().toISOString());
+      if(request!==requestSeq.current)return;
+      setBooking(data);setError("");setLastUpdated(new Date().toISOString());
       if(remember)localStorage.setItem(storageKey,JSON.stringify({bookingReference:ref.trim(),email:mail.trim()}));
-    }catch(e:any){setBooking(null);setError(e.message||"We could not find that booking.");}
-    finally{setBusy(false);}
+    }catch(e:any){
+      if(request!==requestSeq.current)return;
+      // Retain a previously verified booking during transient network failure.
+      setError(e.message||"Unable to refresh this booking.");
+    }finally{
+      if(request===requestSeq.current){
+        requestInFlight.current=false;
+        if(!background)setBusy(false);
+      }
+    }
   }
 
   useEffect(()=>{
-    if(!booking||!bookingReference||!email)return;
-    const timer=window.setInterval(()=>void load(bookingReference,email,false),30000);
-    return()=>window.clearInterval(timer);
-  },[booking?.bookingId,bookingReference,email]);
+    if(!booking||!bookingReference||!email||["COMPLETED","CANCELLED","REJECTED","EXPIRED","NO_SHOW"].includes(booking.status||""))return;
+    const update=()=>{if(document.visibilityState==="visible")void load(bookingReference,email,false,true);};
+    const onFocus=()=>{
+      if(document.visibilityState!=="visible")return;
+      const last=new Date(lastUpdated||0).getTime();
+      if(!last||Date.now()-last>=60_000)update();
+    };
+    // 30-second quiet tracking only while a live booking is open and visible.
+    const timer=window.setInterval(update,30_000);
+    window.addEventListener("focus",onFocus);
+    document.addEventListener("visibilitychange",onFocus);
+    return()=>{
+      window.clearInterval(timer);
+      window.removeEventListener("focus",onFocus);
+      document.removeEventListener("visibilitychange",onFocus);
+    };
+  },[booking?.bookingId,booking?.status,bookingReference,email,lastUpdated]);
 
   const currentIndex=useMemo(()=>{
     const status=String(booking?.status||"");
@@ -73,10 +99,11 @@ export default function RenterAccount({slug}:{slug:string}){
       </section>}
 
       {booking&&<>
+        {error&&<div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">Could not check the latest booking status. Your last verified details remain visible. {error}</div>}
         <section className="overflow-hidden rounded-3xl bg-slate-950 p-6 text-white sm:p-8">
           <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
             <div><p className="text-xs font-bold uppercase tracking-[.18em] text-emerald-300">Booking {booking.bookingReference}</p><h2 className="mt-2 text-3xl font-black">{human(booking.status)}</h2><p className="mt-2 text-sm text-slate-300">{booking.vehicle?.make} {booking.vehicle?.model} · {dateTime(booking.schedule?.pickupAt)}</p></div>
-            <div className="flex flex-wrap gap-2"><button onClick={()=>void load(bookingReference,email,false)} disabled={busy} className="inline-flex items-center gap-2 rounded-xl bg-white/10 px-4 py-2 text-sm font-semibold"><RefreshCw size={15} className={busy?"animate-spin":""}/>Refresh</button><button onClick={()=>{localStorage.removeItem(storageKey);setBooking(null);setError("");}} className="rounded-xl bg-white px-4 py-2 text-sm font-bold text-slate-950">Switch booking</button></div>
+            <div className="flex flex-wrap gap-2"><button onClick={()=>void load(bookingReference,email,false)} disabled={busy} className="inline-flex items-center gap-2 rounded-xl bg-white/10 px-4 py-2 text-sm font-semibold"><RefreshCw size={15} className={busy?"animate-spin":""}/>Refresh</button><button onClick={()=>{requestSeq.current++;requestInFlight.current=false;localStorage.removeItem(storageKey);setBooking(null);setError("");}} className="rounded-xl bg-white px-4 py-2 text-sm font-bold text-slate-950">Switch booking</button></div>
           </div>
         </section>
 
