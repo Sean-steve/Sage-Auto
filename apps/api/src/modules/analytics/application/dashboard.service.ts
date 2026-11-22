@@ -280,6 +280,7 @@ export class DashboardService {
         currency,
         grossInvoiced: financialSeries.grossInvoicedTotal,
         netRevenue,
+        netInvoicedRevenue: netRevenue,
         postedRevenue: typeof postedRevenue.value === "number" ? postedRevenue.value : 0,
         cashReceipts: typeof cashCollections.value === "number" ? cashCollections.value : 0,
         outstandingReceivables,
