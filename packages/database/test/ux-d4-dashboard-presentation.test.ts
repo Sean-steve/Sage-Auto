@@ -79,7 +79,7 @@ async function main() {
     overview:{...overview,chartAvailability:{...overview.chartAvailability!,postedRevenue:"UNAVAILABLE"}},
   }));
   assert.match(unavailable,/Financial series unavailable/);
-  assert.equal(unavailable.includes("700"),false,"No bogus revenue value when series unavailable");
+  assert.equal(unavailable.includes("<svg"),false,"Unavailable revenue must not render a financial chart");
 
   console.log("UX-D4 PASS: permission-safe presentation, tenant isolation, grouping, empty states, chart accessibility and no fake financial fallbacks");
 }
