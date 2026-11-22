@@ -46,6 +46,19 @@ async function main(){
     "Separate Node process must read committed booking: "+fromSecondProcess.stderr);
   assert.equal(JSON.parse(fromSecondProcess.stdout.trim()).version,2);
 
+  // The worker process is not merely a reader: it must be able to commit a
+  // versioned booking transition and observe the same provider callback claim.
+  const workerWrite=spawnSync(
+    process.execPath,["--import","tsx","packages/database/test/ux-d6-pg-child.ts",a,bookingId,"write"],
+    {encoding:"utf8",env:process.env,timeout:15_000}
+  );
+  assert.equal(workerWrite.status,0,"Independent worker write failed: "+workerWrite.stderr);
+  assert.equal(JSON.parse(workerWrite.stdout.trim()).version,3);
+  await withTenantPgTransaction(a,async()=>{
+    assert.equal((await bookings.find(a,bookingId))?.value.status,"ACTIVE");
+    assert.equal((await bookings.find(a,bookingId))?.version,3);
+  });
+
   await withTenantPgTransaction(b,async()=>{
     assert.equal(await bookings.find(b,bookingId),null,"Foreign tenant cannot see booking");
     assert.equal((await bookings.list(b)).total,0,"RLS excludes foreign tenant rows");
@@ -54,12 +67,12 @@ async function main(){
   });
 
   await assert.rejects(withTenantPgTransaction(a,async()=>{
-    await bookings.update(a,bookingId,1,{
+    await bookings.update(a,bookingId,2,{
       tenantId:a,status:"CANCELLED",bookingNumber:"PG-BOOKING-001",
     });
   }),/version conflict/i);
   await withTenantPgTransaction(a,async()=>{
-    assert.equal((await bookings.find(a,bookingId))?.value.status,"CONFIRMED");
+    assert.equal((await bookings.find(a,bookingId))?.value.status,"ACTIVE");
   });
 
   const rolledBackId=randomUUID();
