@@ -72,6 +72,7 @@ function sumInto(map: Map<string, number>, day: string, value: number): void {
 }
 
 export function buildAuthoritativePeriodSeries(args: {
+  tenantId: string;
   from: string;
   to: string;
   timezone: string;
@@ -82,20 +83,20 @@ export function buildAuthoritativePeriodSeries(args: {
   invoices: OperationalInvoice[];
   bookings: Booking[];
 }): PeriodSeries {
-  const { from, to, timezone, currency, journals, entries, payments, invoices, bookings } = args;
+  const { tenantId, from, to, timezone, currency, journals, entries, payments, invoices, bookings } = args;
   const days = periodDayKeys(from, to, timezone);
   const validDays = new Set(days);
   const postedRevenue = new Map<string, number>();
   const cashCollections = new Map<string, number>();
   const grossInvoiced = new Map<string, number>();
   const bookingVolume = new Map<string, number>();
-  const headers = new Map(journals.filter(tx => tx.tenantId && tx.currency === currency)
+  const headers = new Map(journals.filter(tx => tx.tenantId === tenantId && tx.currency === currency)
     .map(tx => [tx.id, tx]));
   let incompletePostedJournals = 0;
 
   for (const entry of entries) {
     const header = headers.get(entry.transactionId);
-    if (!header) continue;
+    if (!header || entry.tenantId !== tenantId) continue;
     // Reversed original journals must remain in the original period, while
     // their separately posted reversal offsets them in the reversal period.
     if (header.status !== "POSTED" && header.status !== "REVERSED") continue;
@@ -113,7 +114,7 @@ export function buildAuthoritativePeriodSeries(args: {
   }
 
   for (const payment of payments) {
-    if (payment.currency !== currency || payment.direction !== "INBOUND" ||
+    if (payment.tenantId !== tenantId || payment.currency !== currency || payment.direction !== "INBOUND" ||
       !VERIFIED_PAYMENT_STATES.has(payment.status) || !payment.verifiedAt) continue;
     const at = new Date(payment.verifiedAt).getTime();
     if (!Number.isFinite(at) || at < new Date(from).getTime() || at >= new Date(to).getTime()) continue;
@@ -122,14 +123,14 @@ export function buildAuthoritativePeriodSeries(args: {
   }
 
   for (const invoice of invoices) {
-    if (invoice.currency !== currency || !["ISSUED", "PARTIALLY_PAID", "PAID"].includes(invoice.status)) continue;
+    if (invoice.tenantId !== tenantId || invoice.currency !== currency || !["ISSUED", "PARTIALLY_PAID", "PAID"].includes(invoice.status)) continue;
     // An issueDate is a business date (YYYY-MM-DD), not a payment timestamp.
     const day = invoice.issueDate?.slice(0, 10);
     if (day && validDays.has(day)) sumInto(grossInvoiced, day, numberOf(invoice.total));
   }
 
   for (const booking of bookings) {
-    if (!booking.createdAt) continue;
+    if (booking.tenantId !== tenantId || !booking.createdAt) continue;
     const at = new Date(booking.createdAt).getTime();
     if (!Number.isFinite(at) || at < new Date(from).getTime() || at >= new Date(to).getTime()) continue;
     const day = localDayKey(booking.createdAt, timezone);
