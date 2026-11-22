@@ -190,6 +190,9 @@ export class DashboardService {
       journals: journalTransactions, entries: journalEntries,
       payments: receipts, invoices, bookings: bookingRecords,
     });
+    if (financialSeries.incompletePostedJournals) {
+      throw Object.assign(new Error("Posted revenue journal provenance is incomplete; analytics unavailable until reconciled"), { statusCode: 409 });
+    }
     const postedHeaders = new Map(journalTransactions
       .filter(j => j.currency === currency && (j.status === "POSTED" || j.status === "REVERSED"))
       .map(j => [j.id, j]));
@@ -206,8 +209,7 @@ export class DashboardService {
 
     // Present fleet status cannot prove historic eligible fleet-day capacity.
     // An unknown historical series must NOT be fabricated with today's rate.
-    const revenueChart = financialSeries.incompletePostedJournals
-      ? [] : financialSeries.postedRevenue;
+    const revenueChart = financialSeries.postedRevenue;
     const utilizationChart: TimeSeriesPoint[] = [];
 
     // 6. Recent Activity unified stream
