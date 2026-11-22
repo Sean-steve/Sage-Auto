@@ -404,6 +404,24 @@ export class MetricRegistry {
       },
     ],
 
+    [
+      "HANDOVER_PENDING_COUNT",
+      {
+        key: "HANDOVER_PENDING_COUNT",
+        displayName: "Pending Vehicle Handovers",
+        description: "Count of scheduled or in-progress handover records not yet completed.",
+        sourceDomain: "RENTALS",
+        formula: "COUNT(handovers WHERE status != HANDOVER_COMPLETED)",
+        unit: "COUNT",
+        currencyBehavior: "NOT_APPLICABLE",
+        timeBasis: "CURRENT_SNAPSHOT",
+        filterDimensions: [],
+        freshnessMode: "REAL_TIME",
+        permissionRequired: "rental.read",
+        version: 1,
+      },
+    ],
+
     // Financial & Ledger (Authoritative)
     [
       "FINANCE_GROSS_INVOICED",
