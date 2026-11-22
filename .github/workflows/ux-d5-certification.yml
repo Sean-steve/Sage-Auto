@@ -1,0 +1,43 @@
+name: UX-D5 Dashboard Integration Certification
+
+on:
+  push:
+    branches:
+      - feature/ux-d5-dashboard-integration-certification-20261122
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/components/**'
+      - 'src/lib/**'
+      - 'apps/api/src/modules/analytics/**'
+      - 'apps/api/src/modules/tenancy/**'
+      - 'packages/database/test/ux-d*.test.ts'
+      - '.github/workflows/ux-d5-certification.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  compile-and-dashboard-regression:
+    name: Compile, dashboard security and frontend build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 9.15.9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm test:ux-d1
+      - run: pnpm test:ux-d2
+      - run: pnpm test:ux-d3
+      - run: pnpm test:ux-d4
+      - run: pnpm test:access
+      - run: pnpm test:tenancy
+      - run: pnpm test:analytics
+      - run: pnpm build
