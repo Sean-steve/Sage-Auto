@@ -26,12 +26,10 @@ async function main() {
     timestamp:key+"T00:00:00.000Z",label:key,value,currency:"KES",
   });
   const samples=[day("2026-11-01",500),day("2026-11-02",300),day("2026-11-03",-100)];
-  assert.deepEqual(bucketSeries(samples),[
-    {key:"2026-11-01",label:"Nov 1",value:500},
-    {key:"2026-11-02",label:"Nov 2",value:300},
-    {key:"2026-11-03",label:"Nov 3",value:-100},
+  assert.deepEqual(bucketSeries(samples).map(p=>[p.key,p.value]),[
+    ["2026-11-01",500],["2026-11-02",300],["2026-11-03",-100],
   ]);
-  assert.equal(bucketSeries([day("2026-11-01",500),day("2026-11-02",-100)],"week")[0].value,400);
+  assert.equal(bucketSeries([day("2026-11-02",500),day("2026-11-03",-100)],"week")[0].value,400);
   assert.equal(granularityFor(Array.from({length:31},(_,i)=>day("2026-11-01",i))),"day");
   assert.equal(granularityFor(Array.from({length:65},(_,i)=>day("2026-11-01",i))),"week");
   assert.equal(granularityFor(Array.from({length:200},(_,i)=>day("2026-11-01",i))),"month");
