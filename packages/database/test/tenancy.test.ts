@@ -33,6 +33,8 @@ function assert(condition: boolean, message: string) {
 }
 
 async function runTestSuite() {
+  // Legacy transaction executor is intentionally test-only (not a PostgreSQL certification).
+  process.env.NODE_ENV = "test";
   console.log("==================================================================");
   console.log("CAR HIRE OS — SPRINT 4 TENANCY & RLS TEST SUITE");
   console.log("==================================================================");

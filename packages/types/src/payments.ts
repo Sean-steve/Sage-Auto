@@ -428,6 +428,8 @@ export interface ExecuteOwnerPayoutDto {
 }
 
 export interface ListPaymentsFilter {
+  search?: string;
+  limit?: number;
   customerId?: string;
   purpose?: PaymentPurpose;
   status?: PaymentStatus;

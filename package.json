@@ -83,6 +83,11 @@
     "test:durable": "tsx packages/database/test/durable-storage.test.ts",
     "test:runtime": "tsx packages/database/test/runtime-flow.test.ts",
     "test:access": "tsx packages/database/test/access-onboarding.test.ts",
+    "test:ux-d1": "tsx packages/database/test/workspace-search-contract.test.ts",
+    "test:ux-d2": "tsx packages/database/test/first-rental-onboarding.test.ts",
+    "test:ux-d3": "tsx packages/database/test/ux-d3-financial-intelligence.test.ts",
+    "test:ux-d4": "tsx packages/database/test/ux-d4-dashboard-presentation.test.ts",
+    "test:ux-d5": "tsx packages/database/test/ux-d5-dashboard-http-integration.test.ts",
     "review:api": "tsx scripts/access-review.ts",
     "review:web": "VITE_API_PROXY_TARGET=http://127.0.0.1:3511 vite --host 127.0.0.1 --port 3510 --strictPort",
     "test:restoration": "tsx packages/database/test/restoration-hardening.test.ts",
@@ -98,7 +103,11 @@
     "audit:closure": "tsx scripts/closure-integrity-audit.ts",
     "test:closure-audit": "tsx packages/database/test/closure-integrity-audit.test.ts",
     "dev:workers": "LOCAL_PAYMENT_WORKER_ENABLED=true pnpm dev:worker",
-    "dev:worker:payments": "LOCAL_PAYMENT_WORKER_ENABLED=true pnpm dev:worker"
+    "dev:worker:payments": "LOCAL_PAYMENT_WORKER_ENABLED=true pnpm dev:worker",
+    "test:ux-d6": "tsx packages/database/test/ux-d6-postgres-authority.integration.ts",
+    "test:ux-d6:gate": "tsx packages/database/test/ux-d6-runtime-gate.test.ts",
+    "db:authority:audit": "node scripts/ux-d6-cutover-audit.mjs",
+    "db:authority:certify": "node scripts/ux-d6-cutover-audit.mjs --require-complete"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",

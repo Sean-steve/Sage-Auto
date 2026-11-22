@@ -65,6 +65,8 @@ export function createFinanceController(
           rentalId: req.query.rentalId as string,
           status: req.query.status as any,
           overdueOnly: req.query.overdueOnly === "true" ? true : undefined,
+          search: typeof req.query.search === "string" ? req.query.search : undefined,
+          limit: typeof req.query.limit === "string" ? Number(req.query.limit) : undefined,
         });
         res.status(200).json({ success: true, data: invoices });
       } catch (err) {

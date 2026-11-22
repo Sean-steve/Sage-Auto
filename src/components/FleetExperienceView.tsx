@@ -26,6 +26,7 @@ import { openAttachmentReference, uploadSecureResourceFile, type SecureResourceR
 
 type FleetExperienceProps = {
   portal: AccessPortal;
+  focusRecordId?: string;
 };
 
 type Summary = {
@@ -116,7 +117,7 @@ async function uploadVehiclePrimaryImage(vehicleId:string,file:File):Promise<str
   return linked.largeUrl||linked.mediumUrl||linked.thumbnailUrl||"";
 }
 
-export function FleetExperienceView({portal}:FleetExperienceProps) {
+export function FleetExperienceView({portal,focusRecordId}:FleetExperienceProps) {
   const { navigateSection } = useApp();
   const can = (permission:string) => permits(portal, permission);
   const [vehicles,setVehicles]=useState<any[]>([]);
@@ -133,6 +134,7 @@ export function FleetExperienceView({portal}:FleetExperienceProps) {
   const [createOpen,setCreateOpen]=useState(false);
   const [selectedId,setSelectedId]=useState<string|null>(null);
   const requestSeq=useRef(0);
+  useEffect(()=>{if(focusRecordId&&can("vehicle.read"))setSelectedId(focusRecordId);},[portal.id,focusRecordId]);
 
   const query = useMemo(()=>({
     ...(search.trim()?{search:search.trim()}:{}),

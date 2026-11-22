@@ -1,0 +1,41 @@
+name: UX-D4 Premium Dashboard Review
+
+on:
+  push:
+    branches:
+      - feature/ux-d4-premium-dashboard-visual-analytics-20261122
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'src/lib/dashboard-presentation.ts'
+      - 'src/components/dashboard/**'
+      - 'src/components/CompanyOverviewView.tsx'
+      - 'src/components/RestoredWorkspace.tsx'
+      - 'apps/api/src/modules/analytics/presentation/analytics-access.ts'
+      - 'packages/database/test/ux-d4-dashboard-presentation.test.ts'
+      - 'package.json'
+      - '.github/workflows/ux-d4-review.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  premium-dashboard-validation:
+    name: Typecheck, dashboard contracts, analytics and frontend build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 9.15.9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm test:ux-d4
+      - run: pnpm test:ux-d3
+      - run: pnpm test:analytics
+      - run: pnpm test:access
+      - run: pnpm build

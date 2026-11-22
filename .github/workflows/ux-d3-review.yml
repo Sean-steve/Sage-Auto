@@ -1,0 +1,39 @@
+name: UX-D3 Financial Intelligence Review
+
+on:
+  push:
+    branches: [feature/ux-d3-authoritative-analytics-financial-intelligence-20261122]
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'apps/api/src/modules/analytics/**'
+      - 'packages/types/src/analytics.ts'
+      - 'src/lib/api-client.ts'
+      - 'src/components/DashboardView.tsx'
+      - 'packages/database/test/ux-d3-financial-intelligence.test.ts'
+      - 'package.json'
+      - '.github/workflows/ux-d3-review.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  analytics-validation:
+    name: Financial data truth and authorization tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 9.15.9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test:ux-d3
+      - run: pnpm test:analytics
+      - run: pnpm test:finance
+      - run: pnpm test:tenancy

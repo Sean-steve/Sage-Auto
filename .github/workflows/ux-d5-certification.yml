@@ -1,0 +1,130 @@
+name: UX-D5 Dashboard Integration Certification
+
+on:
+  push:
+    branches:
+      - feature/ux-d5-dashboard-integration-certification-20261122
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/components/**'
+      - 'src/lib/**'
+      - 'apps/api/src/modules/analytics/**'
+      - 'apps/api/src/modules/tenancy/**'
+      - 'packages/database/test/ux-d*.test.ts'
+      - '.github/workflows/ux-d5-certification.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  compile-and-dashboard-regression:
+    name: Compile, dashboard security and frontend build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 9.15.9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm test:ux-d1
+      - run: pnpm test:ux-d2
+      - run: pnpm test:ux-d3
+      - run: pnpm test:ux-d4
+      - run: pnpm test:ux-d5
+      - run: pnpm test:access
+      - run: pnpm test:tenancy
+      - run: pnpm test:analytics
+      - run: pnpm build
+
+  lifecycle-and-cross-portal-regression:
+    name: Rental, payment, tenancy and cross-portal lifecycle
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 9.15.9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test:authz
+      - run: pnpm test:phase4
+      - run: pnpm test:bookings
+      - run: pnpm test:rentals
+      - run: pnpm test:payments
+      - run: pnpm test:finance
+      - run: pnpm test:owner-settlements
+      - run: pnpm test:phase5
+
+  postgres-redis-truth-audit:
+    name: PostgreSQL 17 and Redis readiness (production authority BLOCKED)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: carhire
+          POSTGRES_PASSWORD: ci_local_only_secret
+          POSTGRES_DB: carhire_platform
+        ports: ["55432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U carhire -d carhire_platform"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ["56379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      NODE_ENV: development
+      APP_ENV: development
+      DATABASE_URL: postgresql://carhire:ci_local_only_secret@127.0.0.1:55432/carhire_platform
+      REDIS_URL: redis://127.0.0.1:56379
+      REDIS_REQUIRE_LIVE: "true"
+      REDIS_SIMULATED: "false"
+      LOCAL_CERTIFICATION_MODE: "true"
+      SQLITE_PATH: /tmp/sage-d5-ci/records.sqlite
+      APP_PUBLIC_URL: http://127.0.0.1:3000
+      ACCESS_REVIEW_MODE: "false"
+      LOCAL_PAYMENT_WORKER_ENABLED: "false"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 9.15.9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Install PostgreSQL CLI
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
+      - name: Migrate PostgreSQL and verify idempotency
+        run: pnpm db:migrate && pnpm db:migrate
+      - name: Check live PostgreSQL RLS and schema tracking
+        run: |
+          test "$(psql "$DATABASE_URL" -XqAt -c 'SELECT count(*) FROM sage_auto_schema_migrations;')" = "5"
+          test "$(psql "$DATABASE_URL" -XqAt -c "SELECT count(*) FROM pg_class WHERE relname IN ('tenant_settings','tenant_memberships','idempotency_keys') AND relrowsecurity AND relforcerowsecurity;")" = "3"
+      - name: Inspect live PostgreSQL and Redis readiness
+        run: pnpm local:doctor
+      - name: Verify real BullMQ worker startup
+        run: pnpm local:worker:smoke
+      - name: Enforce known production authority blocker
+        run: |
+          if node scripts/phase5-local-doctor.mjs --require-production-backend; then
+            echo "FAIL: This revision incorrectly claims PostgreSQL business-record authority." >&2
+            exit 1
+          fi
+          echo "EXPECTED BLOCK: PostgreSQL schema and Redis may work, but app business-record authority remains SQLite (Issue #33)."

@@ -99,21 +99,21 @@ export class ReconciliationService {
 
     // 2. Cash Collections vs Payments
     const completedPaymentsSum = payments
-      .filter((p) => p.status === "VERIFIED" || p.status === "ALLOCATED" || (p.status as any) === "COMPLETED")
+      .filter((p) => p.direction === "INBOUND" && ["VERIFIED","PARTIALLY_ALLOCATED","ALLOCATED","PARTIALLY_REFUNDED","REFUNDED"].includes(p.status))
       .reduce((sum, p) => sum + parseFloat(String(p.amount || 0)), 0);
-    const cashVariance = Math.abs(completedPaymentsSum - (cashDebits || completedPaymentsSum));
+    const cashVariance = Math.abs(completedPaymentsSum - cashDebits);
     const cashPass = cashVariance < 0.01;
 
     // 3. Accounts Receivable Integrity
     const openInvoicesSum = invoices
       .filter((i) => i.status === "ISSUED" || i.status === "PARTIALLY_PAID")
       .reduce((sum, i) => sum + parseFloat(String(i.amountOutstanding || 0)), 0);
-    const arVariance = Math.abs(openInvoicesSum - (arDebits || openInvoicesSum));
+    const arVariance = Math.abs(openInvoicesSum - arDebits);
     const arPass = arVariance < 0.01;
 
     // 4. Owner Settlements Audit
     const totalOwnerPayable = settlementPeriods.reduce((sum, p) => sum + (p.totalPayout || 0), 0);
-    const ownerVariance = Math.abs(totalOwnerPayable - (ownerLiabilitiesCredits || totalOwnerPayable));
+    const ownerVariance = Math.abs(totalOwnerPayable - ownerLiabilitiesCredits);
     const ownerPass = ownerVariance < 0.01;
 
     const allPass = glPass && cashPass && arPass && ownerPass;
@@ -135,7 +135,7 @@ export class ReconciliationService {
         cashCollectionsVsPayments: {
           status: cashPass ? "PASS" : "FAIL",
           verifiedPaymentsSum: completedPaymentsSum,
-          cashAccountDebits: cashDebits || completedPaymentsSum,
+          cashAccountDebits: cashDebits,
           variance: Math.round(cashVariance * 100) / 100,
           message: cashPass
             ? "Verified payments match general ledger cash entries."
@@ -144,7 +144,7 @@ export class ReconciliationService {
         accountsReceivableIntegrity: {
           status: arPass ? "PASS" : "FAIL",
           invoiceBalancesSum: openInvoicesSum,
-          arAccountBalance: arDebits || openInvoicesSum,
+          arAccountBalance: arDebits,
           variance: Math.round(arVariance * 100) / 100,
           message: arPass
             ? "Open invoice balances match Accounts Receivable ledger."
@@ -153,7 +153,7 @@ export class ReconciliationService {
         ownerSettlementsAudit: {
           status: ownerPass ? "PASS" : "FAIL",
           totalPayableSum: totalOwnerPayable,
-          ledgerLiabilityBalance: ownerLiabilitiesCredits || totalOwnerPayable,
+          ledgerLiabilityBalance: ownerLiabilitiesCredits,
           variance: Math.round(ownerVariance * 100) / 100,
           message: ownerPass
             ? "Owner settlement statements match accrued ledger liabilities."

@@ -707,7 +707,7 @@ class ApiClient {
   public analytics = {
     getDashboard: (params?: Record<string, any>) => {
       const q = new URLSearchParams(params).toString();
-      return this.get(`/analytics/dashboard${q ? `?${q}` : ''}`);
+      return this.get<import("@carhire/types").TenantDashboardOverviewDto>(`/analytics/dashboard${q ? `?${q}` : ''}`);
     },
     getReportCatalogue: () => this.get('/reports/catalogue'),
     getReportExecutions: () => this.get('/reports/executions'),

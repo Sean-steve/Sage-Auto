@@ -35,6 +35,7 @@ export type MetricKey =
   | "RENTAL_AVERAGE_DURATION_DAYS"
   | "RENTAL_EXTENSIONS_COUNT"
   | "RENTAL_LATE_RETURN_COUNT"
+  | "HANDOVER_PENDING_COUNT"
   // Financial & Ledger (Authoritative)
   | "FINANCE_GROSS_INVOICED"
   | "FINANCE_TAX_INVOICED"
@@ -207,7 +208,10 @@ export interface CrmFunnelSummary {
 export interface FinancialSummaryKpis {
   currency: string;
   grossInvoiced: number;
+  /** Historical invoice subtotal net of explicit discounts, NOT ledger revenue. */
   netRevenue: number;
+  /** Explicit invoice-based alias for consumer labels. */
+  netInvoicedRevenue?: number;
   postedRevenue: number;
   cashReceipts: number;
   outstandingReceivables: number;
@@ -233,8 +237,21 @@ export interface TenantDashboardOverviewDto {
   fleetStatus: FleetStatusBreakdown;
   crmFunnel: CrmFunnelSummary;
   financialSummary: FinancialSummaryKpis;
+  /** Ledger-posted revenue only. Empty when journal provenance is incomplete. */
   revenueChart: TimeSeriesPoint[];
+  cashCollectionsChart?: TimeSeriesPoint[];
+  grossInvoicedChart?: TimeSeriesPoint[];
+  bookingVolumeChart?: TimeSeriesPoint[];
+  /** An empty array plus UNAVAILABLE is intentionally not a flat utilization history. */
   utilizationChart: TimeSeriesPoint[];
+  chartAvailability?: {
+    postedRevenue: "VERIFIED" | "UNAVAILABLE";
+    cashCollections: "VERIFIED" | "UNAVAILABLE";
+    grossInvoiced: "VERIFIED" | "UNAVAILABLE";
+    bookingVolume: "VERIFIED" | "UNAVAILABLE";
+    utilization: "VERIFIED" | "UNAVAILABLE";
+    utilizationReason?: string;
+  };
   recentActivity: Array<{
     id: string;
     type: "BOOKING" | "RENTAL" | "PAYMENT" | "LEAD" | "COMPLIANCE";

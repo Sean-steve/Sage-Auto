@@ -2,9 +2,13 @@ import React, { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import {
   ArrowLeftRight, Banknote, BookOpenCheck, Building2, CalendarRange, CarFront, ChevronLeft,
   ClipboardCheck, Gauge, Globe2, LayoutDashboard, LogOut, Menu, ReceiptText, Settings2,
-  ShieldCheck, Tags, UsersRound, WalletCards, Wrench, X, Search, Sun, Moon, ChevronRight
+  Tags, UsersRound, WalletCards, Wrench, Sun, Moon, ChevronRight, ShieldCheck
 } from "lucide-react";
 import { AppProvider, useApp } from "../lib/store";
+import { WorkspaceSearch } from "./WorkspaceSearch";
+import { WorkspaceAccountMenu } from "./WorkspaceAccountMenu";
+import { WorkspaceSetupGuide } from "./WorkspaceSetupGuide";
+import type { WorkspaceSearchItem } from "../lib/workspace-search";
 import type { AccessContext, AccessPortal } from "../lib/access-context";
 import { FleetExperienceView } from "./FleetExperienceView";
 import { CustomersDriversExperienceView } from "./CustomersDriversExperienceView";
@@ -65,14 +69,15 @@ const groupDefs=[
   {label:"Workspace",ids:["website","team","settings"]},
 ];
 
-function WorkspaceScreen({section,portal}:{section:string;portal:AccessPortal}) {
+function WorkspaceScreen({section,portal,focusedRecord}:{section:string;portal:AccessPortal;focusedRecord:WorkspaceSearchItem|null}) {
+  const focusRecordId=focusedRecord?.section===section?focusedRecord.id:undefined;
   const {workspaceLoading,workspaceError}=useApp();
   if(section==="overview") return <div className="sage-module"><CompanyOverviewView portal={portal}/></div>;
-  if(section==="fleet") return <div className="sage-module"><FleetExperienceView portal={portal}/></div>;
-  if(section==="customers") return <div className="sage-module"><CustomersDriversExperienceView portal={portal}/></div>;
+  if(section==="fleet") return <div className="sage-module"><FleetExperienceView portal={portal} focusRecordId={focusRecordId}/></div>;
+  if(section==="customers") return <div className="sage-module"><CustomersDriversExperienceView portal={portal} focusRecordId={focusRecordId} focusKind={focusedRecord?.kind}/></div>;
   if(section==="pricing") return <div className="sage-module"><PricingExperienceView portal={portal}/></div>;
   if(section==="availability") return <div className="sage-module"><AvailabilityExperienceView portal={portal}/></div>;
-  if(section==="bookings") return <div className="sage-module"><BookingExperienceView portal={portal}/></div>;
+  if(section==="bookings") return <div className="sage-module"><BookingExperienceView portal={portal} focusRecordId={focusRecordId}/></div>;
   if(section==="handover") return <div className="sage-module"><ContractHandoverExperienceView portal={portal}/></div>;
   if(section==="team") return <div className="sage-module"><TeamWorkspaceView portal={portal}/></div>;
   const views:Record<string,React.ElementType>={
@@ -85,16 +90,14 @@ function WorkspaceScreen({section,portal}:{section:string;portal:AccessPortal}) 
   return <div className="sage-module">
     {workspaceError&&<div role="alert" className="m-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 sm:m-6">{workspaceError}</div>}
     {workspaceLoading&&["inspections","maintenance","compliance","owners","settings"].includes(section)&&<div className="px-6 pt-5 text-xs font-semibold text-slate-400">Syncing workspace records…</div>}
-    <Suspense fallback={<div className="grid min-h-[50vh] place-items-center p-8"><div className="w-full max-w-4xl space-y-4"><div className="sage-skeleton h-7 w-48">Loading</div><div className="grid gap-3 sm:grid-cols-3"><div className="sage-skeleton h-24">Loading</div><div className="sage-skeleton h-24">Loading</div><div className="sage-skeleton h-24">Loading</div></div><div className="sage-skeleton h-72">Loading</div></div></div>}><View/></Suspense>
+    <Suspense fallback={<div className="grid min-h-[50vh] place-items-center p-8"><div className="w-full max-w-4xl space-y-4"><div className="sage-skeleton h-7 w-48">Loading</div><div className="grid gap-3 sm:grid-cols-3"><div className="sage-skeleton h-24">Loading</div><div className="sage-skeleton h-24">Loading</div><div className="sage-skeleton h-24">Loading</div></div><div className="sage-skeleton h-72">Loading</div></div></div>}>{section==="rentals"?<RentalsView focusRecordId={focusRecordId}/>:section==="finance"?<FinanceView focusRecordId={focusRecordId} focusKind={focusedRecord?.kind}/>:section==="settings"?<><div className="mx-auto max-w-[1500px] px-4 pt-6 sm:px-6"><WorkspaceSetupGuide portal={portal} mode="settings"/></div><View/></>:<View/>}</Suspense>
   </div>;
 }
 
 function Shell({context,portal,section,onSection,onSwitch,onSignOut}:{context:AccessContext;portal:AccessPortal;section:string;onSection:(s:string)=>void;onSwitch:()=>void;onSignOut:()=>void}) {
   const [mobileOpen,setMobileOpen]=useState(false);
-  const [commandOpen,setCommandOpen]=useState(false);
-  const [commandQuery,setCommandQuery]=useState("");
+  const [focusedRecord,setFocusedRecord]=useState<WorkspaceSearchItem|null>(null);
   const [sidebarCollapsed,setSidebarCollapsed]=useState(()=>localStorage.getItem("sage_sidebar_collapsed")==="1");
-  const [density,setDensity]=useState<"comfortable"|"compact">(()=>localStorage.getItem("sage_density")==="compact"?"compact":"comfortable");
   const [theme,setTheme]=useState<"light"|"dark">(()=>{
     const saved=localStorage.getItem("sage_theme");
     if(saved==="dark"||saved==="light")return saved;
@@ -102,33 +105,33 @@ function Shell({context,portal,section,onSection,onSwitch,onSignOut}:{context:Ac
   });
   const permitted=new Set(portal.sections.map(s=>s.id));
   const groups=useMemo(()=>groupDefs.map(group=>({...group,ids:group.ids.filter(id=>permitted.has(id))})).filter(group=>group.ids.length),[portal.id,portal.sections.map(s=>s.id).join("|")]);
-  const commandItems=useMemo(()=>portal.sections.map(item=>({
-    id:item.id,
-    label:item.label,
-    description:descriptions[item.id]||"Open workspace section",
-    icon:icons[item.id]||ReceiptText,
-  })).filter(item=>{
-    const q=commandQuery.trim().toLowerCase();
-    return !q||item.label.toLowerCase().includes(q)||item.description.toLowerCase().includes(q)||item.id.toLowerCase().includes(q);
-  }),[portal.sections,commandQuery]);
 
   useEffect(()=>{localStorage.setItem("sage_sidebar_collapsed",sidebarCollapsed?"1":"0");},[sidebarCollapsed]);
-  useEffect(()=>{localStorage.setItem("sage_density",density);},[density]);
   useEffect(()=>{localStorage.setItem("sage_theme",theme);},[theme]);
-  useEffect(()=>{
-    const key=(event:KeyboardEvent)=>{
-      if((event.metaKey||event.ctrlKey)&&event.key.toLowerCase()==="k"){event.preventDefault();setCommandOpen(v=>!v);}
-      if(event.key==="Escape")setCommandOpen(false);
-    };
-    window.addEventListener("keydown",key);return()=>window.removeEventListener("keydown",key);
-  },[]);
+  useEffect(()=>{if(focusedRecord&&focusedRecord.section!==section)setFocusedRecord(null);},[section,focusedRecord]);
 
   useEffect(()=>{
-    const handler=(event:Event)=>{const id=(event as CustomEvent).detail?.section;if(id&&permitted.has(id))onSection(id);};
+    const handler=(event:Event)=>{
+      const detail=(event as CustomEvent).detail;
+      const id=detail?.section;
+      if(!id||!permitted.has(id))return;
+      const record=detail?.record as Partial<WorkspaceSearchItem>|undefined;
+      const allowedKinds:Record<string,string>={VEHICLE:"fleet",CUSTOMER:"customers",DRIVER:"customers",BOOKING:"bookings",RENTAL:"rentals",INVOICE:"finance",PAYMENT:"finance"};
+      if(record?.kind&&allowedKinds[record.kind]===id&&typeof record.id==="string"&&record.id.length<160){
+        setFocusedRecord({kind:record.kind,id:record.id,section:id,title:String(record.title||""),subtitle:String(record.subtitle||"")});
+      }else setFocusedRecord(null);
+      onSection(id);
+    };
     window.addEventListener("sage:navigate",handler);return()=>window.removeEventListener("sage:navigate",handler);
   },[portal.id,portal.sections.map(s=>s.id).join("|")]);
 
-  const select=(id:string)=>{onSection(id);setMobileOpen(false);setCommandOpen(false);setCommandQuery("");};
+  const select=(id:string)=>{setFocusedRecord(null);onSection(id);setMobileOpen(false);};
+  const openSearchResult=(result:WorkspaceSearchItem)=>{
+    if(!portal.sections.some(item=>item.id===result.section))return;
+    setFocusedRecord(result.kind==="MODULE"?null:result);
+    onSection(result.section);
+    setMobileOpen(false);
+  };
   const roles=portal.roles.map(r=>r.replaceAll("_"," ").toLowerCase().replace(/\b\w/g,c=>c.toUpperCase())).join(" · ");
   const title=portal.sections.find(s=>s.id===section)?.label||section;
   const Sidebar=()=> <aside className="sage-sidebar flex h-full flex-col text-white">
@@ -146,31 +149,27 @@ function Shell({context,portal,section,onSection,onSwitch,onSignOut}:{context:Ac
     </div>
   </aside>;
 
-  return <div className="saas-workspace min-h-dvh text-slate-900" data-density={density} data-theme={theme}>
+  return <div className="saas-workspace min-h-dvh text-slate-900" data-density="comfortable" data-theme={theme}>
     <div className={`fixed inset-y-0 left-0 z-40 hidden transition-[width] duration-200 lg:block ${sidebarCollapsed?"w-[76px]":"w-[272px]"}`}><Sidebar/></div>
     {mobileOpen&&<div className="fixed inset-0 z-50 lg:hidden"><button aria-label="Close navigation" className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm" onClick={()=>setMobileOpen(false)}/><div className="relative h-full w-[86vw] max-w-[310px] shadow-2xl"><Sidebar/></div></div>}
     <div className={`min-w-0 transition-[padding] duration-200 ${sidebarCollapsed?"lg:pl-[76px]":"lg:pl-[272px]"}`}>
-      <header className="sage-topbar sticky top-0 z-30 flex items-center justify-between gap-4 border-b bg-white/90 px-4 backdrop-blur-xl sm:px-6 lg:px-8">
-        <div className="flex min-w-0 items-center gap-3"><button onClick={()=>setMobileOpen(true)} className="grid h-10 w-10 place-items-center rounded-xl border border-slate-200 lg:hidden"><Menu size={18}/></button><div className="min-w-0"><div className="truncate text-[11px] font-bold uppercase tracking-[.16em] text-slate-400">{portal.name}</div><div className="truncate text-base font-black tracking-tight text-slate-950">{title}</div></div></div>
-        <div className="flex items-center gap-2">
-          <button onClick={()=>setCommandOpen(true)} className="hidden h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-500 hover:bg-slate-50 sm:flex"><Search size={14}/>Search <span className="sage-command-kbd">⌘K</span></button>
-          <button title={density==="compact"?"Use comfortable density":"Use compact density"} onClick={()=>setDensity(d=>d==="compact"?"comfortable":"compact")} className="grid h-9 w-9 place-items-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:bg-slate-50"><Gauge size={15}/></button>
-          <button title={theme==="dark"?"Use light mode":"Use dark mode"} onClick={()=>setTheme(t=>t==="dark"?"light":"dark")} className="grid h-9 w-9 place-items-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:bg-slate-50">{theme==="dark"?<Sun size={15}/>:<Moon size={15}/>}</button>
-          <span className="hidden items-center gap-2 rounded-full bg-emerald-50 px-3 py-1.5 text-[11px] font-bold text-emerald-700 xl:flex"><ShieldCheck size={13}/>Verified</span>
-          <div className="grid h-9 w-9 place-items-center rounded-full bg-slate-900 text-xs font-black text-white">{context.user.fullName.split(/\s+/).map(x=>x[0]).join("").slice(0,2).toUpperCase()}</div>
+      <header className="sage-topbar sticky top-0 z-30 flex items-center gap-3 border-b bg-white/90 px-4 backdrop-blur-xl sm:px-6 lg:gap-5 lg:px-8">
+        <div className="flex min-w-0 shrink items-center gap-3">
+          <button onClick={()=>setMobileOpen(true)} aria-label="Open navigation" className="grid h-10 w-10 place-items-center rounded-xl border border-slate-200 lg:hidden"><Menu size={18}/></button>
+          <div className="min-w-0"><div className="max-w-[92px] truncate text-[11px] font-bold uppercase tracking-[.16em] text-slate-400 sm:max-w-[125px] lg:max-w-[170px] xl:max-w-[235px]">{portal.name}</div><div className="max-w-[115px] truncate text-base font-black tracking-tight text-slate-950 sm:max-w-[145px] lg:max-w-none">{title}</div></div>
+        </div>
+        <div className="flex min-w-0 flex-1 justify-center">
+          <WorkspaceSearch key={portal.id+portal.permissions.join("|")} portal={portal} descriptions={descriptions} onSelect={openSearchResult}/>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <button title={theme==="dark"?"Use light mode":"Use dark mode"} aria-label={theme==="dark"?"Use light mode":"Use dark mode"} onClick={()=>setTheme(t=>t==="dark"?"light":"dark")} className="grid h-9 w-9 place-items-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:bg-slate-50">{theme==="dark"?<Sun size={15}/>:<Moon size={15}/>}</button>
+          {context.user.emailVerified&&<span className="hidden rounded-full bg-emerald-50 px-3 py-1.5 text-[11px] font-bold text-emerald-700 xl:inline-flex">Email verified</span>}
+          <WorkspaceAccountMenu context={context} portal={portal} onSection={select} onSwitch={onSwitch} onSignOut={onSignOut}/>
         </div>
       </header>
       {section!=="overview"&&<div className="sage-page-context border-b bg-white px-4 sm:px-6 lg:px-8"><div className="mx-auto max-w-[1500px]"><div className="text-[10px] font-black uppercase tracking-[.2em] text-emerald-600">Company workspace</div><div className="mt-1 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between"><div><h1 className="text-2xl font-black tracking-[-.025em] text-slate-950">{title}</h1><p className="mt-1 text-sm text-slate-500">{descriptions[section]||"Operational workspace"}</p></div></div></div></div>}
-      <main className="min-w-0 overflow-x-hidden"><WorkspaceScreen key={section} section={section} portal={portal}/></main>
-      {commandOpen&&<div className="fixed inset-0 z-[70] flex items-start justify-center bg-slate-950/40 px-4 pt-[10vh] backdrop-blur-sm" onMouseDown={e=>{if(e.target===e.currentTarget)setCommandOpen(false);}}>
-        <section role="dialog" aria-modal="true" aria-label="Search Sage Auto" className="w-full max-w-2xl overflow-hidden border border-slate-200 bg-white shadow-2xl">
-          <div className="flex items-center gap-3 border-b border-slate-200 px-4"><Search size={18} className="text-slate-400"/><input autoFocus value={commandQuery} onChange={e=>setCommandQuery(e.target.value)} placeholder="Search modules and workflows…" className="h-14 flex-1 border-0 bg-transparent text-sm text-slate-900 outline-none"/><span className="sage-command-kbd">ESC</span></div>
-          <div className="max-h-[60vh] overflow-y-auto p-2">
-            {!commandItems.length?<div className="p-8 text-center text-sm text-slate-500">No matching workspace action.</div>:commandItems.map(item=>{const Icon=item.icon;return <button key={item.id} onClick={()=>select(item.id)} className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left hover:bg-slate-50"><span className="grid h-9 w-9 place-items-center rounded-lg bg-slate-100 text-slate-600"><Icon size={16}/></span><span className="min-w-0 flex-1"><span className="block text-sm font-semibold text-slate-900">{item.label}</span><span className="mt-0.5 block truncate text-xs text-slate-500">{item.description}</span></span><ChevronRight size={15} className="text-slate-300"/></button>})}
-          </div>
-          <div className="flex items-center justify-between border-t border-slate-200 bg-slate-50 px-4 py-2 text-[11px] text-slate-500"><span>Navigate the company workspace</span><span>Ctrl/⌘ K</span></div>
-        </section>
-      </div>}
+      <main className="min-w-0 overflow-x-hidden"><WorkspaceScreen key={section} section={section} portal={portal} focusedRecord={focusedRecord}/></main>
+
     </div>
   </div>;
 }

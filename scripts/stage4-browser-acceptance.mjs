@@ -12,7 +12,7 @@
  * NOT payment-provider E2E, settlement money movement, or live environment test.
  */
 import assert from 'node:assert/strict';
-import { readFileSync, mkdtempSync, existsSync, rmSync } from 'node:fs';
+import { readFileSync, mkdtempSync, existsSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawn, execFileSync } from 'node:child_process';
@@ -222,6 +222,50 @@ try {
     const uiLabels=await cdp.evaluate(`([...document.querySelectorAll('button.sage-nav-item, nav[aria-label="Workspace navigation"] button, nav[aria-label="Vehicle owner sections"] button, nav[aria-label="Platform navigation"] button')].map(n=>n.textContent.trim()))`);
     for(const sectionLabel of uiLabels) {
       assert.ok(allowed.has(sectionLabel),spec.role+' is rendered unauthorized section '+sectionLabel);
+    }
+    // UX-D6.7: Company Owner dashboard in real Chromium on three widths.
+    if(spec.role==='COMPANY_OWNER') {
+      const overview=portal.sections.find(s=>s.id==='overview');
+      assert.ok(overview,'Company Owner must have Overview navigation');
+      await cdp.clickSection(overview.label);
+      await waitFor(()=>cdp.evaluate('(()=>{const t=document.querySelector("main")?.innerText||"";return t.includes("Your business, at a glance.")&&t.includes("Revenue and collections")&&t.includes("Booking trends")&&t.includes("Fleet status")&&t.includes("Posted revenue")&&t.includes("Cash received");})()'),
+        'premium Company Overview renders',30000);
+      checks+=6;
+      const dashboard=await req('/analytics/dashboard?preset=THIS_MONTH',token,tenantId);
+      assert.equal(dashboard.status,200,'Company Owner must have analytics');
+      const dto=(await dashboard.json()).data;
+      assert.equal(dto.tenantId,tenantId,'Dashboard must match authenticated tenant');
+      assert.equal(dto.chartAvailability.utilization,'UNAVAILABLE','Never fabricate historical utilization');
+      checks+=2;
+      for(const width of [390,768,1280]) {
+        await cdp.call('Emulation.setDeviceMetricsOverride',{
+          width,height:900,deviceScaleFactor:1,mobile:width<768,
+        });
+        await delay(350);
+        const actual=await cdp.evaluate('(()=>{return {width:innerWidth,scroll:document.documentElement.scrollWidth,header:[...document.querySelectorAll("h1")].some(n=>n.textContent.includes("Your business, at a glance.")),plot:!!document.querySelector("section[aria-label=\\"Financial trends\\"]")};})()');
+        assert.equal(actual.header,true,'Overview heading missing at '+width+'px');
+        assert.equal(actual.plot,true,'Finance trend missing at '+width+'px');
+        if(actual.scroll>actual.width+24){
+          const offenders=await cdp.evaluate('([...document.querySelectorAll("body *")].map(n=>({tag:n.tagName,cls:String(n.className?.baseVal||n.className||"").slice(0,95),txt:(n.textContent||"").slice(0,40),right:Math.round(n.getBoundingClientRect().right),left:Math.round(n.getBoundingClientRect().left),width:Math.round(n.getBoundingClientRect().width)})).filter(r=>r.right>innerWidth+20&&r.width>0).sort((a,b)=>b.right-a.right).slice(0,15))');
+          console.error('Responsive overflow diagnostics at '+width+'px:',JSON.stringify(offenders));
+        }
+        assert.ok(actual.scroll<=actual.width+24,
+          'Horizontal overflow at '+width+'px: '+actual.scroll+' > '+actual.width);
+        checks+=3;
+        if(process.env.UX_D6_SCREENSHOT_DIR) {
+          mkdirSync(process.env.UX_D6_SCREENSHOT_DIR,{recursive:true,mode:0o700});
+          const capture=await cdp.call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
+          writeFileSync(join(process.env.UX_D6_SCREENSHOT_DIR,'company-dashboard-'+width+'.png'),
+            Buffer.from(capture.data,'base64'),{mode:0o600});
+        }
+      }
+      await cdp.call('Emulation.clearDeviceMetricsOverride');
+      const switched=await cdp.evaluate('(()=>{const btn=[...document.querySelectorAll("section[aria-label=\\"Financial trends\\"] button")].find(b=>b.textContent.includes("Cash received"));if(!btn)return false;btn.click();return true;})()');
+      assert.equal(switched,true,'Collections series switcher missing');
+      await waitFor(()=>cdp.evaluate('([...document.querySelectorAll("section[aria-label=\\"Financial trends\\"] button")].some(b=>b.textContent.includes("Cash received")&&b.getAttribute("aria-pressed")==="true"))'),
+        'Cash collections series selected');
+      checks++;
+      console.log('PASS UX-D6.7 Company Overview: validated charts, 390/768/1280 widths and financial series switch.');
     }
     for(const section of spec.sections) {
       const s=portal.sections.find(item=>item.id===section);

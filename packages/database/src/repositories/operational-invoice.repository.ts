@@ -24,6 +24,8 @@ export interface ListInvoicesFilter {
   rentalId?: string;
   status?: OperationalInvoiceStatus;
   overdueOnly?: boolean;
+  search?: string;
+  limit?: number;
 }
 
 export interface IOperationalInvoiceRepository {
@@ -113,6 +115,10 @@ export class OperationalInvoiceRepository implements IOperationalInvoiceReposito
       if (filter?.corporateAccountId && inv.corporateAccountId !== filter.corporateAccountId) continue;
       if (filter?.rentalId && inv.rentalId !== filter.rentalId) continue;
       if (filter?.status && inv.status !== filter.status) continue;
+      if (filter?.search) {
+        const q=String(filter.search).trim().toLowerCase();
+        if (!inv.invoiceNumber.toLowerCase().includes(q) && !String(inv.billingSnapshot?.customerName||"").toLowerCase().includes(q)) continue;
+      }
       if (filter?.overdueOnly) {
         const isOverdue =
           inv.status !== "PAID" &&
@@ -124,7 +130,9 @@ export class OperationalInvoiceRepository implements IOperationalInvoiceReposito
       results.push(JSON.parse(JSON.stringify(inv)));
     }
 
-    return results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    const limit=Number(filter?.limit);
+    return Number.isFinite(limit)&&limit>=1 ? results.slice(0,Math.min(50,Math.floor(limit))) : results;
   }
 
   async create(

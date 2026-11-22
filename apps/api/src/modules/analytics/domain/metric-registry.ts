@@ -404,6 +404,24 @@ export class MetricRegistry {
       },
     ],
 
+    [
+      "HANDOVER_PENDING_COUNT",
+      {
+        key: "HANDOVER_PENDING_COUNT",
+        displayName: "Pending Vehicle Handovers",
+        description: "Count of scheduled or in-progress handover records not yet completed.",
+        sourceDomain: "RENTALS",
+        formula: "COUNT(handovers WHERE status != HANDOVER_COMPLETED)",
+        unit: "COUNT",
+        currencyBehavior: "NOT_APPLICABLE",
+        timeBasis: "CURRENT_SNAPSHOT",
+        filterDimensions: [],
+        freshnessMode: "REAL_TIME",
+        permissionRequired: "rental.read",
+        version: 1,
+      },
+    ],
+
     // Financial & Ledger (Authoritative)
     [
       "FINANCE_GROSS_INVOICED",
@@ -478,7 +496,7 @@ export class MetricRegistry {
       {
         key: "FINANCE_POSTED_REVENUE",
         displayName: "General Ledger Posted Revenue",
-        description: "Authoritative earned revenue: net credit postings to REVENUE accounts in POSTED journal entries",
+        description: "Net revenue account credits less debits from posted journal headers in the selected posting period; reversal entries included.",
         sourceDomain: "LEDGER",
         formula: "SUM(journal_entries.credit - journal_entries.debit WHERE accountType = 'REVENUE')",
         unit: "CURRENCY",
@@ -495,9 +513,9 @@ export class MetricRegistry {
       {
         key: "FINANCE_CASH_RECEIPTS",
         displayName: "Verified Cash Receipts",
-        description: "Authoritative cash and electronic collections: sum of verified COMPLETED Payments",
+        description: "Gross verified incoming customer funds (including refundable deposits); not recognized revenue. Refund outflows reported separately.",
         sourceDomain: "FINANCE",
-        formula: "SUM(payments.amount WHERE status = 'COMPLETED')",
+        formula: "SUM(payment.amount WHERE inbound AND verifiedAt IN period AND status is verified/allocated/refunded); gross receipts, refunds separate",
         unit: "CURRENCY",
         currencyBehavior: "GROUPED_BY_CURRENCY",
         timeBasis: "PAYMENT_VERIFIED",

@@ -113,11 +113,17 @@ export class PaymentRepository implements IPaymentRepository {
       if (filter?.direction && payment.direction !== filter.direction) continue;
       if (filter?.provider && payment.provider !== filter.provider) continue;
       if (filter?.customerId && payment.sourceContext?.customerId !== filter.customerId) continue;
+      if (filter?.search) {
+        const q=String(filter.search).trim().toLowerCase();
+        if (![payment.paymentNumber,payment.providerTransactionId,payment.providerReference].some(value=>String(value||"").toLowerCase().includes(q))) continue;
+      }
       if (filter?.fromDate && payment.paidAt < filter.fromDate) continue;
       if (filter?.toDate && payment.paidAt > filter.toDate) continue;
       results.push({ ...payment });
     }
-    return results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    const limit=Number(filter?.limit);
+    return Number.isFinite(limit)&&limit>=1 ? results.slice(0,Math.min(50,Math.floor(limit))) : results;
   }
 
   async create(

@@ -1,0 +1,116 @@
+name: UX-D6 PostgreSQL Authority Foundation Gate
+
+on:
+  push:
+    branches:
+      - feature/ux-d6-postgres-authority-foundation-20261122
+  pull_request:
+    branches: [main]
+    paths:
+      - 'infrastructure/database/migrations/**'
+      - 'packages/database/src/postgres/**'
+      - 'packages/database/test/ux-d6-*.ts'
+      - 'packages/database/package.json'
+      - 'pnpm-lock.yaml'
+      - 'scripts/phase5-local-doctor.mjs'
+      - '.github/workflows/ux-d6-certification.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  pg17-rls-transaction-contract:
+    name: PostgreSQL 17 tenant RLS, atomic records and cross-process authority
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: carhire
+          POSTGRES_PASSWORD: ci_migrations_only
+          POSTGRES_DB: carhire_platform
+        ports:
+          - 55432:5432
+        options: >-
+          --health-cmd "pg_isready -U carhire -d carhire_platform"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 56379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      NODE_ENV: development
+      APP_ENV: development
+      DATABASE_URL: postgresql://carhire:ci_migrations_only@127.0.0.1:55432/carhire_platform
+      PG_BUSINESS_DATABASE_URL: postgresql://sage_d6_runtime:ci_d6_isolated_only@127.0.0.1:55432/carhire_platform
+      REDIS_URL: redis://127.0.0.1:56379
+      REDIS_REQUIRE_LIVE: "true"
+      REDIS_SIMULATED: "false"
+      LOCAL_CERTIFICATION_MODE: "true"
+      SQLITE_PATH: /tmp/sage-uxd6-ci/records.sqlite
+      APP_PUBLIC_URL: http://127.0.0.1:3000
+      LOCAL_PAYMENT_WORKER_ENABLED: "false"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 9.15.9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Install PostgreSQL psql client
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
+      - name: Apply five real SQL migrations twice (checksum + idempotency)
+        run: pnpm db:migrate && pnpm db:migrate
+      - name: Verify migration ledger and tenant RLS are enforced
+        run: |
+          test "$(psql "$DATABASE_URL" -XqAt -c 'SELECT count(*) FROM sage_auto_schema_migrations;')" = "5"
+          test "$(psql "$DATABASE_URL" -XqAt -c "SELECT count(*) FROM pg_class WHERE relname IN ('sage_business_records','sage_business_claims','sage_vehicle_allocations') AND relrowsecurity AND relforcerowsecurity;")" = "3"
+      - name: Provision unprivileged test-only runtime role
+        run: |
+          psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE ROLE sage_d6_runtime LOGIN PASSWORD 'ci_d6_isolated_only' NOSUPERUSER NOBYPASSRLS NOINHERIT;
+          GRANT USAGE ON SCHEMA public TO sage_d6_runtime;
+          GRANT SELECT, INSERT, UPDATE, DELETE ON
+            sage_business_records, sage_business_claims, sage_vehicle_allocations, idempotency_keys
+            TO sage_d6_runtime;
+          SQL
+      - name: Test genuine SQL business transactions across independent Node processes
+        run: pnpm test:ux-d6
+      - name: Check real Redis BullMQ readiness and existing schema doctor
+        run: pnpm local:doctor && pnpm local:worker:smoke
+      - name: Require the expected NO-GO for incomplete application-wide PostgreSQL cutover
+        run: |
+          if node scripts/phase5-local-doctor.mjs --require-production-backend; then
+            echo "ERROR: False production certification. Legacy business repositories still use SQLite." >&2
+            exit 1
+          fi
+          echo "Correct NO-GO: PostgreSQL foundation works; complete API/worker repository cutover is still required."
+
+  regression-and-frontend-build:
+    name: Existing UX, booking and finance regression (SQLite test runtime)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 9.15.9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm test:ux-d5
+      - run: pnpm test:ux-d6:gate
+      - run: pnpm test:phase4
+      - run: pnpm test:finance
+      - run: pnpm test:payments
+      - run: pnpm build
