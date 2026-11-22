@@ -133,7 +133,6 @@ function Shell({context,portal,section,onSection,onSwitch,onSignOut}:{context:Ac
     setMobileOpen(false);
   };
   const roles=portal.roles.map(r=>r.replaceAll("_"," ").toLowerCase().replace(/\b\w/g,c=>c.toUpperCase())).join(" · ");
-  const title=portal.sections.find(s=>s.id===section)?.label||section;
   const Sidebar=()=> <aside className="sage-sidebar flex h-full flex-col text-white">
     <div className={`border-b border-white/10 ${sidebarCollapsed?"px-3 py-4":"px-5 py-5"}`}>
       <div className="flex items-center gap-3"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-emerald-400 font-black text-slate-950">S</span>{!sidebarCollapsed&&<div className="min-w-0"><div className="text-sm font-black tracking-tight">Sage Auto</div><div className="truncate text-[11px] text-slate-400">{portal.name}</div></div>}</div>
@@ -156,7 +155,7 @@ function Shell({context,portal,section,onSection,onSwitch,onSignOut}:{context:Ac
       <header className="sage-topbar sticky top-0 z-30 flex items-center gap-3 border-b bg-white/90 px-4 backdrop-blur-xl sm:px-6 lg:gap-5 lg:px-8">
         <div className="flex min-w-0 shrink items-center gap-3">
           <button onClick={()=>setMobileOpen(true)} aria-label="Open navigation" className="grid h-10 w-10 place-items-center rounded-xl border border-slate-200 lg:hidden"><Menu size={18}/></button>
-          <div className="min-w-0"><div className="max-w-[92px] truncate text-[11px] font-bold uppercase tracking-[.16em] text-slate-400 sm:max-w-[125px] lg:max-w-[170px] xl:max-w-[235px]">{portal.name}</div><div className="max-w-[115px] truncate text-base font-black tracking-tight text-slate-950 sm:max-w-[145px] lg:max-w-none">{title}</div></div>
+          <div className="min-w-0"><div className="text-[11px] font-bold uppercase tracking-[.16em] text-slate-400">Company workspace</div><div className="max-w-[160px] truncate text-sm font-black tracking-tight text-slate-950 sm:max-w-[240px] lg:max-w-[300px]">{portal.name}</div></div>
         </div>
         <div className="flex min-w-0 flex-1 justify-center">
           <WorkspaceSearch key={portal.id+portal.permissions.join("|")} portal={portal} descriptions={descriptions} onSelect={openSearchResult}/>
@@ -167,7 +166,6 @@ function Shell({context,portal,section,onSection,onSwitch,onSignOut}:{context:Ac
           <WorkspaceAccountMenu context={context} portal={portal} onSection={select} onSwitch={onSwitch} onSignOut={onSignOut}/>
         </div>
       </header>
-      {section!=="overview"&&<div className="sage-page-context border-b bg-white px-4 sm:px-6 lg:px-8"><div className="mx-auto max-w-[1500px]"><div className="text-[10px] font-black uppercase tracking-[.2em] text-emerald-600">Company workspace</div><div className="mt-1 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between"><div><h1 className="text-2xl font-black tracking-[-.025em] text-slate-950">{title}</h1><p className="mt-1 text-sm text-slate-500">{descriptions[section]||"Operational workspace"}</p></div></div></div></div>}
       <main className="min-w-0 overflow-x-hidden"><WorkspaceScreen key={section} section={section} portal={portal} focusedRecord={focusedRecord}/></main>
 
     </div>
