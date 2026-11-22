@@ -37,6 +37,7 @@ jobs:
       - run: pnpm test:ux-d2
       - run: pnpm test:ux-d3
       - run: pnpm test:ux-d4
+      - run: pnpm test:ux-d5
       - run: pnpm test:access
       - run: pnpm test:tenancy
       - run: pnpm test:analytics
