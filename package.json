@@ -104,7 +104,8 @@
     "test:closure-audit": "tsx packages/database/test/closure-integrity-audit.test.ts",
     "dev:workers": "LOCAL_PAYMENT_WORKER_ENABLED=true pnpm dev:worker",
     "dev:worker:payments": "LOCAL_PAYMENT_WORKER_ENABLED=true pnpm dev:worker",
-    "test:ux-d6": "tsx packages/database/test/ux-d6-postgres-authority.test.ts"
+    "test:ux-d6": "tsx packages/database/test/ux-d6-postgres-authority.test.ts",
+    "test:ux-d6:gate": "tsx packages/database/test/ux-d6-runtime-gate.test.ts"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
