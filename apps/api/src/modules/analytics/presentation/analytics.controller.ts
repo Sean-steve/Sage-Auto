@@ -40,7 +40,7 @@ export function createAnalyticsController(
           currency: (req.query.currency as string) || req.tenantContext!.currency,
           timezone: req.tenantContext!.timezone,
         });
-        res.json(overview);
+        res.json({ data: overview });
       } catch (err: any) {
         res.status(err.statusCode || 400).json({ error: { message: err.message } });
       }
