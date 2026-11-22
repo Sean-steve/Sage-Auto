@@ -360,6 +360,18 @@ export class MetricsService {
         return { value: lateCount };
       }
 
+      case "HANDOVER_PENDING_COUNT": {
+        const repo = new HandoverRepository();
+        const states = [
+          "SCHEDULED", "CUSTOMER_ARRIVED", "DOCUMENT_VERIFIED",
+          "PRE_RENTAL_INSPECTION", "SIGNATURE", "KEY_HANDOVER",
+        ] as const;
+        const totals = await Promise.all(states.map(status =>
+          repo.findMany(tenantId, { status, limit: 1 })
+        ));
+        return { value: totals.reduce((sum, row) => sum + row.total, 0) };
+      }
+
       // Financial & Ledger (Authoritative)
       case "FINANCE_GROSS_INVOICED": {
         const invoices = await this.invoiceRepo.listByTenant(tenantId);
