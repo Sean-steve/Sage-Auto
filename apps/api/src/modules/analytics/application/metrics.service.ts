@@ -113,7 +113,7 @@ export class MetricsService {
     let priorValue: number | boolean | undefined;
     let changePercentage: number | null = null;
 
-    if (typeof currentValue.value === "number") {
+    if (typeof currentValue.value === "number" && definition.timeBasis !== "CURRENT_SNAPSHOT") {
       const priorResult = await this.computeRawMetric(
         tenantId,
         params.key,
