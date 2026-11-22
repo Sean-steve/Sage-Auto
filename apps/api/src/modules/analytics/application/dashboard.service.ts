@@ -18,9 +18,11 @@ import {
   SalesQuoteRepository,
   ComplianceRecordRepository,
   JournalEntryRepository,
+  JournalTransactionRepository,
 } from "@carhire/database";
 import { MetricsService } from "./metrics.service";
 import { TemporalWindowResolver } from "../domain/temporal-window";
+import { buildAuthoritativePeriodSeries, localDayKey } from "../domain/dashboard-intelligence";
 
 export class DashboardService {
   constructor(
@@ -33,7 +35,8 @@ export class DashboardService {
     private readonly leadRepo: LeadRepository = new LeadRepository(),
     private readonly quoteRepo: SalesQuoteRepository = new SalesQuoteRepository(),
     private readonly complianceRepo: ComplianceRecordRepository = new ComplianceRecordRepository(),
-    private readonly journalEntryRepo: JournalEntryRepository = new JournalEntryRepository()
+    private readonly journalEntryRepo: JournalEntryRepository = new JournalEntryRepository(),
+    private readonly journalTxRepo: JournalTransactionRepository = new JournalTransactionRepository()
   ) {}
 
   /**
@@ -57,6 +60,7 @@ export class DashboardService {
       timezone: tz,
     });
     const currency = options.currency || "KES";
+    if (!/^[A-Z]{3}$/.test(currency)) throw Object.assign(new Error("Invalid dashboard currency"), { statusCode: 422 });
 
     // 1. Fetch Headline KPIs concurrently
     const [
@@ -137,12 +141,13 @@ export class DashboardService {
 
     // 2. Fetch Fleet Status breakdown
     const vehicles = await this.vehicleRepo.list(tenantId);
-    const totalVehicles = vehicles.length;
-    const available = vehicles.filter((v: any) => (v.lifecycleStatus || v.status) === "ACTIVE" && v.availabilityStatus === "AVAILABLE").length;
-    const onRent = vehicles.filter((v: any) => (v.lifecycleStatus || v.status) === "ACTIVE" && v.availabilityStatus === "ON_RENT").length;
-    const reserved = vehicles.filter((v: any) => (v.lifecycleStatus || v.status) === "ACTIVE" && v.availabilityStatus === "RESERVED").length;
-    const maintenance = vehicles.filter((v: any) => (v.lifecycleStatus || v.status) === "ACTIVE" && v.availabilityStatus === "MAINTENANCE").length;
-    const blocked = vehicles.filter((v: any) => (v.lifecycleStatus || v.status) === "ACTIVE" && v.availabilityStatus === "BLOCKED").length;
+    const activeVehicles = vehicles.filter((v: any) => (v.lifecycleStatus || v.status) === "ACTIVE");
+    const totalVehicles = activeVehicles.length;
+    const available = activeVehicles.filter(v => v.availabilityStatus === "AVAILABLE").length;
+    const onRent = activeVehicles.filter(v => v.availabilityStatus === "ON_RENT").length;
+    const reserved = activeVehicles.filter(v => v.availabilityStatus === "RESERVED").length;
+    const maintenance = activeVehicles.filter(v => v.availabilityStatus === "MAINTENANCE").length;
+    const blocked = activeVehicles.filter(v => v.availabilityStatus === "BLOCKED").length;
     const currentUtil = totalVehicles > 0 ? Math.round((onRent / totalVehicles) * 1000) / 10 : 0;
 
     // 3. Fetch CRM Funnel summary
@@ -159,42 +164,51 @@ export class DashboardService {
       .reduce((sum, q) => sum + ((q as any).grossTotal || (q as any).total || 0), 0);
     const leadConversionRate = inWindowLeads.length > 0 ? Math.round((wonLeads / inWindowLeads.length) * 1000) / 10 : 0;
 
-    // 4. Fetch Financial Summary with Trial Balance Check
-    const invoices = await this.invoiceRepo.listByTenant(tenantId);
-    const inWindowInvoices = invoices.filter(
-      (i) => i.issueDate >= window.from && i.issueDate <= window.to && (i.status === "ISSUED" || i.status === "PAID" || i.status === "PARTIALLY_PAID")
+    // 4. Period financial facts come from their own authoritative dates.
+    // Invoice issuance != verified collection != posted ledger revenue.
+    const [invoices, journalEntries, journalTransactions, receipts, bookingRecords] = await Promise.all([
+      this.invoiceRepo.listByTenant(tenantId),
+      this.journalEntryRepo.listByTenant(tenantId),
+      this.journalTxRepo.listByTenant(tenantId),
+      this.paymentRepo.listByTenant(tenantId),
+      this.loadAllBookings(tenantId),
+    ]);
+    const businessStart = localDayKey(window.from, tz);
+    const businessEnd = localDayKey(new Date(new Date(window.to).getTime() - 1), tz);
+    const inWindowInvoices = invoices.filter(i =>
+      i.currency === currency && i.issueDate >= businessStart && i.issueDate <= businessEnd &&
+      ["ISSUED", "PAID", "PARTIALLY_PAID"].includes(i.status)
     );
-    const grossInvoiced = inWindowInvoices.reduce((sum, i) => sum + parseFloat(i.total || "0"), 0);
-    const netRevenue = inWindowInvoices.reduce((sum, i) => sum + (parseFloat(i.subtotal || "0") - parseFloat(i.discountTotal || "0")), 0);
-
-    const openInvoices = invoices.filter((i) => i.status === "ISSUED" || i.status === "PARTIALLY_PAID");
-    const outstandingReceivables = openInvoices.reduce((sum, i) => sum + parseFloat(i.amountOutstanding || "0"), 0);
-
-    const journalEntries = await this.journalEntryRepo.listByTenant(tenantId);
+    const netRevenue = inWindowInvoices.reduce(
+      (sum, i) => sum + Number(i.subtotal || 0) - Number(i.discountTotal || 0), 0
+    );
+    const outstandingReceivables = invoices
+      .filter(i => i.currency === currency && ["ISSUED", "PARTIALLY_PAID"].includes(i.status))
+      .reduce((sum, i) => sum + Number(i.amountOutstanding || 0), 0);
+    const financialSeries = buildAuthoritativePeriodSeries({
+      from: window.from, to: window.to, timezone: tz, currency,
+      journals: journalTransactions, entries: journalEntries,
+      payments: receipts, invoices, bookings: bookingRecords,
+    });
+    const postedHeaders = new Map(journalTransactions
+      .filter(j => j.currency === currency && (j.status === "POSTED" || j.status === "REVERSED"))
+      .map(j => [j.id, j]));
     let totalDebits = 0;
     let totalCredits = 0;
     for (const entry of journalEntries) {
-      const amt = parseFloat(entry.amount || "0");
-      if (entry.direction === "DEBIT") {
-        totalDebits += amt;
-      } else if (entry.direction === "CREDIT") {
-        totalCredits += amt;
-      }
+      if (!postedHeaders.has(entry.transactionId)) continue;
+      const amount = Number(entry.amount);
+      if (!Number.isFinite(amount)) throw new Error("Invalid ledger amount in trial balance");
+      if (entry.direction === "DEBIT") totalDebits += amount;
+      else totalCredits += amount;
     }
     const trialBalanceReconciled = Math.abs(totalDebits - totalCredits) < 0.01;
 
-    // 5. Generate Time-Series Chart Data (Bucketed across the window)
-    const { revenueChart, utilizationChart } = this.generateTimeSeriesBuckets(
-      window.from,
-      window.to,
-      currency,
-      invoices.map((inv) => ({
-        issueDate: inv.issueDate,
-        totalAmount: parseFloat(inv.total || "0"),
-        currency: inv.currency,
-      })),
-      currentUtil
-    );
+    // Present fleet status cannot prove historic eligible fleet-day capacity.
+    // An unknown historical series must NOT be fabricated with today's rate.
+    const revenueChart = financialSeries.incompletePostedJournals
+      ? [] : financialSeries.postedRevenue;
+    const utilizationChart: TimeSeriesPoint[] = [];
 
     // 6. Recent Activity unified stream
     const { items: recentBookings } = await this.bookingRepo.findMany(tenantId, { limit: 5 });
@@ -264,7 +278,7 @@ export class DashboardService {
       },
       financialSummary: {
         currency,
-        grossInvoiced,
+        grossInvoiced: financialSeries.grossInvoicedTotal,
         netRevenue,
         postedRevenue: typeof postedRevenue.value === "number" ? postedRevenue.value : 0,
         cashReceipts: typeof cashCollections.value === "number" ? cashCollections.value : 0,
@@ -272,48 +286,31 @@ export class DashboardService {
         trialBalanceReconciled,
       },
       revenueChart,
+      cashCollectionsChart: financialSeries.cashCollections,
+      grossInvoicedChart: financialSeries.grossInvoiced,
+      bookingVolumeChart: financialSeries.bookingVolume,
       utilizationChart,
+      chartAvailability: {
+        postedRevenue: financialSeries.incompletePostedJournals ? "UNAVAILABLE" : "VERIFIED",
+        cashCollections: "VERIFIED",
+        grossInvoiced: "VERIFIED",
+        bookingVolume: "VERIFIED",
+        utilization: "UNAVAILABLE",
+        utilizationReason: "Historical eligible fleet-day denominators are not yet certified.",
+      },
       recentActivity,
     };
   }
 
-  private generateTimeSeriesBuckets(
-    from: string,
-    to: string,
-    currency: string,
-    invoices: Array<{ issueDate: string; totalAmount: number; currency?: string }>,
-    currentUtil: number
-  ): { revenueChart: TimeSeriesPoint[]; utilizationChart: TimeSeriesPoint[] } {
-    const startDate = new Date(from);
-    const endDate = new Date(to);
-    const dayCount = Math.max(1, Math.min(30, Math.ceil((endDate.getTime() - startDate.getTime()) / 86400000)));
-
-    const revenueChart: TimeSeriesPoint[] = [];
-    const utilizationChart: TimeSeriesPoint[] = [];
-
-    for (let i = 0; i < dayCount; i++) {
-      const bucketDate = new Date(startDate.getTime() + i * 86400000);
-      const dateStr = bucketDate.toISOString().split("T")[0];
-      const label = bucketDate.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-
-      const dayRevenue = invoices
-        .filter((inv) => inv.issueDate && inv.issueDate.startsWith(dateStr))
-        .reduce((sum, inv) => sum + (inv.totalAmount || 0), 0);
-
-      revenueChart.push({
-        timestamp: bucketDate.toISOString(),
-        label,
-        value: dayRevenue,
-        currency,
-      });
-
-      utilizationChart.push({
-        timestamp: bucketDate.toISOString(),
-        label,
-        value: currentUtil,
-      });
+  private async loadAllBookings(tenantId: string) {
+    const size = 250;
+    const rows: Awaited<ReturnType<BookingRepository["findMany"]>>["items"] = [];
+    let offset = 0;
+    while (true) {
+      const page = await this.bookingRepo.findMany(tenantId, { offset, limit: size });
+      rows.push(...page.items);
+      offset += page.items.length;
+      if (!page.items.length || offset >= page.total) return rows;
     }
-
-    return { revenueChart, utilizationChart };
   }
 }
