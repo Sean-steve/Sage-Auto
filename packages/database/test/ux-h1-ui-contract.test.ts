@@ -44,6 +44,11 @@ assert.ok(!company.includes('className="sage-page-context'),"Duplicate company b
 assert.match(company,/Company workspace/);
 const platform=readFileSync("src/components/platform/PlatformOwnerWorkspace.tsx","utf8");
 assert.ok(!platform.includes("<h1>{currentTitle}</h1>"),"Dynamic platform title belongs to its page, not global toolbar");
+const renter=readFileSync("src/components/RenterAccount.tsx","utf8");
+assert.match(renter,/document\.visibilityState/,"Renter tracking must pause while hidden");
+assert.match(renter,/background=false/,"Quiet renter checks must not show blocking loaders");
+assert.match(renter,/\["COMPLETED","CANCELLED","REJECTED","EXPIRED","NO_SHOW"\]/,
+  "Terminal renter bookings do not need background monitoring");
 const owner=readFileSync("src/components/owner/VehicleOwnerWorkspace.tsx","utf8");
 assert.ok(!owner.includes("<h1>{heading}</h1>"),"Dynamic vehicle owner heading belongs to the body panel");
 console.log("UX-H1 PASS: stable empty booking register, visibility and in-flight throttles, targeted financial polling, distinct states, unified cross-portal headers.");
