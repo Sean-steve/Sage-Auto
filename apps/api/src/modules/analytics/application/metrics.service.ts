@@ -12,6 +12,7 @@ import {
   VehicleRepository,
   BookingRepository,
   RentalRepository,
+  HandoverRepository,
   PaymentRepository,
   OperationalInvoiceRepository,
   JournalEntryRepository,
