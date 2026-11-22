@@ -41,4 +41,5 @@ jobs:
       - run: pnpm test:access
       - run: pnpm test:bookings
       - run: pnpm test:phase4
+      - run: pnpm test:all
       - run: pnpm build
