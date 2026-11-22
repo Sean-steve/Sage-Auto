@@ -7,9 +7,10 @@ import { Request, Response } from "express";
 import { ReportingService } from "../application/reporting.service";
 import { ReportExportService } from "../application/report-export.service";
 import { ReportScheduleService } from "../application/report-schedule.service";
-import { SavedReportRepository } from "@carhire/database";
+import { SavedReportRepository, ReportScheduleRepository } from "@carhire/database";
 import { ReportRegistry } from "../domain/report-registry";
 import type { ReportKey, ReportFormat, PeriodPreset } from "@carhire/types";
+import { hasAnalyticRights, requireAnalyticsPermissions, requiredPermissionsForReport } from "./analytics-access";
 
 export function createReportsController(
   reportingService: ReportingService,
@@ -18,7 +19,7 @@ export function createReportsController(
   savedReportRepo: SavedReportRepository = new SavedReportRepository()
 ) {
   const getTenantId = (req: Request): string => {
-    const tid = (req as any).tenantContext?.tenantId || (req as any).tenantId;
+    const tid = req.tenantContext?.tenantId;
     if (!tid) {
       const err: any = new Error("Forbidden: Missing or unverified tenant context.");
       err.statusCode = 403;
@@ -26,6 +27,15 @@ export function createReportsController(
     }
     return tid;
   };
+
+  const canReport = (req: Request, key: ReportKey): boolean =>
+    hasAnalyticRights(req.tenantContext?.permissions || [], requiredPermissionsForReport(key));
+  const assertReport = (req: Request, key: ReportKey, exportAction = false): void => {
+    if (!ReportRegistry.get(key)) throw Object.assign(new Error("Unknown report"), { statusCode: 404 });
+    requireAnalyticsPermissions(req, requiredPermissionsForReport(key));
+    if (exportAction) requireAnalyticsPermissions(req, ["report.export"]);
+  };
+  const scheduleRepo = new ReportScheduleRepository();
 
   const getActorId = (req: Request): string => {
     const auth = (req as any).auth;
@@ -42,27 +52,30 @@ export function createReportsController(
   return {
     async getCatalogue(req: Request, res: Response): Promise<void> {
       try {
+        getTenantId(req);
+        requireAnalyticsPermissions(req, ["report.read"]);
         const category = req.query.category as string;
-        const reports = category
-          ? ReportRegistry.getByCategory(category)
-          : ReportRegistry.getAll();
+        const definitions = category ? ReportRegistry.getByCategory(category) : ReportRegistry.getAll();
+        const reports = definitions.filter(def => canReport(req, def.key));
         res.json({ reports });
       } catch (err: any) {
-        res.status(400).json({ error: { message: err.message } });
+        res.status(err.statusCode || 400).json({ error: { message: err.message } });
       }
     },
 
     async getReportDefinition(req: Request, res: Response): Promise<void> {
       try {
+        getTenantId(req);
         const key = req.params.key as ReportKey;
         const definition = ReportRegistry.get(key);
         if (!definition) {
           res.status(404).json({ error: { message: `Report not found: ${key}` } });
           return;
         }
+        assertReport(req, key);
         res.json(definition);
       } catch (err: any) {
-        res.status(400).json({ error: { message: err.message } });
+        res.status(err.statusCode || 400).json({ error: { message: err.message } });
       }
     },
 
@@ -70,6 +83,7 @@ export function createReportsController(
       try {
         const tenantId = getTenantId(req);
         const key = req.params.key as ReportKey;
+        assertReport(req, key);
         const page = req.query.page ? parseInt(req.query.page as string, 10) : 1;
         const pageSize = req.query.pageSize ? parseInt(req.query.pageSize as string, 10) : 50;
 
@@ -94,6 +108,7 @@ export function createReportsController(
       try {
         const tenantId = getTenantId(req);
         const key = req.params.key as ReportKey;
+        assertReport(req, key, true);
         const format = (req.body.format || "CSV").toUpperCase() as ReportFormat;
         const actorId = getActorId(req);
 
@@ -114,7 +129,8 @@ export function createReportsController(
     async listExecutions(req: Request, res: Response): Promise<void> {
       try {
         const tenantId = getTenantId(req);
-        const executions = await exportService.listExecutions(tenantId);
+        requireAnalyticsPermissions(req, ["report.read"]);
+        const executions = (await exportService.listExecutions(tenantId)).filter(x => canReport(req, x.reportKey));
         res.json({ executions });
       } catch (err: any) {
         res.status(err.statusCode || 400).json({ error: { message: err.message } });
@@ -129,6 +145,7 @@ export function createReportsController(
           res.status(404).json({ error: { message: "Report execution not found" } });
           return;
         }
+        assertReport(req, execution.reportKey);
         res.json(execution);
       } catch (err: any) {
         res.status(err.statusCode || 400).json({ error: { message: err.message } });
@@ -143,6 +160,7 @@ export function createReportsController(
           res.status(404).json({ error: { message: "Report artifact not available for download" } });
           return;
         }
+        assertReport(req, execution.reportKey, true);
 
         const filename = `${execution.reportKey.toLowerCase()}-${execution.id}.${execution.format.toLowerCase()}`;
         res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
@@ -157,7 +175,8 @@ export function createReportsController(
     async listSavedReports(req: Request, res: Response): Promise<void> {
       try {
         const tenantId = getTenantId(req);
-        const saved = await savedReportRepo.listByTenant(tenantId);
+        requireAnalyticsPermissions(req, ["report.read"]);
+        const saved = (await savedReportRepo.listByTenant(tenantId)).filter(x => canReport(req, x.reportKey));
         res.json({ savedReports: saved });
       } catch (err: any) {
         res.status(err.statusCode || 400).json({ error: { message: err.message } });
@@ -168,6 +187,7 @@ export function createReportsController(
       try {
         const tenantId = getTenantId(req);
         const actorId = getActorId(req);
+        assertReport(req, req.body.reportKey as ReportKey);
         const created = await savedReportRepo.create({
           tenantId,
           name: req.body.name,
@@ -185,6 +205,9 @@ export function createReportsController(
     async deleteSavedReport(req: Request, res: Response): Promise<void> {
       try {
         const tenantId = getTenantId(req);
+        const saved = await savedReportRepo.findById(req.params.id, tenantId);
+        if (!saved) { res.status(404).json({ error: { message: "Saved report not found" } }); return; }
+        assertReport(req, saved.reportKey);
         await savedReportRepo.delete(req.params.id, tenantId);
         res.json({ success: true });
       } catch (err: any) {
@@ -196,7 +219,8 @@ export function createReportsController(
     async listSchedules(req: Request, res: Response): Promise<void> {
       try {
         const tenantId = getTenantId(req);
-        const schedules = await scheduleService.listSchedules(tenantId);
+        requireAnalyticsPermissions(req, ["report.read"]);
+        const schedules = (await scheduleService.listSchedules(tenantId)).filter(x => canReport(req, x.reportKey));
         res.json({ schedules });
       } catch (err: any) {
         res.status(err.statusCode || 400).json({ error: { message: err.message } });
@@ -207,6 +231,7 @@ export function createReportsController(
       try {
         const tenantId = getTenantId(req);
         const actorId = getActorId(req);
+        assertReport(req, req.body.reportKey as ReportKey, true);
         const schedule = await scheduleService.createSchedule(tenantId, {
           reportKey: req.body.reportKey,
           frequency: req.body.frequency,
@@ -224,6 +249,9 @@ export function createReportsController(
     async deleteSchedule(req: Request, res: Response): Promise<void> {
       try {
         const tenantId = getTenantId(req);
+        const saved = await scheduleRepo.findById(req.params.id, tenantId);
+        if (!saved) { res.status(404).json({ error: { message: "Report schedule not found" } }); return; }
+        assertReport(req, saved.reportKey, true);
         await scheduleService.deleteSchedule(req.params.id, tenantId);
         res.json({ success: true });
       } catch (err: any) {
