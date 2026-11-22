@@ -1,0 +1,40 @@
+name: UX-D6 Workspace Dependency Lockfile Sync
+
+on:
+  push:
+    branches:
+      - feature/ux-d6-postgres-authority-foundation-20261122
+    paths:
+      - 'packages/database/package.json'
+      - '.github/workflows/ux-d6-lockfile-sync.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  generate-lockfile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 9.15.9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Resolve dependency versions and regenerate lockfile
+        run: pnpm install --lockfile-only --no-frozen-lockfile
+      - name: Commit deterministic lockfile update to this feature branch only
+        run: |
+          git add pnpm-lock.yaml
+          if git diff --cached --quiet; then
+            echo "Lockfile is already current."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "build(ux-d6): synchronize node-postgres workspace lockfile"
+          git push origin HEAD:"$GITHUB_REF_NAME"
