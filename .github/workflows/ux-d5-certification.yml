@@ -41,3 +41,26 @@ jobs:
       - run: pnpm test:tenancy
       - run: pnpm test:analytics
       - run: pnpm build
+
+  lifecycle-and-cross-portal-regression:
+    name: Rental, payment, tenancy and cross-portal lifecycle
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 9.15.9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test:authz
+      - run: pnpm test:phase4
+      - run: pnpm test:bookings
+      - run: pnpm test:rentals
+      - run: pnpm test:payments
+      - run: pnpm test:finance
+      - run: pnpm test:owner-settlements
+      - run: pnpm test:phase5
