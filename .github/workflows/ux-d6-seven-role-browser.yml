@@ -1,0 +1,80 @@
+name: UX-D6.7 Seven-Role Browser and Local Workflow Certification
+
+on:
+  push:
+    branches:
+      - feature/ux-d6-full-local-certification-20261122
+  pull_request:
+    branches: [main]
+    paths:
+      - 'scripts/stage4-browser-acceptance.mjs'
+      - '.github/workflows/ux-d6-seven-role-browser.yml'
+      - 'src/**'
+      - 'apps/api/**'
+      - 'packages/database/**'
+
+permissions:
+  contents: read
+
+jobs:
+  seven-role-real-chromium:
+    name: Seven access roles and premium dashboard in real Chromium
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      UX_D6_SCREENSHOT_DIR: .review/screenshots
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 9.15.9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - name: Locate real browser
+        run: which google-chrome || which google-chrome-stable || which chromium || which chromium-browser
+      - name: Start isolated seven-role review API (not production credentials)
+        run: |
+          rm -rf .review/access .review/screenshots
+          (pnpm review:api > /tmp/sage-d6-api.log 2>&1 & echo $! > /tmp/sage-d6-api.pid)
+          for i in $(seq 1 120); do
+            if grep -q 'READY: 20 role accounts' /tmp/sage-d6-api.log; then exit 0; fi
+            if grep -qE 'Error:|Fatal|Unhandled|ELIFECYCLE' /tmp/sage-d6-api.log; then
+              tail -n 40 /tmp/sage-d6-api.log; exit 1
+            fi
+            sleep 1
+          done
+          tail -n 60 /tmp/sage-d6-api.log; exit 1
+      - name: Start actual Vite SPA through review proxy
+        run: |
+          (pnpm review:web > /tmp/sage-d6-web.log 2>&1 & echo $! > /tmp/sage-d6-web.pid)
+          for i in $(seq 1 90); do
+            if curl -fsS http://127.0.0.1:3510/ >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          tail -n 40 /tmp/sage-d6-web.log; exit 1
+      - name: Real browser seven-role permission and visual experience
+        run: node scripts/stage4-browser-acceptance.mjs
+      - name: Upload isolated dashboard screenshots (no customer data)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ux-d6-company-dashboard-review-screenshots
+          path: .review/screenshots/
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Redacted service diagnostics on failed test
+        if: failure()
+        run: |
+          echo '=== API logs ==='; tail -n 40 /tmp/sage-d6-api.log 2>/dev/null || true
+          echo '=== Web logs ==='; tail -n 40 /tmp/sage-d6-web.log 2>/dev/null || true
+      - name: Stop services and destroy test credentials
+        if: always()
+        run: |
+          for pid in /tmp/sage-d6-api.pid /tmp/sage-d6-web.pid; do
+            if test -f "$pid"; then kill "$(cat "$pid")" 2>/dev/null || true; fi
+          done
+          rm -rf .review/access .review/screenshots
