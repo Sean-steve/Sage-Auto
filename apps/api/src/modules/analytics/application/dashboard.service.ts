@@ -71,7 +71,7 @@ export class DashboardService {
       availableVehicles,
       urgentComplianceCount,
       newLeads,
-      pendingBookings,
+      pendingHandovers,
     ] = await Promise.all([
       this.metricsService.evaluateMetric(tenantId, {
         key: "FLEET_UTILIZATION_RATE",
@@ -258,7 +258,7 @@ export class DashboardService {
         postedRevenue,
         availableVehicles,
         urgentComplianceCount,
-        pendingHandovers: pendingBookings,
+        pendingHandovers: pendingHandovers,
         newLeads,
       },
       fleetStatus: {
