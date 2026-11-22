@@ -130,7 +130,7 @@ export class DashboardService {
         timezone: tz,
       }),
       this.metricsService.evaluateMetric(tenantId, {
-        key: "BOOKING_CONFIRMED_COUNT",
+        key: "HANDOVER_PENDING_COUNT",
         preset: window.preset,
         from: window.from,
         to: window.to,
