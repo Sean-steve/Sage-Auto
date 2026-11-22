@@ -186,7 +186,7 @@ export class DashboardService {
       .filter(i => i.currency === currency && ["ISSUED", "PARTIALLY_PAID"].includes(i.status))
       .reduce((sum, i) => sum + Number(i.amountOutstanding || 0), 0);
     const financialSeries = buildAuthoritativePeriodSeries({
-      from: window.from, to: window.to, timezone: tz, currency,
+      tenantId, from: window.from, to: window.to, timezone: tz, currency,
       journals: journalTransactions, entries: journalEntries,
       payments: receipts, invoices, bookings: bookingRecords,
     });
