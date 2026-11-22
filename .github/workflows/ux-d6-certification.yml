@@ -109,6 +109,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
       - run: pnpm test:ux-d5
+      - run: pnpm test:ux-d6:gate
       - run: pnpm test:phase4
       - run: pnpm test:finance
       - run: pnpm test:payments
