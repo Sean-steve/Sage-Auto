@@ -197,6 +197,8 @@ export async function runBookingsAndReservationsTests() {
       name: "Standard 2026 Fleet Rates",
       code: "STD-2026",
       currency: "KES",
+      // Historical test dates must fall inside the explicit plan effective window.
+      effectiveFrom: "2026-09-01T00:00:00.000Z",
       isDefault: true,
       priority: 10,
     },
