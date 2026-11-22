@@ -160,8 +160,8 @@ export class DashboardService {
     const quotesSent = inWindowQuotes.filter((q) => q.status === "SENT").length;
     const quotesAccepted = inWindowQuotes.filter((q) => q.status === "ACCEPTED").length;
     const pipelineValue = quotes
-      .filter((q) => q.status === "DRAFT" || q.status === "SENT")
-      .reduce((sum, q) => sum + ((q as any).grossTotal || (q as any).total || 0), 0);
+      .filter((q) => q.currency === currency && (q.status === "DRAFT" || q.status === "SENT"))
+      .reduce((sum, q) => sum + Number(q.grandTotal || 0), 0);
     const leadConversionRate = inWindowLeads.length > 0 ? Math.round((wonLeads / inWindowLeads.length) * 1000) / 10 : 0;
 
     // 4. Period financial facts come from their own authoritative dates.
