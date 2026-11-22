@@ -521,9 +521,10 @@ async function runSprint34TestSuite() {
 
   // Verify ReconciliationService
   const reconStatus = await reconciliationService.runAudit(tenantAId);
-  assert.equal(reconStatus.overallStatus, "RECONCILED");
+  assert.equal(reconStatus.overallStatus, "DISCREPANCY_DETECTED", "A balanced GL alone cannot certify unposted receivables");
+  assert.equal(reconStatus.checks.accountsReceivableIntegrity.status, "FAIL");
   assert.equal(reconStatus.checks.generalLedgerEquilibrium.status, "PASS");
-  console.log("  ✓ [PASS] 6. Double-entry ledger equilibrium strictly confirmed.");
+  console.log("  ✓ [PASS] 6. Balanced GL distinguished from unresolved invoice/receivable reconciliation.");
 
   // ==========================================================================
   // Test 7: CSV Formula Injection Defense
