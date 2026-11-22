@@ -45,7 +45,7 @@ function isDateInWindow(dateStr: string | undefined | null, from: string, to: st
   if (isNaN(time)) return false;
   const fromTime = new Date(from).getTime();
   const toTime = new Date(to).getTime();
-  return time >= fromTime && time <= toTime;
+  return time >= fromTime && time < toTime;
 }
 
 export class MetricsService {
@@ -67,6 +67,18 @@ export class MetricsService {
     private readonly refundRepo: RefundRepository = new RefundRepository(),
     private readonly settlementRepo: OwnerSettlementRepository = new OwnerSettlementRepository()
   ) {}
+
+  private async allBookings(tenantId: string) {
+    const pageSize = 250;
+    const items: Awaited<ReturnType<BookingRepository["findMany"]>>["items"] = [];
+    let offset = 0;
+    while (true) {
+      const page = await this.bookingRepo.findMany(tenantId, { limit: pageSize, offset });
+      items.push(...page.items);
+      offset += page.items.length;
+      if (!page.items.length || offset >= page.total) return items;
+    }
+  }
 
   /**
    * Evaluates a single metric for a tenant over the requested temporal window
@@ -194,42 +206,42 @@ export class MetricsService {
 
       // Bookings & Reservations
       case "BOOKING_TOTAL_COUNT": {
-        const { items } = await this.bookingRepo.findMany(tenantId);
+        const items = await this.allBookings(tenantId);
         const inWindow = items.filter(
           (b) => b.createdAt >= from && b.createdAt <= to
         );
         return { value: inWindow.length };
       }
       case "BOOKING_CONFIRMED_COUNT": {
-        const { items } = await this.bookingRepo.findMany(tenantId);
+        const items = await this.allBookings(tenantId);
         const inWindow = items.filter(
           (b) => b.createdAt >= from && b.createdAt <= to && b.status === "CONFIRMED"
         );
         return { value: inWindow.length };
       }
       case "BOOKING_COMPLETED_COUNT": {
-        const { items } = await this.bookingRepo.findMany(tenantId);
+        const items = await this.allBookings(tenantId);
         const inWindow = items.filter(
           (b) => b.createdAt >= from && b.createdAt <= to && b.status === "COMPLETED"
         );
         return { value: inWindow.length };
       }
       case "BOOKING_CANCELLED_COUNT": {
-        const { items } = await this.bookingRepo.findMany(tenantId);
+        const items = await this.allBookings(tenantId);
         const inWindow = items.filter(
           (b) => b.createdAt >= from && b.createdAt <= to && b.status === "CANCELLED"
         );
         return { value: inWindow.length };
       }
       case "BOOKING_NO_SHOW_COUNT": {
-        const { items } = await this.bookingRepo.findMany(tenantId);
+        const items = await this.allBookings(tenantId);
         const inWindow = items.filter(
           (b) => b.createdAt >= from && b.createdAt <= to && b.status === "NO_SHOW"
         );
         return { value: inWindow.length };
       }
       case "BOOKING_TOTAL_VALUE": {
-        const { items } = await this.bookingRepo.findMany(tenantId);
+        const items = await this.allBookings(tenantId);
         const inWindow = items.filter(
           (b) => b.createdAt >= from && b.createdAt <= to
         );
@@ -242,7 +254,7 @@ export class MetricsService {
         return { value: byCurrency[targetCurr] || 0, byCurrency };
       }
       case "BOOKING_AVERAGE_VALUE": {
-        const { items } = await this.bookingRepo.findMany(tenantId);
+        const items = await this.allBookings(tenantId);
         const inWindow = items.filter(
           (b) => b.createdAt >= from && b.createdAt <= to
         );
@@ -260,7 +272,7 @@ export class MetricsService {
         return { value: avg, byCurrency };
       }
       case "BOOKING_CANCELLATION_RATE": {
-        const { items } = await this.bookingRepo.findMany(tenantId);
+        const items = await this.allBookings(tenantId);
         const inWindow = items.filter(
           (b) => b.createdAt >= from && b.createdAt <= to
         );
@@ -269,7 +281,7 @@ export class MetricsService {
         return { value: Math.round((cancelled / inWindow.length) * 1000) / 10 };
       }
       case "BOOKING_NO_SHOW_RATE": {
-        const { items } = await this.bookingRepo.findMany(tenantId);
+        const items = await this.allBookings(tenantId);
         const inWindow = items.filter(
           (b) => b.createdAt >= from && b.createdAt <= to
         );
@@ -281,7 +293,7 @@ export class MetricsService {
         return { value: Math.round((noShows / eligible.length) * 1000) / 10 };
       }
       case "BOOKING_LEAD_TIME_HOURS": {
-        const { items } = await this.bookingRepo.findMany(tenantId);
+        const items = await this.allBookings(tenantId);
         const inWindow = items.filter(
           (b) => b.createdAt >= from && b.createdAt <= to && (b.pickupAt || (b as any).pickupDateTime)
         );
@@ -407,33 +419,49 @@ export class MetricsService {
         return { value: byCurrency[targetCurr] || 0, byCurrency };
       }
       case "FINANCE_POSTED_REVENUE": {
-        // Authoritative: Ledger entries for REVENUE accounts on POSTED transactions
-        const entries = await this.journalEntryRepo.listByTenant(tenantId);
+        // Ledger lines do not carry currency or posting date. Both belong to
+        // the parent journal header; never default a line to KES or include drafts.
+        const [entries, transactions] = await Promise.all([
+          this.journalEntryRepo.listByTenant(tenantId),
+          this.journalTxRepo.listByTenant(tenantId),
+        ]);
+        const headers = new Map(transactions.map(tx => [tx.id, tx]));
         const byCurrency: Record<string, number> = {};
-        for (const e of entries) {
-          if (e.accountCode && e.accountCode.startsWith("4")) { // Account 4xxx = REVENUE
-            const c = (e as any).currency || "KES";
-            const amt = parseFloat(String((e as any).amount || 0));
-            const debit = (e as any).direction === "DEBIT" ? amt : parseFloat(String((e as any).debit || 0));
-            const credit = (e as any).direction === "CREDIT" ? amt : parseFloat(String((e as any).credit || 0));
-            const netCredit = credit - debit;
-            byCurrency[c] = (byCurrency[c] || 0) + netCredit;
-          }
+        for (const entry of entries) {
+          const header = headers.get(entry.transactionId);
+          // Include an originally posted REVERSED journal and its separate
+          // posted reversal. Otherwise corrections disappear from history.
+          if (!header || (header.status !== "POSTED" && header.status !== "REVERSED") ||
+            !header.postedAt || !entry.accountCode.startsWith("4")) continue;
+          if (!isDateInWindow(header.postedAt, from, to)) continue;
+          const amount = Number(entry.amount);
+          if (!Number.isFinite(amount)) throw new Error("Invalid posted journal amount");
+          const c = header.currency;
+          if (!c) throw new Error("Posted journal missing currency");
+          byCurrency[c] = (byCurrency[c] || 0) + (entry.direction === "CREDIT" ? amount : -amount);
         }
         const targetCurr = currency || Object.keys(byCurrency)[0] || "KES";
-        return { value: byCurrency[targetCurr] || 0, byCurrency };
+        return { value: Math.round((byCurrency[targetCurr] || 0) * 100) / 100, byCurrency };
       }
       case "FINANCE_CASH_RECEIPTS": {
-        // Authoritative: verified COMPLETED payments
+        // Gross verified inbound receipts (including refundable deposits).
+        // These are cash facts, NOT earned revenue; refunds are reported
+        // separately and must not rewrite the original payment date.
         const payments = await this.paymentRepo.listByTenant(tenantId);
-        const valid = payments.filter((p) => p.status === "VERIFIED" || p.status === "ALLOCATED" || (p.status as any) === "COMPLETED");
         const byCurrency: Record<string, number> = {};
-        for (const p of valid) {
-          const c = p.currency || "KES";
-          byCurrency[c] = (byCurrency[c] || 0) + parseFloat(String(p.amount || 0));
+        const verified = new Set([
+          "VERIFIED", "PARTIALLY_ALLOCATED", "ALLOCATED", "PARTIALLY_REFUNDED", "REFUNDED",
+        ]);
+        for (const p of payments) {
+          if (p.direction !== "INBOUND" || !verified.has(p.status) ||
+            !isDateInWindow(p.verifiedAt, from, to)) continue;
+          const amount = Number(p.amount);
+          if (!Number.isFinite(amount)) throw new Error("Invalid verified receipt amount");
+          if (!p.currency) throw new Error("Verified receipt missing currency");
+          byCurrency[p.currency] = (byCurrency[p.currency] || 0) + amount;
         }
         const targetCurr = currency || Object.keys(byCurrency)[0] || "KES";
-        return { value: byCurrency[targetCurr] || 0, byCurrency };
+        return { value: Math.round((byCurrency[targetCurr] || 0) * 100) / 100, byCurrency };
       }
       case "FINANCE_TOTAL_EXPENSES": {
         const entries = await this.journalEntryRepo.listByTenant(tenantId);
