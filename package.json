@@ -85,6 +85,7 @@
     "test:access": "tsx packages/database/test/access-onboarding.test.ts",
     "test:ux-d1": "tsx packages/database/test/workspace-search-contract.test.ts",
     "test:ux-d2": "tsx packages/database/test/first-rental-onboarding.test.ts",
+    "test:ux-d3": "tsx packages/database/test/ux-d3-financial-intelligence.test.ts",
     "review:api": "tsx scripts/access-review.ts",
     "review:web": "VITE_API_PROXY_TARGET=http://127.0.0.1:3511 vite --host 127.0.0.1 --port 3510 --strictPort",
     "test:restoration": "tsx packages/database/test/restoration-hardening.test.ts",
