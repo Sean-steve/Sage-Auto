@@ -21,6 +21,9 @@ export class TransactionManager {
    * Runs a callback within an isolated database transaction
    */
   static async run<T>(callback: (tx: TransactionContext) => Promise<T>): Promise<T> {
+    if (process.env.NODE_ENV !== "test") {
+      throw new Error("Legacy TransactionManager is a test-only stub, not PostgreSQL. Use the native withTenantPgTransaction API for real SQL operations.");
+    }
     const txContext: TransactionContext = {
       isTransaction: true,
       executor: {
@@ -56,7 +59,7 @@ export class TransactionManager {
     }
 
     return this.run(async (tx) => {
-      // Execute SET LOCAL app.current_tenant_id inside the active transaction
+      // This test-only executor is not an actual SQL session. Native PG uses set_config inside BEGIN.
       await tx.executor.execute(`SET LOCAL app.current_tenant_id = $1`, [tenantId]);
       tx.tenantId = tenantId;
 
