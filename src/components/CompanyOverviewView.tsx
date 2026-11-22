@@ -111,9 +111,13 @@ export function CompanyOverviewView({ portal }: {portal: AccessPortal}) {
   const mayRentals = canRead(portal, "rental.read");
   const hasSection = (section: string) => portal.sections.some(s => s.id === section);
   const navigate = (section: string) => {
-    if (hasSection(section)) {
-      window.dispatchEvent(new CustomEvent("sage:navigate", { detail: { section } }));
-    }
+    if (hasSection(section)) window.dispatchEvent(new CustomEvent("sage:navigate", { detail: { section } }));
+  };
+  const openBooking = (booking: Record<string,any>) => {
+    if (!hasSection("bookings") || !canRead(portal,"booking.read") || typeof booking.id !== "string") return;
+    window.dispatchEvent(new CustomEvent("sage:navigate", {detail: {
+      section: "bookings", record: {kind: "BOOKING", id: booking.id, title: booking.bookingNumber || "Booking", subtitle: "Recent booking"},
+    }}));
   };
   const customValid = preset !== "CUSTOM" || (
     !!customFrom && !!customTo && customFrom <= customTo &&
@@ -150,9 +154,11 @@ export function CompanyOverviewView({ portal }: {portal: AccessPortal}) {
       bookingsError: mayBookings ? bookingsResponse?.error?.message ||
         (!Array.isArray(bookingsResponse?.data) ? "Recent booking records could not be verified." : null) : null,
       overdueCount: rentalsResponse && !rentalsResponse.error
-        ? (typeof rentalsResponse.meta?.total === "number" ? rentalsResponse.meta.total : null) : null,
+        ? (typeof rentalsResponse.meta?.total === "number" ? rentalsResponse.meta.total :
+          typeof rentalsResponse.total === "number" ? rentalsResponse.total : null) : null,
       rentalsError: mayRentals ? rentalsResponse?.error?.message ||
-        (typeof rentalsResponse?.meta?.total !== "number" ? "Overdue rental total is unavailable." : null) : null,
+        (typeof rentalsResponse?.meta?.total !== "number" && typeof rentalsResponse?.total !== "number"
+          ? "Overdue rental total is unavailable." : null) : null,
       refreshedAt: new Date().toISOString(),
     });
     setLoading(false);
@@ -328,7 +334,7 @@ export function CompanyOverviewView({ portal }: {portal: AccessPortal}) {
             : summary.recentBookings === null ? <p className="py-9 text-sm text-slate-500">{mayBookings?"Recent bookings are currently unavailable.":"Booking access is restricted for this role."}</p>
             : !summary.recentBookings.length ? <p className="py-10 text-sm text-slate-500">No booking records yet. Use the booking workspace to create one.</p>
             : summary.recentBookings.map(booking=><button type="button" key={booking.id} disabled={!hasSection("bookings")}
-                onClick={()=>navigate("bookings")}
+                onClick={()=>openBooking(booking)}
                 className="grid w-full gap-2 py-4 text-left transition hover:bg-slate-50 sm:grid-cols-[1fr_1fr_auto] sm:items-center">
                 <span><span className="block font-mono text-xs font-black text-slate-950">{booking.bookingNumber||"Reservation"}</span>
                   <span className="mt-1 block text-xs text-slate-500">{booking.customerName||"Customer reservation"}</span></span>
