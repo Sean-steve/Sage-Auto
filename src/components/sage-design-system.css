@@ -86,6 +86,14 @@
 
 /* Data tables */
 .saas-workspace .sage-module table{width:100%;font-size:13px;font-variant-numeric:tabular-nums;border-spacing:0}
+/* Chart data tables remain screen-reader-accessible without expanding the
+   responsive layout. The general table width rule must not override sr-only. */
+.saas-workspace .sage-module table.sr-only{
+  position:absolute!important;width:1px!important;min-width:1px!important;height:1px!important;
+  padding:0!important;margin:-1px!important;overflow:hidden!important;
+  clip:rect(0,0,0,0)!important;clip-path:inset(50%)!important;
+  white-space:nowrap!important;border:0!important;
+}
 .saas-workspace .sage-module thead{background:var(--sage-surface-subtle)}
 .saas-workspace .sage-module th{
   color:var(--sage-muted)!important;
