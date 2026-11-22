@@ -75,6 +75,9 @@ import { createAuthGuard } from "./modules/identity/presentation/auth.guard";
 import { validateDeploymentConfig } from "@carhire/config";
 
 export function createApiApp(): Express {
+  if ([process.env.APP_ENV, process.env.NODE_ENV].some(value => ["staging", "production"].includes(String(value || "").toLowerCase()))) {
+    throw new Error("PRODUCTION NO-GO (Issue #33): SQLite-backed business repositories cannot be launched as a production PostgreSQL authority.");
+  }
   validateDeploymentConfig();
   const app = express();
   const logger = new AppLoggerService("HttpServer");
