@@ -3,6 +3,7 @@ import {
   buildAuthoritativePeriodSeries, periodDayKeys, localDayKey,
 } from "../../../apps/api/src/modules/analytics/domain/dashboard-intelligence";
 import { TemporalWindowResolver } from "../../../apps/api/src/modules/analytics/domain/temporal-window";
+import { MetricRegistry } from "../../../apps/api/src/modules/analytics/domain/metric-registry";
 import {
   FULL_EXECUTIVE_DASHBOARD_RIGHTS, hasAnalyticRights,
   requiredPermissionsForMetric, requiredPermissionsForReport, requireAnalyticsPermissions,
@@ -94,6 +95,8 @@ async function main() {
   assert.deepEqual(requiredPermissionsForMetric("FINANCE_POSTED_REVENUE"), ["analytics.read", "ledger.read"]);
   assert.deepEqual(requiredPermissionsForMetric("FINANCE_CASH_RECEIPTS"), ["analytics.read", "payment.read"]);
   assert.deepEqual(requiredPermissionsForMetric("FLEET_UTILIZATION_RATE"), ["analytics.read", "vehicle.read"]);
+  assert.equal(MetricRegistry.get("HANDOVER_PENDING_COUNT")?.timeBasis, "CURRENT_SNAPSHOT");
+  assert.deepEqual(requiredPermissionsForMetric("HANDOVER_PENDING_COUNT"), ["analytics.read", "rental.read"]);
   assert.throws(() => requireAnalyticsPermissions({
     auth: {userId:"user-A"},
     tenantContext: {tenantId:"tenant-A", permissions:["analytics.read", "vehicle.read"]},
