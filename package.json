@@ -105,7 +105,9 @@
     "dev:workers": "LOCAL_PAYMENT_WORKER_ENABLED=true pnpm dev:worker",
     "dev:worker:payments": "LOCAL_PAYMENT_WORKER_ENABLED=true pnpm dev:worker",
     "test:ux-d6": "tsx packages/database/test/ux-d6-postgres-authority.test.ts",
-    "test:ux-d6:gate": "tsx packages/database/test/ux-d6-runtime-gate.test.ts"
+    "test:ux-d6:gate": "tsx packages/database/test/ux-d6-runtime-gate.test.ts",
+    "db:authority:audit": "node scripts/ux-d6-cutover-audit.mjs",
+    "db:authority:certify": "node scripts/ux-d6-cutover-audit.mjs --require-complete"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
