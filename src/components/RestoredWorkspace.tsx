@@ -2,7 +2,7 @@ import React, { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import {
   ArrowLeftRight, Banknote, BookOpenCheck, Building2, CalendarRange, CarFront, ChevronLeft,
   ClipboardCheck, Gauge, Globe2, LayoutDashboard, LogOut, Menu, ReceiptText, Settings2,
-  Tags, UsersRound, WalletCards, Wrench, Sun, Moon, ChevronRight
+  Tags, UsersRound, WalletCards, Wrench, Sun, Moon, ChevronRight, ShieldCheck
 } from "lucide-react";
 import { AppProvider, useApp } from "../lib/store";
 import { WorkspaceSearch } from "./WorkspaceSearch";
