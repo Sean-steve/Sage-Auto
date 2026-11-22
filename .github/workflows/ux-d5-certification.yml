@@ -115,7 +115,7 @@ jobs:
         run: pnpm db:migrate && pnpm db:migrate
       - name: Check live PostgreSQL RLS and schema tracking
         run: |
-          test "$(psql "$DATABASE_URL" -XqAt -c 'SELECT count(*) FROM sage_auto_schema_migrations;')" = "4"
+          test "$(psql "$DATABASE_URL" -XqAt -c 'SELECT count(*) FROM sage_auto_schema_migrations;')" = "5"
           test "$(psql "$DATABASE_URL" -XqAt -c "SELECT count(*) FROM pg_class WHERE relname IN ('tenant_settings','tenant_memberships','idempotency_keys') AND relrowsecurity AND relforcerowsecurity;")" = "3"
       - name: Inspect live PostgreSQL and Redis readiness
         run: pnpm local:doctor
