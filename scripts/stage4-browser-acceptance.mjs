@@ -245,6 +245,10 @@ try {
         const actual=await cdp.evaluate('(()=>{return {width:innerWidth,scroll:document.documentElement.scrollWidth,header:[...document.querySelectorAll("h1")].some(n=>n.textContent.includes("Your business, at a glance.")),plot:!!document.querySelector("section[aria-label=\\"Financial trends\\"]")};})()');
         assert.equal(actual.header,true,'Overview heading missing at '+width+'px');
         assert.equal(actual.plot,true,'Finance trend missing at '+width+'px');
+        if(actual.scroll>actual.width+24){
+          const offenders=await cdp.evaluate('([...document.querySelectorAll("body *")].map(n=>({tag:n.tagName,cls:String(n.className?.baseVal||n.className||"").slice(0,95),txt:(n.textContent||"").slice(0,40),right:Math.round(n.getBoundingClientRect().right),left:Math.round(n.getBoundingClientRect().left),width:Math.round(n.getBoundingClientRect().width)})).filter(r=>r.right>innerWidth+20&&r.width>0).sort((a,b)=>b.right-a.right).slice(0,15))');
+          console.error('Responsive overflow diagnostics at '+width+'px:',JSON.stringify(offenders));
+        }
         assert.ok(actual.scroll<=actual.width+24,
           'Horizontal overflow at '+width+'px: '+actual.scroll+' > '+actual.width);
         checks+=3;
