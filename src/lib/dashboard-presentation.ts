@@ -3,7 +3,7 @@ import type { AccessPortal } from "./access-context";
 
 export const EXECUTIVE_DASHBOARD_PERMISSIONS = [
   "analytics.read", "vehicle.read", "booking.read", "rental.read",
-  "invoice.read", "payment.read", "ledger.read", "lead.read", "quote.read",
+  "invoice.read", "payment.read", "ledger.read", "crm.lead.read", "crm.quote.read",
 ] as const;
 
 export type FinancialSeriesKey = "postedRevenue" | "cashCollections" | "grossInvoiced";
