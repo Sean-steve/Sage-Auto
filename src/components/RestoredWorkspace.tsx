@@ -154,9 +154,9 @@ function Shell({context,portal,section,onSection,onSwitch,onSignOut}:{context:Ac
     {mobileOpen&&<div className="fixed inset-0 z-50 lg:hidden"><button aria-label="Close navigation" className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm" onClick={()=>setMobileOpen(false)}/><div className="relative h-full w-[86vw] max-w-[310px] shadow-2xl"><Sidebar/></div></div>}
     <div className={`min-w-0 transition-[padding] duration-200 ${sidebarCollapsed?"lg:pl-[76px]":"lg:pl-[272px]"}`}>
       <header className="sage-topbar sticky top-0 z-30 flex items-center gap-3 border-b bg-white/90 px-4 backdrop-blur-xl sm:px-6 lg:gap-5 lg:px-8">
-        <div className="flex min-w-0 shrink-0 items-center gap-3">
+        <div className="flex min-w-0 shrink items-center gap-3">
           <button onClick={()=>setMobileOpen(true)} aria-label="Open navigation" className="grid h-10 w-10 place-items-center rounded-xl border border-slate-200 lg:hidden"><Menu size={18}/></button>
-          <div className="min-w-0"><div className="max-w-[170px] truncate text-[11px] font-bold uppercase tracking-[.16em] text-slate-400 xl:max-w-[235px]">{portal.name}</div><div className="truncate text-base font-black tracking-tight text-slate-950">{title}</div></div>
+          <div className="min-w-0"><div className="max-w-[92px] truncate text-[11px] font-bold uppercase tracking-[.16em] text-slate-400 sm:max-w-[125px] lg:max-w-[170px] xl:max-w-[235px]">{portal.name}</div><div className="max-w-[115px] truncate text-base font-black tracking-tight text-slate-950 sm:max-w-[145px] lg:max-w-none">{title}</div></div>
         </div>
         <div className="flex min-w-0 flex-1 justify-center">
           <WorkspaceSearch key={portal.id+portal.permissions.join("|")} portal={portal} descriptions={descriptions} onSelect={openSearchResult}/>
