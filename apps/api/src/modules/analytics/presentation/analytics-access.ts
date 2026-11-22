@@ -17,7 +17,7 @@ export function requiredPermissionsForMetric(key: MetricKey): string[] {
   if (key.startsWith("FINANCE_")) return [...rights, "invoice.read"];
   if (key.startsWith("FLEET_")) return [...rights, "vehicle.read"];
   if (key.startsWith("BOOKING_")) return [...rights, "booking.read"];
-  if (key.startsWith("RENTAL_")) return [...rights, "rental.read"];
+  if (key.startsWith("RENTAL_") || key.startsWith("HANDOVER_")) return [...rights, "rental.read"];
   if (key.startsWith("VEHICLE_")) return [...rights, "vehicle.read", "invoice.read"];
   if (key.startsWith("OWNER_")) return [...rights, "settlement.read"];
   if (key.startsWith("MAINTENANCE_")) return [...rights, "maintenance.read"];
