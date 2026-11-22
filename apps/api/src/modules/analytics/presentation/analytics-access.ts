@@ -1,4 +1,4 @@
-import type { MetricKey } from "@carhire/types";
+import type { MetricKey, ReportKey } from "@carhire/types";
 import type { Request } from "express";
 
 export function hasAnalyticRights(permissions: readonly string[], required: readonly string[]): boolean {
@@ -41,5 +41,31 @@ export function requireAnalyticsPermissions(req: Request, required: readonly str
   }
   if (!hasAnalyticRights(req.tenantContext.permissions || [], required)) {
     throw Object.assign(new Error("Insufficient permissions for these analytics fields"), { statusCode: 403 });
+  }
+}
+
+
+/** Metric-registry labels such as "reports:view" are descriptive legacy codes,
+ * not enforceable tenant permissions. Every report is mapped explicitly. */
+export function requiredPermissionsForReport(key: ReportKey): string[] {
+  const rights = ["report.read"];
+  switch (key) {
+    case "REPORT_FLEET_PERFORMANCE":
+    case "REPORT_VEHICLE_UTILIZATION":
+      return [...rights, "vehicle.read", "invoice.read"];
+    case "REPORT_BOOKING_LIFECYCLE": return [...rights, "booking.read"];
+    case "REPORT_RENTAL_OPERATIONS": return [...rights, "rental.read"];
+    case "REPORT_REVENUE_BILLING":
+    case "REPORT_RECEIVABLES_AGING": return [...rights, "invoice.read"];
+    case "REPORT_CASH_RECEIPTS": return [...rights, "payment.read"];
+    case "REPORT_GENERAL_LEDGER":
+    case "REPORT_TRIAL_BALANCE": return [...rights, "ledger.read"];
+    case "REPORT_VEHICLE_PROFITABILITY":
+      return [...rights, "vehicle.read", "invoice.read", "expense.read", "settlement.read"];
+    case "REPORT_OWNER_SETTLEMENTS": return [...rights, "settlement.read"];
+    case "REPORT_MAINTENANCE_COSTS": return [...rights, "maintenance.read", "expense.read"];
+    case "REPORT_COMPLIANCE_STATUS": return [...rights, "compliance.read"];
+    case "REPORT_CRM_FUNNEL": return [...rights, "lead.read", "quote.read"];
+    default: return [...rights, "__unmapped_report__"];
   }
 }
