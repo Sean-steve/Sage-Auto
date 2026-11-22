@@ -24,15 +24,15 @@ export function requiredPermissionsForMetric(key: MetricKey): string[] {
   if (key.startsWith("COMPLIANCE_")) return [...rights, "compliance.read"];
   if (key.startsWith("CUSTOMER_")) return [...rights, "customer.read"];
   if (key.startsWith("CORPORATE_")) return [...rights, "corporate_account.read"];
-  if (key.startsWith("CRM_QUOTE_")) return [...rights, "quote.read"];
-  if (key.startsWith("CRM_")) return [...rights, "lead.read"];
+  if (key.startsWith("CRM_QUOTE_")) return [...rights, "crm.quote.read"];
+  if (key.startsWith("CRM_")) return [...rights, "crm.lead.read"];
   // New unclassified metrics must be explicitly mapped, never public by default.
   return [...rights, "__unmapped_metric__"];
 }
 
 export const FULL_EXECUTIVE_DASHBOARD_RIGHTS = [
   "analytics.read", "vehicle.read", "booking.read", "rental.read",
-  "invoice.read", "payment.read", "ledger.read", "lead.read", "quote.read",
+  "invoice.read", "payment.read", "ledger.read", "crm.lead.read", "crm.quote.read",
 ] as const;
 
 export function requireAnalyticsPermissions(req: Request, required: readonly string[]): void {
@@ -65,7 +65,7 @@ export function requiredPermissionsForReport(key: ReportKey): string[] {
     case "REPORT_OWNER_SETTLEMENTS": return [...rights, "settlement.read"];
     case "REPORT_MAINTENANCE_COSTS": return [...rights, "maintenance.read", "expense.read"];
     case "REPORT_COMPLIANCE_STATUS": return [...rights, "compliance.read"];
-    case "REPORT_CRM_FUNNEL": return [...rights, "lead.read", "quote.read"];
+    case "REPORT_CRM_FUNNEL": return [...rights, "crm.lead.read", "crm.quote.read"];
     default: return [...rights, "__unmapped_report__"];
   }
 }
