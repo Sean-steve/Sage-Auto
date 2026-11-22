@@ -22,7 +22,7 @@ export function WorkspaceSetupGuide({ portal, mode }: { portal: AccessPortal; mo
     if (!silent) setLoading(true);
     const response = await firstRentalSetupApi.getStatus();
     if (response.error) setError(response.error.message || "Unable to load first-rental setup.");
-    else if (response.data?.tenantId === portal.tenantId) {
+    else if (response.data && response.data.tenantId === portal.tenantId) {
       setStatus(response.data);
       setError("");
     } else setError("Company setup could not be verified.");
@@ -49,7 +49,7 @@ export function WorkspaceSetupGuide({ portal, mode }: { portal: AccessPortal; mo
     setError("");
     try {
       const response = await firstRentalSetupApi.updateVisibility(action);
-      if (response.error || response.data?.tenantId !== portal.tenantId) {
+      if (response.error || !response.data || response.data.tenantId !== portal.tenantId) {
         throw new Error(response.error?.message || "Unable to update workspace setup.");
       }
       setStatus(response.data);
