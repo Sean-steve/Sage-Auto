@@ -1,0 +1,45 @@
+name: UX-H1 Unified Headers and Smart Refresh Review
+
+on:
+  push:
+    branches:
+      - feature/ux-h1-unified-headers-smart-refresh-20261123
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'src/components/RestoredWorkspace.tsx'
+      - 'src/components/BookingExperienceView.tsx'
+      - 'src/components/RenterAccount.tsx'
+      - 'src/components/platform/PlatformOwnerWorkspace.tsx'
+      - 'src/components/owner/VehicleOwnerWorkspace.tsx'
+      - 'src/lib/booking-refresh-policy.ts'
+      - 'packages/database/test/ux-h1-ui-contract.test.ts'
+      - 'scripts/stage4-browser-acceptance.mjs'
+      - 'package.json'
+      - '.github/workflows/ux-h1-review.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  ui-refresh-review:
+    name: Typecheck, header contracts, booking lifecycle and frontend build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 9.15.9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm test:ux-h1
+      - run: pnpm test:access
+      - run: pnpm test:bookings
+      - run: pnpm test:phase4
+      - run: pnpm test:all
+      - run: pnpm build

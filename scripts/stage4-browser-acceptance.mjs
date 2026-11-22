@@ -218,6 +218,16 @@ try {
     await waitFor(()=>cdp.evaluate(`([...document.querySelectorAll('button.sage-nav-item, nav[aria-label="Workspace navigation"] button, nav[aria-label="Vehicle owner sections"] button, nav[aria-label="Platform navigation"] button')]
       .some(n=>n.textContent.trim()===${JSON.stringify(portal.sections[0]?.label||'')}))`),
       spec.role+' own permission-scoped sidebar',35000);
+    if(spec.role==='PLATFORM_OWNER') {
+      const heading=await cdp.evaluate('document.querySelector(".platform-toolbar h1")?.textContent?.trim()');
+      assert.equal(heading,'Platform workspace','Platform global toolbar must not mirror each module title');
+      checks++;
+    }
+    if(spec.role==='VEHICLE_OWNER') {
+      const heading=await cdp.evaluate('document.querySelector(".owner-topbar h1")?.textContent?.trim()');
+      assert.equal(heading,'Vehicle owner workspace','Owner global toolbar must not mirror each panel title');
+      checks++;
+    }
     const allowed=new Set(portal.sections.map(item=>item.label));
     const uiLabels=await cdp.evaluate(`([...document.querySelectorAll('button.sage-nav-item, nav[aria-label="Workspace navigation"] button, nav[aria-label="Vehicle owner sections"] button, nav[aria-label="Platform navigation"] button')].map(n=>n.textContent.trim()))`);
     for(const sectionLabel of uiLabels) {
@@ -266,6 +276,44 @@ try {
         'Cash collections series selected');
       checks++;
       console.log('PASS UX-D6.7 Company Overview: validated charts, 390/768/1280 widths and financial series switch.');
+      // UX-H1: Company page title belongs to the screen, not a second banner.
+      const bookingsLink=portal.sections.find(s=>s.id==='bookings');
+      assert.ok(bookingsLink,'Owner must access Bookings');
+      await cdp.clickSection(bookingsLink.label);
+      await waitFor(()=>cdp.evaluate('(()=>{const m=document.querySelector("main")?.innerText||"";return m.includes("Visible dossiers")&&!m.includes("Loading Bookings")&&!m.includes("Bookings are temporarily unavailable.");})()'),
+        'Company booking register loaded before refresh assertions',30000);
+      const initialCalls=await cdp.evaluate('performance.getEntriesByType("resource").filter(r=>{try{return new URL(r.name).pathname==="/api/v1/bookings";}catch{return false;}}).length');
+      assert.ok(initialCalls>0,'Booking register must be fetched from the authenticated API');
+      await delay(6_400);
+      const afterIdle=await cdp.evaluate('performance.getEntriesByType("resource").filter(r=>{try{return new URL(r.name).pathname==="/api/v1/bookings";}catch{return false;}}).length');
+      assert.equal(afterIdle,initialCalls,'Idle booking list must NOT poll every five seconds');
+      checks+=2;
+      for(const width of [390,768,1280]) {
+        await cdp.call('Emulation.setDeviceMetricsOverride',{
+          width,height:900,deviceScaleFactor:1,mobile:width<768,
+        });
+        await delay(220);
+        const layout=await cdp.evaluate('(()=>{const main=document.querySelector("main");const bar=document.querySelector(".sage-topbar");return {width:innerWidth,scroll:document.documentElement.scrollWidth,extraBanner:!!document.querySelector(".sage-page-context"),bookingTitles:[...main.querySelectorAll("h1")].filter(x=>x.textContent.trim()==="Bookings").length,topbarTitle:bar?.innerText?.includes("Bookings")};})()');
+        assert.equal(layout.extraBanner,false,'Duplicate company page banner detected');
+        assert.equal(layout.bookingTitles,1,'Booking heading must appear once in content');
+        assert.equal(layout.topbarTitle,false,'Global utilities must not repeat the booking heading');
+        assert.ok(layout.scroll<=layout.width+24,'Horizontal Booking overflow at '+width+'px');
+        checks+=4;
+        if(process.env.UX_D6_SCREENSHOT_DIR) {
+          mkdirSync(process.env.UX_D6_SCREENSHOT_DIR,{recursive:true,mode:0o700});
+          const capture=await cdp.call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
+          writeFileSync(join(process.env.UX_D6_SCREENSHOT_DIR,'ux-h1-bookings-'+width+'.png'),
+            Buffer.from(capture.data,'base64'),{mode:0o600});
+        }
+      }
+      await cdp.call('Emulation.clearDeviceMetricsOverride');
+      const triggered=await cdp.evaluate('(()=>{const b=document.querySelector("button[aria-label=\\"Refresh bookings\\"]");if(!b)return false;b.click();return true;})()');
+      assert.equal(triggered,true,'Manual refresh remains available');
+      await waitFor(()=>cdp.evaluate('performance.getEntriesByType("resource").filter(r=>{try{return new URL(r.name).pathname==="/api/v1/bookings";}catch{return false;}}).length>'+afterIdle),
+        'manual refresh starts a new authoritative request',12000);
+      checks++;
+      console.log('PASS UX-H1 Bookings: one title, 390/768/1280 layouts, no 5s polling, explicit refresh.');
+
     }
     for(const section of spec.sections) {
       const s=portal.sections.find(item=>item.id===section);

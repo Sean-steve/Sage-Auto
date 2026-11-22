@@ -148,7 +148,6 @@ export function VehicleOwnerWorkspace({context,portal,section,onSection,onSwitch
     }catch(e:any){setError(e.message||"The dispute was not accepted by the settlement service.");}
     finally{setBusy(false);}
   };
-  const heading=sections.get(section)||"Owner portal";
   function content():React.ReactNode {
     if(loading)return <p className="owner-loading" role="status"><RefreshCw size={17}/> Loading verified owner data…</p>;
     if(error&&!data)return <Panel title="Unable to load this workspace"><div className="owner-warning" role="alert">{error}</div>
@@ -334,8 +333,8 @@ export function VehicleOwnerWorkspace({context,portal,section,onSection,onSwitch
       <button className="owner-switch" onClick={onSwitch}><ArrowLeft size={16}/> Switch company</button>
     </aside>
     <main className="owner-main">
-      <header className="owner-topbar"><div><div className="owner-eyebrow">PARTNER PORTAL / {portal.name}</div><h1>{heading}</h1>
-        <p>{context.user.fullName} · Your vehicles, terms and earnings</p></div>
+      <header className="owner-topbar"><div><div className="owner-eyebrow">PARTNER PORTAL / {portal.name}</div><h1>Vehicle owner workspace</h1>
+        <p>Signed in as {context.user.fullName}</p></div>
         <div className="owner-tools"><button aria-label="Refresh owner records" onClick={()=>setRevision(n=>n+1)}><RefreshCw size={17}/></button>
           <button onClick={onSignOut}><LogOut size={16}/> Sign out</button></div>
       </header>

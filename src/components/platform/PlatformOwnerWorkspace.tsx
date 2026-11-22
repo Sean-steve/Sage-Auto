@@ -466,7 +466,7 @@ export function PlatformOwnerWorkspace({ context, portal, section, onSection, on
       <button className="platform-switch" onClick={onSwitch}><ArrowLeft size={17}/> Switch workspace</button>
     </aside>
     <main className="platform-main">
-      <header className="platform-toolbar"><div><span className="platform-overline">SAGE AUTO / CONTROL PLANE</span><h1>{currentTitle}</h1><p>Platform operations · {context.user.fullName}</p></div>
+      <header className="platform-toolbar"><div><span className="platform-overline">SAGE AUTO / CONTROL PLANE</span><h1>Platform workspace</h1><p>Signed in as {context.user.fullName}</p></div>
         <div className="platform-toolbar-actions"><span className="platform-role"><ShieldCheck size={15}/>{portal.roles.join(", ")}</span>
           <button aria-label="Refresh platform records" onClick={() => setRevision(r => r + 1)}><RefreshCw size={17}/></button>
           <button onClick={onSignOut} className="platform-signout">Sign out <ArrowRight size={15}/></button>

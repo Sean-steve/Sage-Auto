@@ -18,7 +18,11 @@ assert.match(app,/location\.pathname\.endsWith\('\/track'\).*RenterAccount/,"boo
 assert.match(app,/location\.pathname\.endsWith\('\/account'\).*AccessApp site=\{publicSite\[1\]\}/,"public renter account must use the authenticated renter portal");
 assert.match(renter,/bookingReference/);
 assert.match(renter,/booking\/account\/booking/);
-assert.match(renter,/setInterval\(\(\)=>void load\(bookingReference,email,false\),30000\)/);
+assert.match(renter,/window\.setInterval\(update,30_000\)/,"active renter tracking must retain its 30-second cadence");
+assert.match(renter,/load\(bookingReference,email,false,true\)/,"background renter checks must use quiet refresh");
+assert.match(renter,/document\.visibilityState==="visible"/,"hidden renter tabs must not poll");
+assert.match(renter,/\["COMPLETED","CANCELLED","REJECTED","EXPIRED","NO_SHOW"\]/,
+  "terminal renter bookings must stop unnecessary polling");
 assert.match(renter,/Latest notifications/);
 assert.match(renter,/You have the vehicle/);
 assert.match(renter,/timeRemainingMinutes/);
