@@ -148,7 +148,6 @@ export function VehicleOwnerWorkspace({context,portal,section,onSection,onSwitch
     }catch(e:any){setError(e.message||"The dispute was not accepted by the settlement service.");}
     finally{setBusy(false);}
   };
-  const heading=sections.get(section)||"Owner portal";
   function content():React.ReactNode {
     if(loading)return <p className="owner-loading" role="status"><RefreshCw size={17}/> Loading verified owner data…</p>;
     if(error&&!data)return <Panel title="Unable to load this workspace"><div className="owner-warning" role="alert">{error}</div>
