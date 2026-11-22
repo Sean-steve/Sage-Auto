@@ -96,7 +96,11 @@ export function buildAuthoritativePeriodSeries(args: {
 
   for (const entry of entries) {
     const header = headers.get(entry.transactionId);
-    if (!header || entry.tenantId !== tenantId) continue;
+    if (entry.tenantId !== tenantId) continue;
+    if (!header) {
+      if (entry.accountCode.startsWith("4")) incompletePostedJournals++;
+      continue;
+    }
     // Reversed original journals must remain in the original period, while
     // their separately posted reversal offsets them in the reversal period.
     if (header.status !== "POSTED" && header.status !== "REVERSED") continue;
