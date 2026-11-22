@@ -7,6 +7,7 @@ import {
 import { apiClient, type ApiResponse } from "../lib/api-client";
 import { permits, type AccessPortal } from "../lib/access-context";
 import { useApp } from "../lib/store";
+import { PENDING_BOOKING_POLL_MS, shouldRefreshBookingRegister, shouldPollPendingBooking, isPendingFinancialBooking } from "../lib/booking-refresh-policy";
 
 type Props={portal:AccessPortal;focusRecordId?:string};
 type ActionKind="cancel"|"reject"|"expire"|"no-show";
@@ -57,6 +58,9 @@ export function BookingExperienceView({portal,focusRecordId}:Props){
   const [searchInput,setSearchInput]=useState("");
   const [search,setSearch]=useState("");
   const [loading,setLoading]=useState(true);
+  const [listLoaded,setListLoaded]=useState(false);
+  const [listError,setListError]=useState("");
+  const [backgroundRefreshing,setBackgroundRefreshing]=useState(false);
   const [error,setError]=useState("");
   const [notice,setNotice]=useState("");
   const [selectedId,setSelectedId]=useState("");
@@ -71,6 +75,8 @@ export function BookingExperienceView({portal,focusRecordId}:Props){
   const [substituteOpen,setSubstituteOpen]=useState(false);
   const [action,setAction]=useState<ActionKind|null>(null);
   const auxSeq=useRef(0),registerSeq=useRef(0),detailSeq=useRef(0);
+  const lastRegisterSuccessRef=useRef(0);
+  const registerInFlightRef=useRef(false),detailInFlightRef=useRef(false);
 
   async function loadAux(){
     const request=++auxSeq.current;
@@ -98,8 +104,13 @@ export function BookingExperienceView({portal,focusRecordId}:Props){
     setHolds(r[8].error?[]:r[8].data||[]);
   }
 
-  async function loadRegister(){
-    const request=++registerSeq.current;setLoading(true);setError("");
+  async function loadRegister(options:{silent?:boolean}={}){
+    const silent=!!options.silent;
+    if(silent&&registerInFlightRef.current)return;
+    const request=++registerSeq.current;
+    registerInFlightRef.current=true;
+    if(silent)setBackgroundRefreshing(true);
+    else{setLoading(true);setBackgroundRefreshing(false);setListError("");}
     try{
       const params:any={limit:100,sortBy:"createdAt",sortOrder:"desc"};
       if(status!=="ALL")params.status=status;
@@ -108,14 +119,32 @@ export function BookingExperienceView({portal,focusRecordId}:Props){
       const res=await apiClient.bookings.listBookings(params);
       if(request!==registerSeq.current)return;
       if(res.error)throw new Error(res.error.message);
-      setBookings(res.data||[]);
-    }catch(e:any){if(request===registerSeq.current)setError(e.message||"Unable to load Bookings.");}
-    finally{if(request===registerSeq.current)setLoading(false);}
+      if(!Array.isArray(res.data))throw new Error("Booking API returned an invalid records list.");
+      setBookings(res.data);
+      setListLoaded(true);
+      setListError("");
+      lastRegisterSuccessRef.current=Date.now();
+    }catch(e:any){
+      if(request===registerSeq.current)setListError(
+        (silent&&listLoaded?"Could not refresh bookings; showing the last successfully loaded records. ":"Could not load bookings. ")+
+        (e instanceof Error?e.message:"Please try again.")
+      );
+    }finally{
+      if(request===registerSeq.current){
+        registerInFlightRef.current=false;
+        if(silent)setBackgroundRefreshing(false);
+        else setLoading(false);
+      }
+    }
   }
 
-  async function loadDetail(id:string){
+  async function loadDetail(id:string,options:{silent?:boolean}={}){
     if(!id){setDetail(null);setReadiness(null);return;}
-    const request=++detailSeq.current;setDetailLoading(true);setError("");setReadiness(null);
+    const silent=!!options.silent;
+    if(silent&&detailInFlightRef.current)return;
+    const request=++detailSeq.current;
+    detailInFlightRef.current=true;
+    if(!silent){setDetailLoading(true);setError("");setReadiness(null);}
     try{
       const data:any=await unwrap(apiClient.bookings.getBooking(id));
       if(request!==detailSeq.current)return;
@@ -123,26 +152,54 @@ export function BookingExperienceView({portal,focusRecordId}:Props){
       if(data.status==="CONFIRMED"){
         const ready=await apiClient.bookings.getHandoverReadiness(id);
         if(request===detailSeq.current&&!ready.error)setReadiness(ready.data);
-      }
-    }catch(e:any){if(request===detailSeq.current)setError(e.message||"Unable to load Booking.");}
-    finally{if(request===detailSeq.current)setDetailLoading(false);}
+      }else setReadiness(null);
+    }catch(e:any){if(request===detailSeq.current)setError(e.message||"Unable to refresh Booking.");}
+    finally{if(request===detailSeq.current){detailInFlightRef.current=false;if(!silent)setDetailLoading(false);}}
   }
 
-  useEffect(()=>{void loadAux();void loadRegister();return()=>{auxSeq.current++;registerSeq.current++;detailSeq.current++;};},[portal.id]);
-  useEffect(()=>{void loadRegister();},[status,source,search]);
   useEffect(()=>{
+    void loadAux();
+    return()=>{auxSeq.current++;registerSeq.current++;detailSeq.current++;};
+  },[portal.id]);
+  useEffect(()=>{
+    setListLoaded(false);
+    lastRegisterSuccessRef.current=0;
+    void loadRegister();
+    return()=>{registerSeq.current++;};
+  },[portal.id,status,source,search]);
+  useEffect(()=>{
+    const updateIfStale=()=>{
+      if(shouldRefreshBookingRegister({
+        visibility:document.visibilityState==="visible"?"visible":"hidden",
+        lastSuccessfulAt:lastRegisterSuccessRef.current,now:Date.now(),
+        inFlight:registerInFlightRef.current,
+      }))void loadRegister({silent:true});
+    };
+    window.addEventListener("focus",updateIfStale);
+    document.addEventListener("visibilitychange",updateIfStale);
+    return()=>{
+      window.removeEventListener("focus",updateIfStale);
+      document.removeEventListener("visibilitychange",updateIfStale);
+    };
+  },[portal.id,status,source,search]);
+  const editingBooking=createOpen||editOpen||quoteOpen||confirmOpen||amendOpen||substituteOpen||action!==null;
+  const pendingFinancialCheck=!!selectedId&&isPendingFinancialBooking(detail)&&!editingBooking;
+  useEffect(()=>{
+    if(!pendingFinancialCheck)return;
     const timer=window.setInterval(()=>{
-      void loadRegister();
-      if(selectedId)void loadDetail(selectedId);
-    },5000);
+      if(!shouldPollPendingBooking(detail,document.visibilityState==="visible"?"visible":"hidden",selectedId,editingBooking))return;
+      void loadDetail(selectedId,{silent:true});
+      void loadRegister({silent:true});
+    },PENDING_BOOKING_POLL_MS);
     return()=>window.clearInterval(timer);
-  },[portal.id,status,source,search,selectedId]);
+  },[portal.id,selectedId,detail?.status,detail?.paymentStatus,detail?.depositStatus,pendingFinancialCheck]);
+
   useEffect(()=>{setSelectedId("");setDetail(null);setReadiness(null);setCreateOpen(false);setEditOpen(false);setQuoteOpen(false);setConfirmOpen(false);setAmendOpen(false);setSubstituteOpen(false);setAction(null);},[portal.id]);
   useEffect(()=>{if(focusRecordId&&can("booking.read")){setSelectedId(focusRecordId);void loadDetail(focusRecordId);}},[portal.id,focusRecordId]);
 
   async function refreshAll(){
-    await Promise.all([loadRegister(),loadAux()]);
-    if(selectedId)await loadDetail(selectedId);
+    await Promise.all([loadRegister({silent:listLoaded}),loadAux()]);
+    if(selectedId)await loadDetail(selectedId,{silent:!!detail});
   }
   async function mutate(work:()=>Promise<ApiResponse<any>>,message:string){
     setError("");setNotice("");
@@ -161,13 +218,14 @@ export function BookingExperienceView({portal,focusRecordId}:Props){
   const quotedCount=bookings.filter(b=>b.status==="QUOTED").length;
 
   return <div className="mx-auto max-w-[1500px] space-y-6 p-4 sm:p-6 lg:p-8">
-    <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between"><div><p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-600">Reservation engine</p><h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">Bookings</h1><p className="mt-2 max-w-3xl text-sm text-slate-500">Customer reservation dossiers with frozen PricingSnapshots, Availability-backed confirmation and explicit lifecycle history.</p></div><div className="flex flex-wrap gap-2"><button onClick={()=>void refreshAll()} className={secondary}><RefreshCw size={16}/>Refresh</button>{can("booking.create")&&<button onClick={()=>setCreateOpen(true)} className={primary}><Plus size={16}/>Create Booking</button>}</div></header>
+    <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between"><div><p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-600">Reservation engine</p><h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">Bookings</h1><p className="mt-2 max-w-3xl text-sm text-slate-500">Customer reservation dossiers with frozen PricingSnapshots, Availability-backed confirmation and explicit lifecycle history.</p></div><div className="flex flex-wrap gap-2"><button onClick={()=>void refreshAll()} className={secondary} disabled={backgroundRefreshing} aria-label="Refresh bookings"><RefreshCw size={16} className={backgroundRefreshing?"animate-spin":""}/>{backgroundRefreshing?"Updating…":"Refresh"}</button>{can("booking.create")&&<button onClick={()=>setCreateOpen(true)} className={primary}><Plus size={16}/>Create Booking</button>}</div></header>
     {error&&<ErrorBox text={error}/>}
+    {listError&&<ErrorBox text={listError}/>}
     {notice&&<Notice text={notice}/>}
     <section className="grid grid-cols-2 gap-3 lg:grid-cols-4"><Metric label="Visible dossiers" value={bookings.length}/><Metric label="Confirmed / active" value={activeCount}/><Metric label="Awaiting payment" value={awaitingCount}/><Metric label="Quoted" value={quotedCount}/></section>
     <section className="rounded-2xl border bg-white p-4 shadow-sm"><form onSubmit={e=>{e.preventDefault();setSearch(searchInput.trim());}} className="grid gap-3 md:grid-cols-[1fr_180px_200px_auto]"><Field label="Search"><div className="relative"><Search size={15} className="absolute left-3 top-3 text-slate-400"/><input value={searchInput} onChange={e=>setSearchInput(e.target.value)} placeholder="Booking number, customer, Vehicle…" className={inputClass+" pl-9"}/></div></Field><Field label="Status"><select value={status} onChange={e=>setStatus(e.target.value)} className={inputClass}><option>ALL</option>{["DRAFT","PENDING","PENDING_CONFIRMATION","QUOTED","AWAITING_PAYMENT","CONFIRMED","ACTIVE","COMPLETED","CANCELLED","REJECTED","EXPIRED","NO_SHOW"].map(x=><option key={x}>{x}</option>)}</select></Field><Field label="Source"><select value={source} onChange={e=>setSource(e.target.value)} className={inputClass}><option>ALL</option>{["TENANT_ADMIN","OPERATIONS_DESK","PUBLIC_WEBSITE","PUBLIC_PORTAL","AGENT_REFERRAL","CORPORATE","CORPORATE_PORTAL","PHONE","WALK_IN","API","BACKOFFICE","WEB"].map(x=><option key={x}>{x}</option>)}</select></Field><div className="flex items-end"><button className={secondary+" w-full"}>Apply search</button></div></form></section>
 
-    {loading?<div className="grid place-items-center rounded-2xl border bg-white p-20 text-slate-500"><Loader2 className="mb-3 animate-spin"/>Loading Bookings…</div>:!bookings.length?<div className="rounded-2xl border border-dashed bg-white p-14 text-center text-sm text-slate-500">No Bookings match the current server filters.</div>:<div className="grid gap-3">{bookings.map(b=><button key={b.id} onClick={()=>{setSelectedId(b.id);void loadDetail(b.id);}} className="grid w-full gap-4 rounded-2xl border bg-white p-4 text-left shadow-sm transition hover:border-emerald-300 hover:shadow-md md:grid-cols-[1.2fr_1fr_1fr_auto] md:items-center"><div><div className="flex flex-wrap items-center gap-2"><span className="font-mono text-sm font-bold text-slate-900">{b.bookingNumber}</span><Status value={b.status}/><span className="text-[10px] font-semibold text-slate-400">{human(b.source)}</span></div><p className="mt-2 text-sm font-semibold text-slate-700">{lookup(customers,b.customerId)}</p><p className="text-xs text-slate-500">{vehicleName(b.assignedVehicleId||b.requestedVehicleId)}</p></div><div><p className="text-xs text-slate-500">{dateTime(b.pickupAt)}</p><p className="my-1 text-[10px] uppercase tracking-wide text-slate-400">to</p><p className="text-xs text-slate-500">{dateTime(b.returnAt)}</p></div><div className="grid grid-cols-2 gap-3"><Info label="Gross total" value={money(b.grossTotal,b.currency||b.pricingSnapshot?.currency||"KES")}/><Info label="Paid" value={money(b.amountPaid||0,b.currency||b.pricingSnapshot?.currency||"KES")}/><div><Status value={b.paymentStatus}/></div><div><Status value={b.depositStatus}/></div></div><ChevronRight className="hidden text-slate-300 md:block"/></button>)}</div>}
+    {loading?<div className="grid place-items-center rounded-2xl border bg-white p-20 text-slate-500"><Loader2 className="mb-3 animate-spin"/>Loading Bookings…</div>:!listLoaded?<div role="status" className="rounded-2xl border border-dashed bg-white p-12 text-center"><p className="text-sm font-semibold text-slate-800">Bookings are temporarily unavailable.</p><p className="mt-2 text-xs text-slate-500">The server did not return a verified booking list. Existing records have not been changed.</p><button type="button" onClick={()=>void loadRegister()} className={secondary+" mt-4"}>Try again</button></div>:!bookings.length?<div role="status" className="rounded-2xl border border-dashed bg-white p-12 text-center"><p className="text-base font-bold text-slate-800">{status!=="ALL"||source!=="ALL"||!!search?"No bookings match these filters.":"No bookings yet."}</p><p className="mt-2 text-sm text-slate-500">{status!=="ALL"||source!=="ALL"||!!search?"Try different search terms or clear the filters to see all bookings.":"Bookings you create will appear here, including their payment and handover status."}</p><div className="mt-4 flex flex-wrap justify-center gap-2">{(status!=="ALL"||source!=="ALL"||!!search)&&<button type="button" className={secondary} onClick={()=>{setStatus("ALL");setSource("ALL");setSearch("");setSearchInput("");}}>Clear filters</button>}{status==="ALL"&&source==="ALL"&&!search&&can("booking.create")&&<button type="button" className={primary} onClick={()=>setCreateOpen(true)}><Plus size={16}/>Create first booking</button>}</div></div>:<div className="grid gap-3">{bookings.map(b=><button key={b.id} onClick={()=>{setSelectedId(b.id);void loadDetail(b.id);}} className="grid w-full gap-4 rounded-2xl border bg-white p-4 text-left shadow-sm transition hover:border-emerald-300 hover:shadow-md md:grid-cols-[1.2fr_1fr_1fr_auto] md:items-center"><div><div className="flex flex-wrap items-center gap-2"><span className="font-mono text-sm font-bold text-slate-900">{b.bookingNumber}</span><Status value={b.status}/><span className="text-[10px] font-semibold text-slate-400">{human(b.source)}</span></div><p className="mt-2 text-sm font-semibold text-slate-700">{lookup(customers,b.customerId)}</p><p className="text-xs text-slate-500">{vehicleName(b.assignedVehicleId||b.requestedVehicleId)}</p></div><div><p className="text-xs text-slate-500">{dateTime(b.pickupAt)}</p><p className="my-1 text-[10px] uppercase tracking-wide text-slate-400">to</p><p className="text-xs text-slate-500">{dateTime(b.returnAt)}</p></div><div className="grid grid-cols-2 gap-3"><Info label="Gross total" value={money(b.grossTotal,b.currency||b.pricingSnapshot?.currency||"KES")}/><Info label="Paid" value={money(b.amountPaid||0,b.currency||b.pricingSnapshot?.currency||"KES")}/><div><Status value={b.paymentStatus}/></div><div><Status value={b.depositStatus}/></div></div><ChevronRight className="hidden text-slate-300 md:block"/></button>)}</div>}
 
     {selectedId&&<Modal title={detail?.bookingNumber||"Booking dossier"} subtitle={detail?"Canonical Booking aggregate · v"+(detail.version||1):"Loading Booking…"} onClose={()=>{setSelectedId("");setDetail(null);setReadiness(null);}} max="max-w-6xl">{detailLoading&&!detail?<div className="grid place-items-center p-16"><Loader2 className="animate-spin"/></div>:detail&&<><BookingDossier booking={detail} readiness={readiness} customers={customers} corporates={corporates} drivers={drivers} vehicles={vehicles} agents={agents} portal={portal} onEdit={()=>setEditOpen(true)} onQuote={()=>setQuoteOpen(true)} onRequestPayment={()=>void mutate(()=>apiClient.bookings.requestPayment(detail.id),"Booking moved to Awaiting Payment.")} onConfirm={()=>setConfirmOpen(true)} onAction={setAction} onAmend={()=>setAmendOpen(true)} onSubstitute={()=>setSubstituteOpen(true)} onRefreshReadiness={async()=>{try{const r:any=await unwrap(apiClient.bookings.getHandoverReadiness(detail.id));setReadiness(r);}catch(e:any){setError(e.message);}}} onOpenHandover={()=>navigateSection("handover")}/><BookingPayments key={portal.id+detail.id} booking={detail} portal={portal} onRefresh={async()=>{await loadRegister();await loadDetail(detail.id);}}/></>}</Modal>}
 
