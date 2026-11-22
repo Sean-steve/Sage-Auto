@@ -63,6 +63,7 @@ export const DashboardView: React.FC = () => {
   const [preset, setPreset] = useState<PeriodPreset>("THIS_MONTH");
   const [currency, setCurrency] = useState<string>(activeTenant?.currency || "KES");
   const [overview, setOverview] = useState<TenantDashboardOverviewDto | null>(null);
+  const [analyticsError, setAnalyticsError] = useState("");
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isReportsHubOpen, setIsReportsHubOpen] = useState<boolean>(false);
 
@@ -74,6 +75,8 @@ export const DashboardView: React.FC = () => {
     }
 
     setIsLoading(true);
+    setOverview(null);
+    setAnalyticsError("");
     try {
       const params = new URLSearchParams({
         preset,
@@ -81,11 +84,10 @@ export const DashboardView: React.FC = () => {
         timezone: "Africa/Nairobi",
       });
       const res = await apiClient.analytics.getDashboard(Object.fromEntries(params));
-      if (!res.error && res.data) {
-        setOverview(res.data as TenantDashboardOverviewDto);
-      }
+      if (res.error || !res.data) throw new Error(res.error?.message || "Analytics unavailable");
+      setOverview(res.data);
     } catch (err) {
-      console.warn("Backend analytics API unavailable, calculating from store state", err);
+      setAnalyticsError(err instanceof Error ? err.message : "Backend analytics unavailable");
     } finally {
       setIsLoading(false);
     }
@@ -113,14 +115,13 @@ export const DashboardView: React.FC = () => {
   const fallbackReserved = tenantVehicles.filter((v) => v.availabilityStatus === "RESERVED").length;
   const fallbackMaint = tenantVehicles.filter((v) => v.availabilityStatus === "MAINTENANCE").length;
   const fallbackUtil = fallbackTotalVehicles > 0 ? Math.round((fallbackOnRent / fallbackTotalVehicles) * 100) : 0;
-  const fallbackRevenue = tenantPayments.reduce((acc, curr) => acc + curr.amount, 0);
 
   // Authoritative metrics from backend overview (with fallback)
   const utilizationRate = overview?.headlineKpis.utilizationRate.value ?? fallbackUtil;
   const utilizationDelta = overview?.headlineKpis.utilizationRate.changePercentage;
 
-  const cashCollections = overview?.financialSummary.cashReceipts ?? fallbackRevenue;
-  const postedRevenue = overview?.financialSummary.postedRevenue ?? fallbackRevenue;
+  const cashCollections = overview?.financialSummary.cashReceipts;
+  const postedRevenue = overview?.financialSummary.postedRevenue;
   const activeRentalsCount = overview?.headlineKpis.activeRentals.value ?? tenantRentals.filter((r) => r.state === "ACTIVE_ON_ROAD").length;
   const availableVehiclesCount = overview?.fleetStatus.available ?? fallbackAvailable;
   const trialBalanceOk = overview?.financialSummary.trialBalanceReconciled;
@@ -129,6 +130,7 @@ export const DashboardView: React.FC = () => {
 
   return (
     <div id="dashboard-view" className="p-6 max-w-7xl mx-auto space-y-6">
+      {analyticsError && <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">Verified analytics unavailable: {analyticsError}. Financial amounts are hidden rather than estimated from browser records.</div>}
       {/* Top Banner / Welcome with Control Bar */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 p-6 rounded-2xl text-white shadow-lg border border-slate-700">
         <div>
@@ -260,14 +262,14 @@ export const DashboardView: React.FC = () => {
             </div>
             <div className="mt-2 flex items-baseline gap-2">
               <span className="text-2xl font-black text-slate-900 dark:text-white">
-                {restoration && !overview ? "Not connected" : `${currency} ${Number(cashCollections).toLocaleString()}`}
+                {overview ? `${currency} ${Number(cashCollections).toLocaleString()}` : "Unavailable"}
               </span>
             </div>
           </div>
           <div className="mt-3 pt-2 border-t border-slate-100 dark:border-slate-700 flex items-center justify-between text-[11px]">
             <span className="text-slate-500 dark:text-slate-400">GL Posted Rev:</span>
             <span className="font-bold text-slate-800 dark:text-slate-200">
-              {restoration && !overview ? "Not connected" : `${currency} ${Number(postedRevenue).toLocaleString()}`}
+              {overview ? `${currency} ${Number(postedRevenue).toLocaleString()}` : "Unavailable"}
             </span>
           </div>
         </div>
