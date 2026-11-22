@@ -131,10 +131,19 @@ async function runSprint41DeploymentTests() {
   assert.strictEqual(ProductionMigrationEngine.isLockHeld(), false);
   console.log("  ✔ Advisory lock released successfully.");
 
-  // 3.3 Idempotent execution
-  const migrationResult = await ProductionMigrationEngine.applyMigrations(migrationsDir, "test-runner");
-  assert.strictEqual(migrationResult.applied.length, 0, "No pending migrations should remain on synced db");
-  console.log("  ✔ Migration run is idempotent (0 pending executions on current schema).");
+  // 3.3 The old in-memory test simulator starts with the historic four
+  // migrations. Adding a real SQL migration must not make this test pretend
+  // the simulator already applied it. The genuine PostgreSQL verification is
+  // separately run with pnpm db:migrate + psql against PostgreSQL 17.
+  const pendingBefore = ProductionMigrationEngine.listPendingMigrations(migrationsDir);
+  assert.ok(pendingBefore.includes("20261122_005_pg_business_authority_foundation.sql"),
+    "UX-D6 migration should be pending in the historic test-only registry");
+  const firstResult = await ProductionMigrationEngine.applyMigrations(migrationsDir, "test-runner");
+  assert.deepStrictEqual(firstResult.applied.sort(), pendingBefore.sort(),
+    "Simulated runner must acknowledge all newly pending migrations");
+  const secondResult = await ProductionMigrationEngine.applyMigrations(migrationsDir, "test-runner-repeat");
+  assert.strictEqual(secondResult.applied.length, 0, "Reapplying the same registry is idempotent");
+  console.log("  ✔ Historical registry adds new migration once; duplicate test run applies zero.");
 
   // --------------------------------------------------------------------------
   // TEST 4: ROLLING UPDATE ZERO-DOWNTIME CONTRACTS (API PROBES)
