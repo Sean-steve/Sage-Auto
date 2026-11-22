@@ -5,7 +5,7 @@ import {
 import { TemporalWindowResolver } from "../../../apps/api/src/modules/analytics/domain/temporal-window";
 import {
   FULL_EXECUTIVE_DASHBOARD_RIGHTS, hasAnalyticRights,
-  requiredPermissionsForMetric, requireAnalyticsPermissions,
+  requiredPermissionsForMetric, requiredPermissionsForReport, requireAnalyticsPermissions,
 } from "../../../apps/api/src/modules/analytics/presentation/analytics-access";
 
 async function main() {
@@ -89,6 +89,8 @@ async function main() {
   const ownerPermissions = [...FULL_EXECUTIVE_DASHBOARD_RIGHTS];
   assert.equal(hasAnalyticRights(ownerPermissions, FULL_EXECUTIVE_DASHBOARD_RIGHTS), true);
   assert.equal(hasAnalyticRights(["analytics.read", "vehicle.read"], FULL_EXECUTIVE_DASHBOARD_RIGHTS), false);
+  assert.deepEqual(requiredPermissionsForReport("REPORT_CASH_RECEIPTS"), ["report.read", "payment.read"]);
+  assert.deepEqual(requiredPermissionsForReport("REPORT_GENERAL_LEDGER"), ["report.read", "ledger.read"]);
   assert.deepEqual(requiredPermissionsForMetric("FINANCE_POSTED_REVENUE"), ["analytics.read", "ledger.read"]);
   assert.deepEqual(requiredPermissionsForMetric("FINANCE_CASH_RECEIPTS"), ["analytics.read", "payment.read"]);
   assert.deepEqual(requiredPermissionsForMetric("FLEET_UTILIZATION_RATE"), ["analytics.read", "vehicle.read"]);
