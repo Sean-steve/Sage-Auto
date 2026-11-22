@@ -107,7 +107,8 @@
     "test:ux-d6": "tsx packages/database/test/ux-d6-postgres-authority.integration.ts",
     "test:ux-d6:gate": "tsx packages/database/test/ux-d6-runtime-gate.test.ts",
     "db:authority:audit": "node scripts/ux-d6-cutover-audit.mjs",
-    "db:authority:certify": "node scripts/ux-d6-cutover-audit.mjs --require-complete"
+    "db:authority:certify": "node scripts/ux-d6-cutover-audit.mjs --require-complete",
+    "test:ux-h1": "tsx packages/database/test/ux-h1-ui-contract.test.ts"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
