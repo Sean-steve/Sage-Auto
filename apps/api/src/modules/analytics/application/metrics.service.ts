@@ -432,7 +432,8 @@ export class MetricsService {
           // Include an originally posted REVERSED journal and its separate
           // posted reversal. Otherwise corrections disappear from history.
           if (!header || (header.status !== "POSTED" && header.status !== "REVERSED") ||
-            !header.postedAt || !entry.accountCode.startsWith("4")) continue;
+            !entry.accountCode.startsWith("4")) continue;
+          if (!header.postedAt) throw new Error("Posted revenue journal is missing posting timestamp");
           if (!isDateInWindow(header.postedAt, from, to)) continue;
           const amount = Number(entry.amount);
           if (!Number.isFinite(amount)) throw new Error("Invalid posted journal amount");
@@ -453,8 +454,9 @@ export class MetricsService {
           "VERIFIED", "PARTIALLY_ALLOCATED", "ALLOCATED", "PARTIALLY_REFUNDED", "REFUNDED",
         ]);
         for (const p of payments) {
-          if (p.direction !== "INBOUND" || !verified.has(p.status) ||
-            !isDateInWindow(p.verifiedAt, from, to)) continue;
+          if (p.direction !== "INBOUND" || !verified.has(p.status)) continue;
+          if (!p.verifiedAt) throw new Error("Verified incoming payment is missing verification timestamp");
+          if (!isDateInWindow(p.verifiedAt, from, to)) continue;
           const amount = Number(p.amount);
           if (!Number.isFinite(amount)) throw new Error("Invalid verified receipt amount");
           if (!p.currency) throw new Error("Verified receipt missing currency");
