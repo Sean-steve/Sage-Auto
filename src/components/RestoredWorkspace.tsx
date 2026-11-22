@@ -111,7 +111,17 @@ function Shell({context,portal,section,onSection,onSwitch,onSignOut}:{context:Ac
   useEffect(()=>{if(focusedRecord&&focusedRecord.section!==section)setFocusedRecord(null);},[section,focusedRecord]);
 
   useEffect(()=>{
-    const handler=(event:Event)=>{const id=(event as CustomEvent).detail?.section;if(id&&permitted.has(id)){setFocusedRecord(null);onSection(id);}};
+    const handler=(event:Event)=>{
+      const detail=(event as CustomEvent).detail;
+      const id=detail?.section;
+      if(!id||!permitted.has(id))return;
+      const record=detail?.record as Partial<WorkspaceSearchItem>|undefined;
+      const allowedKinds:Record<string,string>={VEHICLE:"fleet",CUSTOMER:"customers",DRIVER:"customers",BOOKING:"bookings",RENTAL:"rentals",INVOICE:"finance",PAYMENT:"finance"};
+      if(record?.kind&&allowedKinds[record.kind]===id&&typeof record.id==="string"&&record.id.length<160){
+        setFocusedRecord({kind:record.kind,id:record.id,section:id,title:String(record.title||""),subtitle:String(record.subtitle||"")});
+      }else setFocusedRecord(null);
+      onSection(id);
+    };
     window.addEventListener("sage:navigate",handler);return()=>window.removeEventListener("sage:navigate",handler);
   },[portal.id,portal.sections.map(s=>s.id).join("|")]);
 
