@@ -39,6 +39,7 @@ export const InspectionModal: React.FC = () => {
     setIsInspectionModalOpen,
     vehicles,
     activeTenant,
+    currentUser,
     activeTenantId,
     bookings,
     rentals,
@@ -75,8 +76,8 @@ export const InspectionModal: React.FC = () => {
   });
 
   // Signatures
-  const [inspectorName, setInspectorName] = useState("Stanley Njoroge");
-  const [customerName, setCustomerName] = useState("Kiprono Koech");
+  const [inspectorName, setInspectorName] = useState(currentUser.fullName||"");
+  const [customerName, setCustomerName] = useState("");
   const [saving,setSaving]=useState(false);
   const [saveError,setSaveError]=useState("");
   const [evidenceLink,setEvidenceLink]=useState("");
@@ -111,6 +112,7 @@ export const InspectionModal: React.FC = () => {
     if(!isInspectionModalOpen)return;
     if(inspectionTarget?.vehicleId)setVehicleId(inspectionTarget.vehicleId);
     if(inspectionTarget?.type)setInspectionType(inspectionTarget.type);
+    setInspectorName(currentUser.fullName||"");
     setCustomerName(resolvedContext.driver?.fullName||resolvedContext.customer?.fullName||"");
     const vehicle=vehicles.find((item:any)=>item.id===(inspectionTarget?.vehicleId||vehicleId));
     if(vehicle){
@@ -118,7 +120,7 @@ export const InspectionModal: React.FC = () => {
       setFuelLevel(String(vehicle.fuelLevel??100));
     }
     setSaveError("");
-  },[isInspectionModalOpen,inspectionTarget?.vehicleId,inspectionTarget?.type,vehicleId,resolvedContext.driver?.id,resolvedContext.customer?.id]);
+  },[currentUser.id,isInspectionModalOpen,inspectionTarget?.vehicleId,inspectionTarget?.type,vehicleId,resolvedContext.driver?.id,resolvedContext.customer?.id]);
 
   if (!isInspectionModalOpen) return null;
 

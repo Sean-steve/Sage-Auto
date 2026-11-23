@@ -58,7 +58,7 @@ const badgeClass = (state: string) => {
 const nowLocalInput = () => {
   const date = new Date();
   const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
-  return local.toISOString().slice(0, 16);
+  return local.toISOString().slice(0, 23);
 };
 
 export const ReturnFinalCalculationView: React.FC = () => {
@@ -781,7 +781,7 @@ export const ReturnFinalCalculationView: React.FC = () => {
                 <div className="grid gap-3 sm:grid-cols-2">
                   <label className="text-xs font-semibold text-slate-700 dark:text-slate-200">
                     Received at
-                    <input type="datetime-local" required value={receivedAt} onChange={(e) => setReceivedAt(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 dark:border-slate-700 dark:bg-slate-950" />
+                    <input type="datetime-local" step="0.001" required value={receivedAt} onChange={(e) => setReceivedAt(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 dark:border-slate-700 dark:bg-slate-950" />
                   </label>
                   <label className="text-xs font-semibold text-slate-700 dark:text-slate-200">
                     Return location / branch

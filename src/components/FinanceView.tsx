@@ -38,6 +38,7 @@ type ActionMode =
   | "MANUAL_PAYMENT"
   | "MPESA"
   | "ALLOCATE"
+  | "CONFIRM_OFFLINE_REFUND"
   | "REFUND"
   | "APPLY_DEPOSIT"
   | "CREATE_EXPENSE"
@@ -139,6 +140,8 @@ export const FinanceView: React.FC<{focusRecordId?:string;focusKind?:string}> = 
   const [mpesaPhone, setMpesaPhone] = useState("");
   const [allocationInvoiceId, setAllocationInvoiceId] = useState("");
   const [refundReason, setRefundReason] = useState("");
+  const [offlineRefund,setOfflineRefund]=useState<Refund|null>(null);
+  const [offlineReference,setOfflineReference]=useState("");
   const [depositInvoiceId, setDepositInvoiceId] = useState("");
   const [expenseDescription, setExpenseDescription] = useState("");
   const [expenseAmount, setExpenseAmount] = useState("");
@@ -225,7 +228,7 @@ export const FinanceView: React.FC<{focusRecordId?:string;focusKind?:string}> = 
   const depositPaymentSources = payments.filter((payment) =>
     payment.purpose === "RENTAL_DEPOSIT" &&
     payment.direction === "INBOUND" &&
-    payment.sourceContext?.rentalId === focusedRentalId &&
+    (payment.sourceContext?.rentalId === focusedRentalId || Boolean(heldDeposit?.bookingId && payment.sourceContext?.bookingId === heldDeposit.bookingId)) &&
     payment.status !== "VOIDED" &&
     money(payment.amount) - money(payment.refundedAmount) > 0
   );
@@ -320,7 +323,7 @@ export const FinanceView: React.FC<{focusRecordId?:string;focusKind?:string}> = 
       const response = await apiClient.finance.generateRentalInvoice({
         rentalId,
         dueDate: dueDate || undefined,
-        applyDepositDeduction: true,
+        applyDepositDeduction: false,
       });
       if (response.error) throw new Error(response.error.message);
       showNotification("Authoritative invoice generated from the saved final Return calculation.");
@@ -483,15 +486,18 @@ export const FinanceView: React.FC<{focusRecordId?:string;focusKind?:string}> = 
     if (!selectedPayment) return;
     setSubmitting(true);
     try {
-      const isDepositRefund =
-        selectedPayment.purpose === "RENTAL_DEPOSIT" &&
-        selectedPayment.sourceContext?.rentalId === focusedRentalId;
+      const isDepositRefund = selectedPayment.purpose === "RENTAL_DEPOSIT";
+      const refundDeposit = isDepositRefund ? deposits.find((deposit) =>
+        (selectedPayment.sourceContext?.rentalId && deposit.rentalId === selectedPayment.sourceContext.rentalId) ||
+        (selectedPayment.sourceContext?.bookingId && deposit.bookingId === selectedPayment.sourceContext.bookingId)
+      ) : undefined;
+      if (isDepositRefund && !refundDeposit) throw new Error("The payment's deposit position could not be found. Refresh Finance before requesting a refund.");
       const response = await apiClient.payments.requestRefund({
         paymentId: selectedPayment.id,
         amount: paymentAmount,
         reason: refundReason.trim(),
         sourceObligationType: isDepositRefund ? "RENTAL_DEPOSIT" : "CUSTOMER_INVOICE",
-        sourceObligationId: isDepositRefund ? (heldDeposit?.id || focusedRentalId) : undefined,
+        sourceObligationId: refundDeposit?.id,
       });
       if (response.error) throw new Error(response.error.message);
       showNotification("Refund request created. A user with refund approval authority must execute it.");
@@ -704,7 +710,7 @@ export const FinanceView: React.FC<{focusRecordId?:string;focusKind?:string}> = 
               <div className="grid grid-cols-2 gap-3 rounded-xl bg-slate-50 p-3 text-xs dark:bg-slate-950/60 lg:grid-cols-4">
                 <div><span className="text-slate-500">Rental</span><p className="font-bold">{focusedRental.rentalNumber}</p></div>
                 <div><span className="text-slate-500">Customer balance to collect</span><p className="font-bold">{formatMoney(focusedCalculation.depositAdditionalPaymentDue)}</p></div>
-                <div><span className="text-slate-500">Deposit refund due</span><p className="font-bold">{formatMoney(focusedCalculation.depositRefundDue)}</p></div>
+                <div><span className="text-slate-500">{focusedCalculation.isImmutable && focusedCalculation.depositSettlementStatus === "REFUNDED" ? "Deposit refunded" : "Deposit refund due"}</span><p className="font-bold">{formatMoney(focusedCalculation.depositRefundDue)}</p></div>
                 <div><span className="text-slate-500">Settlement</span><p className="font-bold">{focusedCalculation.isImmutable ? label(focusedCalculation.depositSettlementStatus) : "Awaiting finalization"}</p></div>
               </div>
               <div className="flex flex-wrap items-center gap-2 text-xs">
@@ -960,7 +966,7 @@ export const FinanceView: React.FC<{focusRecordId?:string;focusKind?:string}> = 
                       <div className="text-right"><span className={`rounded px-2 py-0.5 text-[10px] font-bold ${statusClass(refund.status)}`}>{label(refund.status)}</span><p className="mt-1 text-xs font-bold">{formatMoney(refund.amount, refund.currency)}</p></div>
                     </div>
                     {refund.status === "PENDING" && hasPermission("refund.execute") && (
-                      <button disabled={submitting} onClick={() => void handleApproveRefund(refund)} className="mt-3 rounded-lg bg-rose-700 px-3 py-2 text-[11px] font-bold text-white">Approve & execute</button>
+                      <button disabled={submitting} onClick={() => {if(payments.find(p=>p.id===refund.originalPaymentId)?.provider==="MANUAL_RECORD"){setOfflineRefund(refund);setOfflineReference("");setActionMode("CONFIRM_OFFLINE_REFUND");}else void handleApproveRefund(refund);}} className="mt-3 rounded-lg bg-rose-700 px-3 py-2 text-[11px] font-bold text-white">{payments.find(p=>p.id===refund.originalPaymentId)?.provider==="MANUAL_RECORD"?"Confirm offline refund paid":"Approve & execute"}</button>
                     )}
                   </div>
                 ))}
@@ -1059,7 +1065,7 @@ export const FinanceView: React.FC<{focusRecordId?:string;focusKind?:string}> = 
                 <label className="block text-xs font-semibold">Due date
                   <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 dark:border-slate-700 dark:bg-slate-950" />
                 </label>
-                <p className="rounded-xl bg-blue-50 p-3 text-[11px] text-blue-800 dark:bg-blue-950/30 dark:text-blue-300">Only an actually recorded held deposit can be applied. A deposit requirement alone is never treated as money received.</p>
+                <p className="rounded-xl bg-blue-50 p-3 text-[11px] text-blue-800 dark:bg-blue-950/30 dark:text-blue-300">The security deposit remains held separately. Allocate the recorded rental payment to this invoice; refund the deposit through Payments after reviewing the return.</p>
                 <SubmitButton busy={submitting} text="Generate authoritative invoice" />
               </form>
             )}
@@ -1138,6 +1144,16 @@ export const FinanceView: React.FC<{focusRecordId?:string;focusKind?:string}> = 
                 </label>
                 <Field label="Amount to allocate" value={paymentAmount} setValue={setPaymentAmount} type="number" required />
                 <SubmitButton busy={submitting} text="Allocate verified payment" />
+              </form>
+            )}
+
+            {actionMode === "CONFIRM_OFFLINE_REFUND" && offlineRefund && (
+              <form className="space-y-3" onSubmit={async e=>{e.preventDefault();setSubmitting(true);try{const response=await apiClient.payments.confirmOfflineRefund(offlineRefund.id,{reference:offlineReference.trim(),confirmed:true});if(response.error)throw new Error(response.error.message);setActionMode(null);await loadAll();showNotification("Offline refund recorded. No transfer was initiated.");}catch(error:any){showNotification(error.message,"error");}finally{setSubmitting(false);}}}>
+                <p className="rounded-xl bg-slate-50 p-3 text-sm">{offlineRefund.refundNumber} · {formatMoney(offlineRefund.amount,offlineRefund.currency)}</p>
+                <Field label="Cash receipt or bank refund reference" value={offlineReference} setValue={setOfflineReference} required />
+                <label className="flex items-start gap-2 text-sm"><input required type="checkbox" className="mt-1"/>I verified that this refund has already been paid to the customer. This records that payment; it does not send money.</label>
+                <p className="text-xs text-slate-500">The approver must be a different authorized staff member from the refund requester.</p>
+                <SubmitButton busy={submitting} text="Record confirmed offline refund" />
               </form>
             )}
 

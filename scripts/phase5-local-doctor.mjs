@@ -17,7 +17,7 @@ const url=process.env.DATABASE_URL||"";
 const name=process.env.PGDATABASE||"";
 const redisUrl=process.env.REDIS_URL||"redis://127.0.0.1:6379";
 const sqlitePath=process.env.SQLITE_PATH||resolve(".data/carhire.sqlite");
-const results={runtimeRecordBackend:"SQLite via SQLITE_PATH",postgresSchema:"UNVERIFIED",redis:"UNVERIFIED",
+const results={runtimeRecordBackend:process.env.RECORD_STORE_BACKEND||"postgres",postgresSchema:"UNVERIFIED",redis:"UNVERIFIED",
   sqliteFileExists:existsSync(sqlitePath),productionBackendCertified:false,
   blockers:[],checkedAt:new Date().toISOString()};
 
@@ -48,10 +48,10 @@ try{
   results.blockers.push("Cannot reach live Redis. Redis simulation must not count as certification.");
 }finally{redis.disconnect();}
 
-results.blockers.push("P0: Most API domain repositories still use SQLite record-store rather than PostgreSQL; full PostgreSQL backend certification is blocked.");
+results.blockers.push("Application repositories have a PostgreSQL compatibility backend. Full domain constraints, application-record tenant RLS and fresh-company paid UI certification remain open.");
 console.log(JSON.stringify(results,null,2));
 if(process.argv.includes("--require-production-backend")) {
-  console.error("FAIL CLOSED: PostgreSQL business-data authority is not yet implemented.");
+  console.error("FAIL CLOSED: PostgreSQL application and fresh-company UI certification remain incomplete.");
   process.exitCode=2;
 }else if(results.redis!=="CONNECTED_REAL"||!results.postgresSchema.startsWith("LIVE_SQL_MIGRATIONS_")) {
   process.exitCode=1;

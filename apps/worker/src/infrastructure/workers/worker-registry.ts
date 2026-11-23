@@ -1,3 +1,5 @@
+import {AsyncLocalStorage} from "node:async_hooks";
+import {withRecordTransaction} from "@carhire/database";
 // ============================================================================
 // CAR HIRE OS — WORKER REGISTRY & EXECUTION PLATFORM (DEV-011, BRS-003)
 // Worker lifecycle, concurrency isolation, tenant context scoping, retry & DLQ routing
@@ -37,7 +39,7 @@ export class WorkerRegistry {
   private isRunning: boolean = false;
   private activeJobsCount: number = 0;
 
-  private currentTenantContext: string | null = null;
+  private readonly tenantContext = new AsyncLocalStorage<string | null>();
 
   private constructor(
     queueRegistry?: QueueRegistry,
@@ -277,16 +279,11 @@ export class WorkerRegistry {
    * Enforces tenant context isolation and guaranteed cleanup.
    */
   private async withJobScoping<T>(jobId: string, tenantId: string | null | undefined, fn: () => Promise<T>): Promise<T> {
-    this.currentTenantContext = tenantId || null;
-    try {
-      return await fn();
-    } finally {
-      this.currentTenantContext = null;
-    }
+    return this.tenantContext.run(tenantId || null, () => withRecordTransaction(fn));
   }
 
   public getActiveTenantContext(): string | null {
-    return this.currentTenantContext;
+    return this.tenantContext.getStore() ?? null;
   }
 
   // --------------------------------------------------------------------------

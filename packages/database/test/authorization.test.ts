@@ -1,3 +1,4 @@
+import { closeRecordStore } from "../src/record-store";
 // ============================================================================
 // CAR HIRE OS — SPRINT 5 AUTHORIZATION & RBAC AUTOMATED TEST SUITE
 // Validates:
@@ -537,4 +538,4 @@ async function runTestSuite() {
 runTestSuite().catch((err) => {
   console.error("FATAL ERROR IN TEST SUITE:", err);
   process.exit(1);
-});
+}).finally(closeRecordStore);

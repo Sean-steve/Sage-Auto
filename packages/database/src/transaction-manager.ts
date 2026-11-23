@@ -1,3 +1,4 @@
+import {withRecordTransaction, queryRecordTransaction, bindRecordTransactionTenant} from "./record-store";
 // ============================================================================
 // CAR HIRE OS — TRANSACTION MANAGER & RLS TENANT CONTEXT (DEV-004, DEV-009)
 // Provides transaction-scoped isolation using PostgreSQL SET LOCAL
@@ -29,17 +30,17 @@ export class TransactionManager {
       executor: {
         async query<R = unknown>(sql: string, params?: unknown[]): Promise<R[]> {
           // Transactional query executor
-          return [] as R[];
+          return (await queryRecordTransaction(sql, params)).rows as R[];
         },
         async execute(sql: string, params?: unknown[]): Promise<number> {
           // Transactional execute
-          return 1;
+          return (await queryRecordTransaction(sql, params)).rowCount ?? 0;
         },
       },
     };
 
     try {
-      return await callback(txContext);
+      return await withRecordTransaction(() => callback(txContext));
     } catch (error) {
       throw mapDatabaseError(error, "Transaction execution failed");
     }

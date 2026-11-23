@@ -151,3 +151,6 @@ export * from "./v1-closure";
 
 
 export { withRecordTransaction } from "./record-store";
+
+export { PostgresDatabase } from "./postgres-database";
+export type { PostgresTransaction } from "./postgres-database";

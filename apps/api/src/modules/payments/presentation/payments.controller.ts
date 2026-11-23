@@ -188,6 +188,14 @@ export class PaymentsController {
     }
   };
 
+  confirmOfflineRefund = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const actor=getActor(req);
+      const refund=await this.paymentService.approveAndExecuteRefund(actor.tenantId,req.params.id,actor,{reference:req.body.reference,confirmed:req.body.confirmed});
+      res.status(200).json({success:true,data:refund});
+    } catch(err:any) { res.status(err.statusCode||400).json({success:false,error:{message:err.message,code:err.code}}); }
+  };
+
   listRefunds = async (req: Request, res: Response): Promise<void> => {
     try {
       const actor = getActor(req);

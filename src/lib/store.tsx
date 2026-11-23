@@ -575,7 +575,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode; access?:{context
       catch(error:any){if(!cancelled)setWorkspaceError(previous=>[previous,error.message].filter(Boolean).join(' · '));}
     })).finally(()=>{if(!cancelled)setWorkspaceLoading(false);});
     return()=>{cancelled=true;};
-  },[access?.portal.id]);
+  // Inspection needs records created in the operational screens since workspace entry.
+  },[access?.portal.id,isInspectionModalOpen]);
 
   // Derived Active Tenant and User Objects
   const activeTenant = useMemo(() => {

@@ -1,0 +1,45 @@
+name: PostgreSQL Stash Reconciliation — Safe Review (NO DEPLOY)
+
+on:
+  push:
+    branches:
+      - feature/postgres-local-reconciliation-review-20261123
+  pull_request:
+    paths:
+      - 'packages/database/**'
+      - 'apps/api/**'
+      - 'apps/worker/**'
+      - 'scripts/**'
+      - 'infrastructure/database/migrations/**'
+      - 'src/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+
+permissions:
+  contents: read
+
+jobs:
+  source-and-types:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 9.15.9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Fail on unresolved merge markers
+        run: |
+          if git grep -nE '^(<<<<<<< |=======|>>>>>>> )' -- ':!pnpm-lock.yaml' -- ':!docs/**'; then
+            echo "Merge conflict markers detected; fix before any merge."
+            exit 1
+          fi
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm test:ux-h1
+      - run: pnpm test:analytics
+      - run: pnpm test:bookings
+      - run: pnpm build

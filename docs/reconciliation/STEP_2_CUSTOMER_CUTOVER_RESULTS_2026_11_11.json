@@ -1,0 +1,58 @@
+{
+  "date": "2026-11-11",
+  "normalizedCustomerRegression": {
+    "database": "sage_normalized_customer_1794403394965_test",
+    "code": 0
+  },
+  "customerBackfill": "PASS",
+  "tenantBinding": [
+    {
+      "name": "recordstore",
+      "code": 0,
+      "database": "sage_final_recordstore_1794383986647"
+    }
+  ],
+  "compatibilityNamespaces": 164,
+  "defaultRuntimeCutover": false,
+  "fullStep2Certified": false,
+  "everyWorkflowCertified": false,
+  "launchReady": false,
+  "compatibilityPartyRegression": [
+    {
+      "name": "parties",
+      "code": 0,
+      "database": "sage_final_parties_1794403182514"
+    }
+  ],
+  "typecheckExit": 0,
+  "buildExit": 0,
+  "stagingBackfillEvidence": {
+    "targetDatabase": "sage_normalized_backfill_1794402172198_test",
+    "tenantId": "e9fd80e8-a12f-4b54-b287-20af71e6fc50",
+    "counts": {
+      "tenants": 1,
+      "customers": 1,
+      "vehicles": 1,
+      "bookings": 1,
+      "rentals": 1,
+      "invoices": 1,
+      "invoice_lines": 1,
+      "payments": 2,
+      "deposits": 1,
+      "refunds": 1,
+      "allocations": 2,
+      "source_archive": 12
+    },
+    "financial": {
+      "total": "4060.0000",
+      "amount_outstanding": "0.0000",
+      "held_amount": "0.0000",
+      "refunded_amount": "1000.0000",
+      "state": "COMPLETED",
+      "availability_status": "AVAILABLE"
+    },
+    "sourceDigest": "c9d0faf9961083bb946b0acb0ba45976654579e4763b941a364fb74f055101f9",
+    "sourceUnchanged": true,
+    "runtimeCutover": false
+  }
+}

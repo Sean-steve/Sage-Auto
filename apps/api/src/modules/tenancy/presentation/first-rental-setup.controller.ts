@@ -42,7 +42,7 @@ export function createFirstRentalSetupRouter(service = new FirstRentalSetupServi
       const { action } = visibilitySchema.parse(req.body);
       const tenantId = req.tenantContext!.tenantId;
       const changed = await withRecordTransaction(async () => {
-        const didChange = service.changeVisibility(tenantId, action);
+        const didChange = await service.changeVisibility(tenantId, action);
         if (didChange) {
           await auditors.record({
             tenantId, actorType: "USER", actorId: req.auth!.userId,
