@@ -60,15 +60,8 @@ export class TransactionManager {
     }
 
     return this.run(async (tx) => {
-<<<<<<< Updated upstream
       // This test-only executor is not an actual SQL session. Native PG uses set_config inside BEGIN.
       await tx.executor.execute(`SET LOCAL app.current_tenant_id = $1`, [tenantId]);
-=======
-      // Execute SET LOCAL app.current_tenant_id inside the active transaction
-      if (process.env.RECORD_STORE_BACKEND === "postgres") {
-        await bindRecordTransactionTenant(tenantId);
-      }
->>>>>>> Stashed changes
       tx.tenantId = tenantId;
 
       const result = await callback(tx);
