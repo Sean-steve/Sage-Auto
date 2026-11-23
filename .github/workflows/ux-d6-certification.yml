@@ -66,11 +66,11 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Install PostgreSQL psql client
         run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
-      - name: Apply five real SQL migrations twice (checksum + idempotency)
+      - name: Apply eight real SQL migrations twice (checksum + idempotency)
         run: pnpm db:migrate && pnpm db:migrate
       - name: Verify migration ledger and tenant RLS are enforced
         run: |
-          test "$(psql "$DATABASE_URL" -XqAt -c 'SELECT count(*) FROM sage_auto_schema_migrations;')" = "5"
+          test "$(psql "$DATABASE_URL" -XqAt -c 'SELECT count(*) FROM sage_auto_schema_migrations;')" = "8"
           test "$(psql "$DATABASE_URL" -XqAt -c "SELECT count(*) FROM pg_class WHERE relname IN ('sage_business_records','sage_business_claims','sage_vehicle_allocations') AND relrowsecurity AND relforcerowsecurity;")" = "3"
       - name: Provision unprivileged test-only runtime role
         run: |
