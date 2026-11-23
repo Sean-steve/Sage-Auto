@@ -1,4 +1,4 @@
-import React, { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import React, { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import {
   ArrowLeftRight, Banknote, BookOpenCheck, Building2, CalendarRange, CarFront, ChevronLeft,
   ClipboardCheck, Gauge, Globe2, LayoutDashboard, LogOut, Menu, ReceiptText, Settings2,
@@ -96,15 +96,7 @@ function WorkspaceScreen({section,portal,focusedRecord}:{section:string;portal:A
 
 function Shell({context,portal,section,onSection,onSwitch,onSignOut}:{context:AccessContext;portal:AccessPortal;section:string;onSection:(s:string)=>void;onSwitch:()=>void;onSignOut:()=>void}) {
   const [mobileOpen,setMobileOpen]=useState(false);
-<<<<<<< Updated upstream
   const [focusedRecord,setFocusedRecord]=useState<WorkspaceSearchItem|null>(null);
-=======
-  const mobileDialog=useRef<HTMLDialogElement>(null);
-  useEffect(()=>{const desktop=window.matchMedia("(min-width: 1024px)");const closeOnDesktop=()=>{if(desktop.matches)setMobileOpen(false);};desktop.addEventListener("change",closeOnDesktop);return()=>desktop.removeEventListener("change",closeOnDesktop);},[]);
-  useEffect(()=>{const dialog=mobileDialog.current;if(!dialog)return;if(mobileOpen&&!dialog.open)dialog.showModal();else if(!mobileOpen&&dialog.open)dialog.close();},[mobileOpen]);
-  const [commandOpen,setCommandOpen]=useState(false);
-  const [commandQuery,setCommandQuery]=useState("");
->>>>>>> Stashed changes
   const [sidebarCollapsed,setSidebarCollapsed]=useState(()=>localStorage.getItem("sage_sidebar_collapsed")==="1");
   const [theme,setTheme]=useState<"light"|"dark">(()=>{
     const saved=localStorage.getItem("sage_theme");
@@ -158,9 +150,8 @@ function Shell({context,portal,section,onSection,onSwitch,onSignOut}:{context:Ac
 
   return <div className="saas-workspace min-h-dvh text-slate-900" data-density="comfortable" data-theme={theme}>
     <div className={`fixed inset-y-0 left-0 z-40 hidden transition-[width] duration-200 lg:block ${sidebarCollapsed?"w-[76px]":"w-[272px]"}`}><Sidebar/></div>
-    <dialog ref={mobileDialog} aria-label="Company navigation" onCancel={()=>setMobileOpen(false)} className="fixed inset-0 m-0 h-dvh max-h-none w-screen max-w-none border-0 bg-transparent p-0 lg:hidden backdrop:bg-slate-950/60"><button aria-label="Close navigation" className="absolute inset-0" onClick={()=>setMobileOpen(false)}/><div className="relative h-full w-[86vw] max-w-[310px] shadow-2xl"><Sidebar/></div></dialog>
+    {mobileOpen&&<div className="fixed inset-0 z-50 lg:hidden"><button aria-label="Close navigation" className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm" onClick={()=>setMobileOpen(false)}/><div className="relative h-full w-[86vw] max-w-[310px] shadow-2xl"><Sidebar/></div></div>}
     <div className={`min-w-0 transition-[padding] duration-200 ${sidebarCollapsed?"lg:pl-[76px]":"lg:pl-[272px]"}`}>
-<<<<<<< Updated upstream
       <header className="sage-topbar sticky top-0 z-30 flex items-center gap-3 border-b bg-white/90 px-4 backdrop-blur-xl sm:px-6 lg:gap-5 lg:px-8">
         <div className="flex min-w-0 shrink items-center gap-3">
           <button onClick={()=>setMobileOpen(true)} aria-label="Open navigation" className="grid h-10 w-10 place-items-center rounded-xl border border-slate-200 lg:hidden"><Menu size={18}/></button>
@@ -173,16 +164,6 @@ function Shell({context,portal,section,onSection,onSwitch,onSignOut}:{context:Ac
           <button title={theme==="dark"?"Use light mode":"Use dark mode"} aria-label={theme==="dark"?"Use light mode":"Use dark mode"} onClick={()=>setTheme(t=>t==="dark"?"light":"dark")} className="grid h-9 w-9 place-items-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:bg-slate-50">{theme==="dark"?<Sun size={15}/>:<Moon size={15}/>}</button>
           {context.user.emailVerified&&<span className="hidden rounded-full bg-emerald-50 px-3 py-1.5 text-[11px] font-bold text-emerald-700 xl:inline-flex">Email verified</span>}
           <WorkspaceAccountMenu context={context} portal={portal} onSection={select} onSwitch={onSwitch} onSignOut={onSignOut}/>
-=======
-      <header className="sage-topbar sticky top-0 z-30 flex items-center justify-between gap-4 border-b bg-white/90 px-4 backdrop-blur-xl sm:px-6 lg:px-8">
-        <div className="flex min-w-0 items-center gap-3"><button aria-label="Open navigation" aria-expanded={mobileOpen} onClick={()=>setMobileOpen(true)} className="grid h-10 w-10 place-items-center rounded-xl border border-slate-200 lg:hidden"><Menu size={18}/></button><div className="min-w-0"><div className="truncate text-[11px] font-bold uppercase tracking-[.16em] text-slate-400">{portal.name}</div><div className="truncate text-base font-black tracking-tight text-slate-950">{title}</div></div></div>
-        <div className="flex items-center gap-2">
-          <button onClick={()=>setCommandOpen(true)} className="hidden h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-500 hover:bg-slate-50 sm:flex"><Search size={14}/>Search <span className="sage-command-kbd">⌘K</span></button>
-          <button title={density==="compact"?"Use comfortable density":"Use compact density"} onClick={()=>setDensity(d=>d==="compact"?"comfortable":"compact")} className="grid h-9 w-9 place-items-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:bg-slate-50"><Gauge size={15}/></button>
-          <button title={theme==="dark"?"Use light mode":"Use dark mode"} onClick={()=>setTheme(t=>t==="dark"?"light":"dark")} className="grid h-9 w-9 place-items-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:bg-slate-50">{theme==="dark"?<Sun size={15}/>:<Moon size={15}/>}</button>
-          <span className="hidden items-center gap-2 rounded-full bg-emerald-50 px-3 py-1.5 text-[11px] font-bold text-emerald-700 xl:flex"><ShieldCheck size={13}/>Verified</span>
-          <div className="grid h-9 w-9 place-items-center rounded-full bg-slate-900 text-xs font-black text-white">{context.user.fullName.split(/\s+/).map(x=>x[0]).join("").slice(0,2).toUpperCase()}</div>
->>>>>>> Stashed changes
         </div>
       </header>
       <main className="min-w-0 overflow-x-hidden"><WorkspaceScreen key={section} section={section} portal={portal} focusedRecord={focusedRecord}/></main>
