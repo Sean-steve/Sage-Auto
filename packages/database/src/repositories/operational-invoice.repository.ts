@@ -7,7 +7,6 @@ import type { OperationalInvoice, OperationalInvoiceLine, OperationalInvoiceStat
 import { OperationalInvoiceNotFoundError, CrossTenantViolationError, FinanceConcurrencyConflictError, OperationalInvoiceImmutableError, } from "../errors";
 import { TransactionContext } from "../transaction-manager";
 export interface ListInvoicesFilter {
-<<<<<<< Updated upstream
   customerId?: string;
   corporateAccountId?: string;
   rentalId?: string;
@@ -15,13 +14,6 @@ export interface ListInvoicesFilter {
   overdueOnly?: boolean;
   search?: string;
   limit?: number;
-=======
-    customerId?: string;
-    corporateAccountId?: string;
-    rentalId?: string;
-    status?: OperationalInvoiceStatus;
-    overdueOnly?: boolean;
->>>>>>> Stashed changes
 }
 export interface IOperationalInvoiceRepository {
     findById(id: string, tenantId?: string, tx?: TransactionContext): Promise<OperationalInvoice | null>;
@@ -65,44 +57,6 @@ export class OperationalInvoiceRepository implements IOperationalInvoiceReposito
         }
         return null;
     }
-<<<<<<< Updated upstream
-    return null;
-  }
-
-  async listByTenant(tenantId: string, filter?: ListInvoicesFilter): Promise<OperationalInvoice[]> {
-    const now = new Date().toISOString().split("T")[0];
-    const results: OperationalInvoice[] = [];
-
-    for (const inv of OperationalInvoiceRepository.store.values()) {
-      if (inv.tenantId !== tenantId) continue;
-      if (filter?.customerId && inv.customerId !== filter.customerId) continue;
-      if (filter?.corporateAccountId && inv.corporateAccountId !== filter.corporateAccountId) continue;
-      if (filter?.rentalId && inv.rentalId !== filter.rentalId) continue;
-      if (filter?.status && inv.status !== filter.status) continue;
-      if (filter?.search) {
-        const q=String(filter.search).trim().toLowerCase();
-        if (!inv.invoiceNumber.toLowerCase().includes(q) && !String(inv.billingSnapshot?.customerName||"").toLowerCase().includes(q)) continue;
-      }
-      if (filter?.overdueOnly) {
-        const isOverdue =
-          inv.status !== "PAID" &&
-          inv.status !== "VOIDED" &&
-          inv.dueDate < now &&
-          parseFloat(inv.amountOutstanding) > 0;
-        if (!isOverdue) continue;
-      }
-      results.push(JSON.parse(JSON.stringify(inv)));
-    }
-
-    results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-    const limit=Number(filter?.limit);
-    return Number.isFinite(limit)&&limit>=1 ? results.slice(0,Math.min(50,Math.floor(limit))) : results;
-  }
-
-  async create(
-    data: Omit<OperationalInvoice, "id" | "invoiceNumber" | "version" | "createdAt" | "updatedAt"> & {
-      invoiceNumber?: string;
-=======
     async findByRentalId(rentalId: string, tenantId: string): Promise<OperationalInvoice | null> {
         for (const inv of (await OperationalInvoiceRepository.store.values())) {
             if (inv.rentalId === rentalId && inv.tenantId === tenantId) {
@@ -136,7 +90,6 @@ export class OperationalInvoiceRepository implements IOperationalInvoiceReposito
             results.push(JSON.parse(JSON.stringify(inv)));
         }
         return results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
->>>>>>> Stashed changes
     }
     async create(data: Omit<OperationalInvoice, "id" | "invoiceNumber" | "version" | "createdAt" | "updatedAt"> & {
         invoiceNumber?: string;
