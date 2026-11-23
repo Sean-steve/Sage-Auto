@@ -33,12 +33,12 @@ async function run() {
   assert.equal(progress.completedCount, 3);
   assert.equal(progress.steps.find(s => s.id === "PRICING")?.section, "pricing");
 
-  assert.equal(service.changeVisibility("tenant-a", "DISMISS"), true);
-  assert.equal(service.changeVisibility("tenant-a", "DISMISS"), false, "Repeated dismiss should not generate a second change");
+  assert.equal(await service.changeVisibility("tenant-a", "DISMISS"), true);
+  assert.equal(await service.changeVisibility("tenant-a", "DISMISS"), false, "Repeated dismiss should not generate a second change");
   assert.equal((await anotherSession.getStatus("tenant-a")).state, "DISMISSED");
   assert.equal((await anotherSession.getStatus("tenant-a")).visibleOnOverview, false);
   assert.equal((await service.getStatus("tenant-b")).visibleOnOverview, true, "Company B cannot inherit A's dismissal");
-  assert.equal(anotherSession.changeVisibility("tenant-a", "RESTORE"), true);
+  assert.equal(await anotherSession.changeVisibility("tenant-a", "RESTORE"), true);
   assert.equal((await service.getStatus("tenant-a")).visibleOnOverview, true);
 
   // Historical setup observations are retained when operations change later.
@@ -54,8 +54,8 @@ async function run() {
   assert.equal(finished.state, "COMPLETED");
   assert.equal(finished.visibleOnOverview, false);
   assert.ok(finished.completedAt);
-  assert.equal(service.changeVisibility("tenant-a", "RESTORE"), false, "Reopening cannot undo completed onboarding");
-  assert.equal(anotherSession.changeVisibility("tenant-a", "DISMISS"), false);
+  assert.equal(await service.changeVisibility("tenant-a", "RESTORE"), false, "Reopening cannot undo completed onboarding");
+  assert.equal(await anotherSession.changeVisibility("tenant-a", "DISMISS"), false);
 
   facts.set("tenant-a", new Set());
   const afterDeletion = await anotherSession.getStatus("tenant-a");
@@ -73,7 +73,7 @@ async function run() {
   await assert.rejects(broken.getStatus("tenant-c"), /pricing database unavailable/);
 
   await assert.rejects(service.getStatus(""), /Verified tenant context required/);
-  assert.throws(() => service.changeVisibility("", "DISMISS"), /Verified tenant context required/);
+  await assert.rejects(service.changeVisibility("", "DISMISS"), /Verified tenant context required/);
 
   console.log("UX-D2 PASS — tenant scope, real progress, persisted dismissal, restore, terminal completion, no false success");
 }
