@@ -34,11 +34,7 @@ else {
   }else {
     const applied=Number(pg.stdout.trim());
     results.postgresSchema=Number.isFinite(applied)?`LIVE_SQL_MIGRATIONS_${applied}`:"INVALID_MIGRATION_LEDGER";
-<<<<<<< Updated upstream
     if(applied<5)results.blockers.push("At least five foundation SQL migrations, including UX-D6, must be recorded in PostgreSQL.");
-=======
-    if(applied<5)results.blockers.push("The PostgreSQL application-record migration has not been applied.");
->>>>>>> Stashed changes
   }
 }
 const redis=new Redis(redisUrl,{lazyConnect:true,connectTimeout:4000,retryStrategy:()=>null,maxRetriesPerRequest:0});
