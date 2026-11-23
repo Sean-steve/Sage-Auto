@@ -12,7 +12,11 @@
  * NOT payment-provider E2E, settlement money movement, or live environment test.
  */
 import assert from 'node:assert/strict';
+<<<<<<< Updated upstream
 import { readFileSync, mkdtempSync, existsSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
+=======
+import { readFileSync, writeFileSync, mkdirSync, mkdtempSync, existsSync, rmSync } from 'node:fs';
+>>>>>>> Stashed changes
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawn, execFileSync } from 'node:child_process';
@@ -89,7 +93,7 @@ class Cdp {
   }
   async navigate(url) {
     await this.call('Page.navigate',{url});
-    await waitFor(()=>this.evaluate('document.readyState==="complete" && Boolean(document.body)'),'page load');
+    await waitFor(()=>this.evaluate('document.readyState!=="loading" && Boolean(document.body)'),'page load');
   }
   async clickSection(label) {
     const expr=`(()=>{const labels=document.querySelectorAll('button.sage-nav-item, nav[aria-label="Workspace navigation"] button, nav[aria-label="Vehicle owner sections"] button, nav[aria-label="Platform navigation"] button');
@@ -319,6 +323,32 @@ try {
       const s=portal.sections.find(item=>item.id===section);
       assert.ok(s,spec.role+' was not provisioned expected '+section+' permission');
       await cdp.clickSection(s.label);
+      checks++;
+    }
+
+    if(spec.role==='COMPANY_OWNER') {
+      const overview=portal.sections.find(item=>item.id==='overview');
+      await cdp.clickSection(overview.label);
+      await waitFor(()=>cdp.evaluate(`!document.body.innerText.includes('Checking current operations…')`),'overview loaded');
+      mkdirSync('.review/overview',{recursive:true});
+      for(const width of [1440,390]) {
+        await cdp.call('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:width<600});
+        await delay(300);
+        const screenshot=await cdp.call('Page.captureScreenshot',{format:'png'});
+        writeFileSync('.review/overview/overview-'+width+'.png',Buffer.from(screenshot.data,'base64'));
+        assert.equal(await cdp.evaluate('document.documentElement.scrollWidth<=innerWidth'),true,'overview horizontal overflow at '+width);
+        checks++;
+      }
+      await cdp.call('Emulation.setDeviceMetricsOverride',{width:1440,height:900,deviceScaleFactor:1,mobile:false});
+      await cdp.call('Network.enable');
+      await cdp.call('Network.emulateNetworkConditions',{offline:true,latency:0,downloadThroughput:0,uploadThroughput:0});
+      await cdp.evaluate(`(()=>{[...document.querySelectorAll('button')].find(n=>n.textContent.trim()==='Refresh')?.click();return true;})()`);
+      await waitFor(()=>cdp.evaluate(`document.body.innerText.includes('Company overview is unavailable')`),'actionable overview error');
+      assert.equal(await cdp.evaluate(`document.body.innerText.includes('Operations look clear.')`),false,'failed overview must not claim clear operations');
+      checks++;
+      await cdp.call('Network.emulateNetworkConditions',{offline:false,latency:0,downloadThroughput:-1,uploadThroughput:-1});
+      await cdp.evaluate(`(()=>{[...document.querySelectorAll('button')].find(n=>n.textContent.trim()==='Retry overview')?.click();return true;})()`);
+      await waitFor(()=>cdp.evaluate(`document.body.innerText.includes('What needs your attention today?') && !document.body.innerText.includes('Checking current operations…')`),'overview recovers after retry');
       checks++;
     }
 

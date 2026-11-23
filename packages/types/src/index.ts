@@ -3994,6 +3994,8 @@ export type FinalCalculationCategory =
   | "DISCOUNT";
 
 export interface RentalFinalCalculationItem {
+  /** Legacy lines without a basis are net; current return calculations store gross charges. */
+  amountBasis?: "NET" | "GROSS";
   code: string;
   label: string;
   quantity: number;

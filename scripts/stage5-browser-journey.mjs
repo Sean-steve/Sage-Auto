@@ -72,7 +72,7 @@ class CDP {
   }
   async navigate(url){
     await this.call('Page.navigate',{url});
-    await wait(()=>this.js('document.readyState==="complete" && Boolean(document.body)'),url);
+    await wait(()=>this.js('document.readyState!=="loading" && Boolean(document.body)'),url);
   }
   async button(text){
     const js=`(()=>{const b=[...document.querySelectorAll('button')]

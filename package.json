@@ -104,11 +104,24 @@
     "test:closure-audit": "tsx packages/database/test/closure-integrity-audit.test.ts",
     "dev:workers": "LOCAL_PAYMENT_WORKER_ENABLED=true pnpm dev:worker",
     "dev:worker:payments": "LOCAL_PAYMENT_WORKER_ENABLED=true pnpm dev:worker",
+<<<<<<< Updated upstream
     "test:ux-d6": "tsx packages/database/test/ux-d6-postgres-authority.integration.ts",
     "test:ux-d6:gate": "tsx packages/database/test/ux-d6-runtime-gate.test.ts",
     "db:authority:audit": "node scripts/ux-d6-cutover-audit.mjs",
     "db:authority:certify": "node scripts/ux-d6-cutover-audit.mjs --require-complete",
     "test:ux-h1": "tsx packages/database/test/ux-h1-ui-contract.test.ts"
+=======
+    "local:review:certify": "node scripts/phase5-review-certify.mjs",
+    "test:postgres-transactions": "tsx packages/database/test/postgres-transactions.test.ts",
+    "db:import:sqlite": "tsx packages/database/scripts/import-sqlite-records.ts",
+    "test:postgres-record-store": "tsx packages/database/test/postgres-record-store.test.ts",
+    "test:postgres-import": "tsx packages/database/test/postgres-import.test.ts",
+    "test:postgres-http": "tsx packages/database/test/postgres-http-transaction.test.ts",
+    "test:normalized-core": "tsx packages/database/test/normalized-rental-core.test.ts",
+    "db:backfill-normalized-core": "tsx packages/database/scripts/backfill-normalized-rental-core.ts",
+    "test:normalized-customers": "tsx packages/database/test/normalized-customer.test.ts",
+    "db:cutover-coverage": "node scripts/normalized-cutover-coverage.mjs"
+>>>>>>> Stashed changes
   },
   "dependencies": {
     "@google/genai": "^2.4.0",

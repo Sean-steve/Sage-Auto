@@ -320,11 +320,19 @@ importers:
         specifier: workspace:*
         version: link:../utils
       pg:
+<<<<<<< Updated upstream
         specifier: ^8.16.3
         version: 8.23.1
     devDependencies:
       '@types/pg':
         specifier: ^8.15.5
+=======
+        specifier: ^8.23.1
+        version: 8.23.1
+    devDependencies:
+      '@types/pg':
+        specifier: ^8.23.1
+>>>>>>> Stashed changes
         version: 8.23.1
 
   packages/eslint-config: {}

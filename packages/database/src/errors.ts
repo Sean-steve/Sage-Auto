@@ -338,6 +338,15 @@ export class RentalNotFoundError extends DatabaseError {
   }
 }
 
+export class RentalInvalidReturnTimeError extends DatabaseError {
+  public readonly code = "RENTAL_INVALID_RETURN_TIME";
+  public readonly statusCode = 422;
+  constructor() {
+    super("Return time must be a valid date at or after the rental start.");
+    this.name = "RentalInvalidReturnTimeError";
+  }
+}
+
 export class RentalAlreadyStartedError extends DatabaseError {
   public readonly code = "RENTAL_ALREADY_STARTED";
   constructor(rentalId: string, cause?: unknown) {

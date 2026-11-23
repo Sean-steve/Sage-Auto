@@ -8,5 +8,6 @@ if (stage.some(value => value === "production" || value === "staging")) {
 }
 
 if (process.env.NODE_ENV !== "test") {
-  process.env.SQLITE_PATH ||= resolve(process.cwd(), ".data/carhire.sqlite");
+  process.env.RECORD_STORE_BACKEND ||= "postgres";
+  if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is required for PostgreSQL application persistence.");
 }

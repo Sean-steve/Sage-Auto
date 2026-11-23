@@ -996,6 +996,10 @@ export class PaymentService {
       throw new PaymentNotFoundError(dto.paymentId);
     }
 
+    if (payment.purpose === "RENTAL_DEPOSIT" && dto.sourceObligationType !== "RENTAL_DEPOSIT") {
+      throw new Error("Rental-deposit payments must be refunded against their deposit liability.");
+    }
+
     // Reserve ALL outstanding refund obligations, not only money already
     // disbursed. Multiple pending requests must never overbook one payment.
     // A rental-deposit refund must be supported by THIS payment's allocation
@@ -1067,8 +1071,12 @@ export class PaymentService {
   async approveAndExecuteRefund(
     tenantId: string,
     refundId: string,
-    actor: PaymentActor
+    actor: PaymentActor,
+    offlineConfirmation?: { reference: string; confirmed: boolean }
   ): Promise<Refund> {
+    if (offlineConfirmation && (offlineConfirmation.confirmed !== true || typeof offlineConfirmation.reference !== "string" || !offlineConfirmation.reference.trim() || offlineConfirmation.reference.length > 200)) {
+      throw new Error("Confirm that the offline refund was paid and provide its receipt or bank reference (maximum 200 characters).");
+    }
     const refund = await this.refundRepo.findById(refundId, tenantId);
     if (!refund) {
       throw new RefundNotFoundError(refundId);
@@ -1077,7 +1085,10 @@ export class PaymentService {
     // Terminal refunds are safe to replay without contacting the provider.
     // An in-flight provider request is deliberately non-retryable until its
     // outcome is reconciled, preventing a second outbound disbursement.
-    if (refund.status === "COMPLETED") return refund;
+    if (refund.status === "COMPLETED") {
+      if (offlineConfirmation && refund.providerRefundReference !== offlineConfirmation.reference.trim()) throw new Error("This refund was already recorded with a different reference.");
+      return refund;
+    }
     if (refund.status !== "PENDING") {
       throw new Error("Refund must be PENDING before a provider disbursement; reconcile PROCESSING/FAILED refunds first.");
     }
@@ -1093,7 +1104,17 @@ export class PaymentService {
       throw new PaymentNotFoundError(refund.originalPaymentId);
     }
 
-    if (payment.provider === "MANUAL_RECORD") {
+    const refundDeposit = refund.sourceObligationType === "RENTAL_DEPOSIT" && refund.sourceObligationId && this.depositPositionRepo
+      ? await this.depositPositionRepo.findById(refund.sourceObligationId, tenantId) ||
+        await this.depositPositionRepo.findByRentalId(refund.sourceObligationId, tenantId) ||
+        await this.depositPositionRepo.findByBookingId(refund.sourceObligationId, tenantId)
+      : undefined;
+    if (refund.sourceObligationType === "RENTAL_DEPOSIT" &&
+        (!refundDeposit || Number(refundDeposit.heldAmount) < Number(refund.amount))) {
+      throw new Error("The deposit no longer holds enough money for this refund.");
+    }
+
+    if (payment.provider === "MANUAL_RECORD" && !offlineConfirmation) {
       const error: any = new Error(
         "Manual/offline payments require an explicitly confirmed offline refund workflow; automatic provider refund execution is not available."
       );
@@ -1103,7 +1124,8 @@ export class PaymentService {
       throw error;
     }
 
-    const provider = this.providerRegistry.get(payment.provider);
+    if (offlineConfirmation && payment.provider !== "MANUAL_RECORD") throw new Error("Offline confirmation is only available for manually recorded payments.");
+    const provider = offlineConfirmation ? null : this.providerRegistry.get(payment.provider);
     // Claim one irreversible execution attempt via optimistic versioning
     // BEFORE talking to the provider. A crash cannot silently re-disburse.
     const processing = await this.refundRepo.update(
@@ -1111,7 +1133,8 @@ export class PaymentService {
         approvedAt: new Date().toISOString() }, refund.version);
     let refundResult;
     try {
-      refundResult = await provider.refundPayment({
+      // This branch records staff-confirmed money already returned; it never sends money.
+      refundResult = offlineConfirmation ? {success:true,providerRefundReference:offlineConfirmation.reference.trim(),completedAt:new Date().toISOString()} : await provider!.refundPayment({
       tenantId,
       originalPaymentId: payment.id,
       providerTransactionId: payment.providerTransactionId,
@@ -1169,6 +1192,18 @@ export class PaymentService {
       },
       payment.version
     );
+
+    if (refundDeposit) {
+      const remainingHeld = Number(refundDeposit.heldAmount) - Number(refund.amount);
+      await this.depositPositionRepo!.update(refundDeposit.id, tenantId, {
+        heldAmount: to4Dec(remainingHeld),
+        refundedAmount: to4Dec(Number(refundDeposit.refundedAmount) + Number(refund.amount)),
+        refundDueAmount: to4Dec(Math.max(0, Number(refundDeposit.refundDueAmount) - Number(refund.amount))),
+        status: remainingHeld > 0 ? "PARTIALLY_REFUNDED" : "REFUNDED",
+      }, refundDeposit.version);
+    }
+
+    if (offlineConfirmation) await this.auditRepo?.create({tenantId,actorUserId:actor.userId,actorType:"USER",action:"OFFLINE_REFUND_CONFIRMED",resourceType:"REFUND",resourceId:refund.id,description:"Offline refund confirmed as already paid by a separate authorized approver.",payload:{refundId:refund.id,paymentId:payment.id,reference:offlineConfirmation.reference.trim(),amount:refund.amount}});
 
     const postingContract = PaymentPostingContractFactory.createRefundDisbursedPostingContract(
       updatedRefund,

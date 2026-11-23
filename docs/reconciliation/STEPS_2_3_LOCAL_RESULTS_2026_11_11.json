@@ -1,0 +1,78 @@
+{
+  "checkedOn": "2026-11-11",
+  "scope": "local PostgreSQL-backed recorded cash/bank rental",
+  "postgresRepositoryOperation": "PASS",
+  "freshCompanyPaidRentalUi": "PASS",
+  "restartPersistence": "PASS",
+  "financialReconciliation": "PASS",
+  "targetedMobileKeyboardAndRecovery": "PASS",
+  "fullOriginalStep2Architecture": "OPEN",
+  "wholeProductGraduation": "NOT_CERTIFIED",
+  "businessSuites": [
+    {
+      "name": "payments",
+      "code": 0,
+      "database": "sage_final_payments_1794317718509"
+    },
+    {
+      "name": "finance",
+      "code": 0,
+      "database": "sage_final_finance_1794317732654"
+    },
+    {
+      "name": "rentals",
+      "code": 0,
+      "database": "sage_final_rentals_1794317746386"
+    },
+    {
+      "name": "parties",
+      "code": 0,
+      "database": "sage_final_parties_1794319219342"
+    },
+    {
+      "name": "authorization",
+      "code": 0,
+      "database": "sage_final_authorization_1794319224775"
+    }
+  ],
+  "storageSuites": [
+    {
+      "name": "typecheck",
+      "code": 0
+    },
+    {
+      "name": "build",
+      "code": 0
+    },
+    {
+      "name": "postgres-transactions",
+      "code": 0
+    },
+    {
+      "name": "postgres-record-store",
+      "code": 0
+    },
+    {
+      "name": "postgres-http-transaction",
+      "code": 0
+    },
+    {
+      "name": "postgres-import",
+      "code": 0
+    },
+    {
+      "name": "postgres-numbering",
+      "code": 0
+    }
+  ],
+  "finalTypecheckExit": 0,
+  "finalBuildExit": 0,
+  "remaining": [
+    "Normalized domain schemas and database domain constraints",
+    "Application-record tenant RLS",
+    "External-provider side-effect transaction and outbox acceptance",
+    "Real worker failure/recovery",
+    "Independent-owner settlement and broader cross-portal workflows",
+    "Backup/restore and deployment recovery"
+  ]
+}

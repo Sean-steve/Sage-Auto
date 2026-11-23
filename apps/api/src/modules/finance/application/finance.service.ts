@@ -349,9 +349,10 @@ export class FinanceService {
           taxRate = 0; // Damage compensation is exempt
         }
 
-        const net = item.totalAmount;
-        const tax = item.taxAmount > 0 ? item.taxAmount : net * taxRate;
-        const gross = net + tax;
+        const tax = item.taxAmount ?? 0;
+        const gross = item.amountBasis === "GROSS" ? item.totalAmount : item.totalAmount + tax;
+        const net = gross - tax;
+        taxRate = net > 0 ? tax / net : 0;
 
         lines.push({
           lineType,
@@ -392,12 +393,16 @@ export class FinanceService {
     const taxTotalNum = lines.reduce((s, l) => s + num(l.taxAmount), 0);
     const grossTotalNum = subtotalNum + taxTotalNum;
 
+    if (finalCalc && Math.abs(grossTotalNum - finalCalc.grossFinalTotal) > 0.01) {
+      throw new Error("Invoice lines do not reconcile with the final rental calculation. Review the calculation before issuing an invoice.");
+    }
+
     // 5. Reconcile only an authoritative deposit position.
     // A deposit requirement from the Rental start snapshot is NOT evidence that money was received.
     const depositPosition = await this.depositPositionRepo.findByRentalId(rental.id, tenantId);
 
     let appliedDepositNum = 0;
-    const shouldApplyDeposit = dto.applyDepositDeduction !== false;
+    const shouldApplyDeposit = dto.applyDepositDeduction === true;
 
     if (shouldApplyDeposit && depositPosition && num(depositPosition.heldAmount) > 0) {
       const held = num(depositPosition.heldAmount);

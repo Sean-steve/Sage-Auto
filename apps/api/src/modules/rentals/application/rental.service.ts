@@ -58,6 +58,7 @@ import {
   IRefundRepository,
   RefundRepository,
   RentalNotFoundError,
+  RentalInvalidReturnTimeError,
   BookingNotFoundError,
   ContractNotFoundError,
   HandoverNotFoundError,
@@ -94,6 +95,14 @@ function toAuditActorType(
     return actorType;
   }
   return "USER";
+}
+
+function validateReturnTime(start: string, end: string): void {
+  const startTime = new Date(start).getTime();
+  const endTime = new Date(end).getTime();
+  if (!Number.isFinite(startTime) || !Number.isFinite(endTime) || endTime < startTime) {
+    throw new RentalInvalidReturnTimeError();
+  }
 }
 
 export class RentalService {
@@ -1115,7 +1124,8 @@ export class RentalService {
 
     RentalStateMachine.validateTransition(rental.state, "VEHICLE_RECEIVED", "Vehicle checked in at branch");
 
-    const now = dto.receivedAt || new Date().toISOString();
+    const now = dto.receivedAt ?? new Date().toISOString();
+    validateReturnTime(rental.actualStart || rental.scheduledStart, now);
     const updated = await this.rentalRepo.update(rentalId, tenantId, {
       state: "VEHICLE_RECEIVED",
       returnOdometer: dto.returnOdometer,
@@ -1345,7 +1355,8 @@ export class RentalService {
       approvedExtensions.reduce((sum, e) => sum + e.additionalDays, 0);
 
     const actualStartStr = rental.actualStart || rental.scheduledStart;
-    const actualEndStr = dto.actualReturnAt || rental.actualEnd || now;
+    const actualEndStr = dto.actualReturnAt ?? rental.actualEnd ?? now;
+    validateReturnTime(actualStartStr, actualEndStr);
     const durationDays =
       totalContractedDays > 0
         ? totalContractedDays
@@ -1427,12 +1438,13 @@ export class RentalService {
       0;
     if (baseRentalAmount > 0) {
       lineItems.push({
+        amountBasis: "GROSS",
         code: "BASE_RENTAL",
         label: "Base Rental Charge",
         quantity: 1,
         unitPrice: baseRentalAmount,
         totalAmount: baseRentalAmount,
-        taxAmount: Math.round(baseRentalAmount * 0.16 * 100) / 100,
+        taxAmount: startSnapshot?.pricingSnapshot?.tax?.taxAmount ?? 0,
         category: "BASE_RENTAL",
       });
     }
@@ -1445,6 +1457,7 @@ export class RentalService {
 
     approvedExtensions.forEach((ext) => {
       lineItems.push({
+        amountBasis: "GROSS",
         code: `EXTENSION_${ext.extensionNumber || ext.id}`,
         label: `Rental Extension (${ext.additionalDays} days to ${ext.newEndDate})`,
         quantity: ext.additionalDays,
@@ -1458,12 +1471,13 @@ export class RentalService {
     // Excess Mileage
     if (excessKmCharge > 0) {
       lineItems.push({
+        amountBasis: "GROSS",
         code: "EXCESS_MILEAGE",
         label: `Excess Mileage (${excessDistanceKm} km @ ${excessKmRate}/km)`,
         quantity: excessDistanceKm,
         unitPrice: excessKmRate,
         totalAmount: excessKmCharge,
-        taxAmount: Math.round(excessKmCharge * 0.16 * 100) / 100,
+        taxAmount: Math.round((excessKmCharge - excessKmCharge / 1.16) * 100) / 100,
         category: "EXCESS_MILEAGE",
       });
     }
@@ -1471,6 +1485,7 @@ export class RentalService {
     // Fuel Deficit
     if (fuelDeficitCharge > 0) {
       lineItems.push({
+        amountBasis: "GROSS",
         code: "FUEL_DEFICIT",
         label: `Fuel Deficit (${fuelDeficitLitres}L @ ${fuelPricePerUnit}/L)`,
         quantity: fuelDeficitLitres,
@@ -1483,12 +1498,13 @@ export class RentalService {
 
     if (fuelRefuelingFee > 0) {
       lineItems.push({
+        amountBasis: "GROSS",
         code: "REFUELING_SURCHARGE",
         label: "Branch Refueling Service Surcharge",
         quantity: 1,
         unitPrice: fuelRefuelingFee,
         totalAmount: fuelRefuelingFee,
-        taxAmount: Math.round(fuelRefuelingFee * 0.16 * 100) / 100,
+        taxAmount: Math.round((fuelRefuelingFee - fuelRefuelingFee / 1.16) * 100) / 100,
         category: "FUEL_DEFICIT",
       });
     }
@@ -1496,12 +1512,13 @@ export class RentalService {
     // Late Return Fee
     if (lateReturnFee > 0) {
       lineItems.push({
+        amountBasis: "GROSS",
         code: "LATE_RETURN_FEE",
         label: `Late Return Fee (${billableLateHours} billable hrs @ ${lateHourlyRate}/hr)`,
         quantity: billableLateHours,
         unitPrice: lateHourlyRate,
         totalAmount: lateReturnFee,
-        taxAmount: Math.round(lateReturnFee * 0.16 * 100) / 100,
+        taxAmount: Math.round((lateReturnFee - lateReturnFee / 1.16) * 100) / 100,
         category: "LATE_RETURN",
       });
     }
@@ -1509,6 +1526,7 @@ export class RentalService {
     // Damage
     if (totalDamageCharge > 0) {
       lineItems.push({
+        amountBasis: "GROSS",
         code: "DAMAGE_ASSESSMENT",
         label: "Observed Damage Repair Liability",
         quantity: 1,
@@ -1525,6 +1543,7 @@ export class RentalService {
       dto.additionalFees.forEach((fee) => {
         customAdditionalFees += fee.amount;
         lineItems.push({
+        amountBasis: "GROSS",
           code: fee.code,
           label: fee.label,
           quantity: 1,

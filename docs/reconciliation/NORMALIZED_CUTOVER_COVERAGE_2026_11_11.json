@@ -1,0 +1,1979 @@
+{
+  "scope": "Runtime TypeScript under apps/packages/src, excluding tests/scripts/build dependencies",
+  "filesInspected": 600,
+  "compatibilityNamespaceCount": 164,
+  "namespaces": [
+    {
+      "namespace": "access:accounts",
+      "locations": [
+        {
+          "file": "apps/api/src/modules/access/access.service.ts",
+          "line": 42,
+          "operation": "createRecordStore",
+          "namespace": "access:accounts",
+          "expression": "'access:accounts'"
+        }
+      ]
+    },
+    {
+      "namespace": "access:invitation-claims",
+      "locations": [
+        {
+          "file": "apps/api/src/modules/access/access.service.ts",
+          "line": 316,
+          "operation": "claimRecord",
+          "namespace": "access:invitation-claims",
+          "expression": "'access:invitation-claims'"
+        }
+      ]
+    },
+    {
+      "namespace": "access:invitations",
+      "locations": [
+        {
+          "file": "apps/api/src/modules/access/access.service.ts",
+          "line": 43,
+          "operation": "createRecordStore",
+          "namespace": "access:invitations",
+          "expression": "'access:invitations'"
+        }
+      ]
+    },
+    {
+      "namespace": "access:links",
+      "locations": [
+        {
+          "file": "apps/api/src/modules/access/access.service.ts",
+          "line": 44,
+          "operation": "createRecordStore",
+          "namespace": "access:links",
+          "expression": "'access:links'"
+        }
+      ]
+    },
+    {
+      "namespace": "access:owner-agreement-signatures",
+      "locations": [
+        {
+          "file": "apps/api/src/modules/access/owner-protected-actions.ts",
+          "line": 43,
+          "operation": "createRecordStore",
+          "namespace": "access:owner-agreement-signatures",
+          "expression": "\"access:owner-agreement-signatures\""
+        }
+      ]
+    },
+    {
+      "namespace": "access:owner-payout-changes",
+      "locations": [
+        {
+          "file": "apps/api/src/modules/access/owner-protected-actions.ts",
+          "line": 42,
+          "operation": "createRecordStore",
+          "namespace": "access:owner-payout-changes",
+          "expression": "\"access:owner-payout-changes\""
+        }
+      ]
+    },
+    {
+      "namespace": "access:provisioned-owner-claims",
+      "locations": [
+        {
+          "file": "apps/api/src/modules/access/access.service.ts",
+          "line": 223,
+          "operation": "claimRecord",
+          "namespace": "access:provisioned-owner-claims",
+          "expression": "'access:provisioned-owner-claims'"
+        }
+      ]
+    },
+    {
+      "namespace": "access:setup",
+      "locations": [
+        {
+          "file": "apps/api/src/modules/access/access.service.ts",
+          "line": 342,
+          "operation": "claimRecord",
+          "namespace": "access:setup",
+          "expression": "'access:setup'"
+        }
+      ]
+    },
+    {
+      "namespace": "agent.repository:agentStore",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/agent.repository.ts",
+          "line": 24,
+          "operation": "createRecordStore",
+          "namespace": "agent.repository:agentStore",
+          "expression": "\"agent.repository:agentStore\""
+        }
+      ]
+    },
+    {
+      "namespace": "auth-session.repository:sessionStore",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/auth-session.repository.ts",
+          "line": 20,
+          "operation": "createRecordStore",
+          "namespace": "auth-session.repository:sessionStore",
+          "expression": "\"auth-session.repository:sessionStore\""
+        }
+      ]
+    },
+    {
+      "namespace": "billing-account.repository:store",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/billing-account.repository.ts",
+          "line": 15,
+          "operation": "createRecordStore",
+          "namespace": "billing-account.repository:store",
+          "expression": "\"billing-account.repository:store\""
+        }
+      ]
+    },
+    {
+      "namespace": "booking.repository:bookingStore",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/booking.repository.ts",
+          "line": 38,
+          "operation": "createRecordStore",
+          "namespace": "booking.repository:bookingStore",
+          "expression": "\"booking.repository:bookingStore\""
+        }
+      ]
+    },
+    {
+      "namespace": "booking.repository:pricingSnapshotStore",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/booking.repository.ts",
+          "line": 40,
+          "operation": "createRecordStore",
+          "namespace": "booking.repository:pricingSnapshotStore",
+          "expression": "\"booking.repository:pricingSnapshotStore\""
+        }
+      ]
+    },
+    {
+      "namespace": "booking.repository:sequenceStore",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/booking.repository.ts",
+          "line": 42,
+          "operation": "createRecordStore",
+          "namespace": "booking.repository:sequenceStore",
+          "expression": "\"booking.repository:sequenceStore\""
+        }
+      ]
+    },
+    {
+      "namespace": "booking.repository:statusHistoryStore",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/booking.repository.ts",
+          "line": 39,
+          "operation": "createRecordStore",
+          "namespace": "booking.repository:statusHistoryStore",
+          "expression": "\"booking.repository:statusHistoryStore\""
+        }
+      ]
+    },
+    {
+      "namespace": "booking.repository:vehicleAssignmentStore",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/booking.repository.ts",
+          "line": 41,
+          "operation": "createRecordStore",
+          "namespace": "booking.repository:vehicleAssignmentStore",
+          "expression": "\"booking.repository:vehicleAssignmentStore\""
+        }
+      ]
+    },
+    {
+      "namespace": "communication-preference.repository:preferences",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/communication-preference.repository.ts",
+          "line": 11,
+          "operation": "createRecordStore",
+          "namespace": "communication-preference.repository:preferences",
+          "expression": "\"communication-preference.repository:preferences\""
+        }
+      ]
+    },
+    {
+      "namespace": "compliance-issue.repository:store",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/compliance-issue.repository.ts",
+          "line": 25,
+          "operation": "createRecordStore",
+          "namespace": "compliance-issue.repository:store",
+          "expression": "\"compliance-issue.repository:store\""
+        }
+      ]
+    },
+    {
+      "namespace": "compliance-override.repository:store",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/compliance-override.repository.ts",
+          "line": 18,
+          "operation": "createRecordStore",
+          "namespace": "compliance-override.repository:store",
+          "expression": "\"compliance-override.repository:store\""
+        }
+      ]
+    },
+    {
+      "namespace": "compliance-record.repository:store",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/compliance-record.repository.ts",
+          "line": 39,
+          "operation": "createRecordStore",
+          "namespace": "compliance-record.repository:store",
+          "expression": "\"compliance-record.repository:store\""
+        }
+      ]
+    },
+    {
+      "namespace": "compliance-requirement.repository:store",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/compliance-requirement.repository.ts",
+          "line": 160,
+          "operation": "createRecordStore",
+          "namespace": "compliance-requirement.repository:store",
+          "expression": "\"compliance-requirement.repository:store\""
+        }
+      ]
+    },
+    {
+      "namespace": "contract.repository:contractStore",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/contract.repository.ts",
+          "line": 44,
+          "operation": "createRecordStore",
+          "namespace": "contract.repository:contractStore",
+          "expression": "\"contract.repository:contractStore\""
+        }
+      ]
+    },
+    {
+      "namespace": "contract.repository:sequenceStore",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/contract.repository.ts",
+          "line": 48,
+          "operation": "createRecordStore",
+          "namespace": "contract.repository:sequenceStore",
+          "expression": "\"contract.repository:sequenceStore\""
+        }
+      ]
+    },
+    {
+      "namespace": "contract.repository:signatureStore",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/contract.repository.ts",
+          "line": 45,
+          "operation": "createRecordStore",
+          "namespace": "contract.repository:signatureStore",
+          "expression": "\"contract.repository:signatureStore\""
+        }
+      ]
+    },
+    {
+      "namespace": "contract.repository:statusHistoryStore",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/contract.repository.ts",
+          "line": 47,
+          "operation": "createRecordStore",
+          "namespace": "contract.repository:statusHistoryStore",
+          "expression": "\"contract.repository:statusHistoryStore\""
+        }
+      ]
+    },
+    {
+      "namespace": "contract.repository:versionStore",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/contract.repository.ts",
+          "line": 46,
+          "operation": "createRecordStore",
+          "namespace": "contract.repository:versionStore",
+          "expression": "\"contract.repository:versionStore\""
+        }
+      ]
+    },
+    {
+      "namespace": "corporate-account.repository:accountStore",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/corporate-account.repository.ts",
+          "line": 30,
+          "operation": "createRecordStore",
+          "namespace": "corporate-account.repository:accountStore",
+          "expression": "\"corporate-account.repository:accountStore\""
+        }
+      ]
+    },
+    {
+      "namespace": "corporate-account.repository:authorizedDriverStore",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/corporate-account.repository.ts",
+          "line": 31,
+          "operation": "createRecordStore",
+          "namespace": "corporate-account.repository:authorizedDriverStore",
+          "expression": "\"corporate-account.repository:authorizedDriverStore\""
+        }
+      ]
+    },
+    {
+      "namespace": "credit-note.repository:store",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/credit-note.repository.ts",
+          "line": 26,
+          "operation": "createRecordStore",
+          "namespace": "credit-note.repository:store",
+          "expression": "\"credit-note.repository:store\""
+        }
+      ]
+    },
+    {
+      "namespace": "crm-pipeline-stage.repository:stages",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/crm-pipeline-stage.repository.ts",
+          "line": 21,
+          "operation": "createRecordStore",
+          "namespace": "crm-pipeline-stage.repository:stages",
+          "expression": "\"crm-pipeline-stage.repository:stages\""
+        }
+      ]
+    },
+    {
+      "namespace": "crm-task.repository:tasks",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/crm-task.repository.ts",
+          "line": 13,
+          "operation": "createRecordStore",
+          "namespace": "crm-task.repository:tasks",
+          "expression": "\"crm-task.repository:tasks\""
+        }
+      ]
+    },
+    {
+      "namespace": "customer.repository:customerStore",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/customer.repository.ts",
+          "line": 34,
+          "operation": "createRecordStore",
+          "namespace": "customer.repository:customerStore",
+          "expression": "\"customer.repository:customerStore\""
+        }
+      ]
+    },
+    {
+      "namespace": "damage.repository:damageStore",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/damage.repository.ts",
+          "line": 34,
+          "operation": "createRecordStore",
+          "namespace": "damage.repository:damageStore",
+          "expression": "\"damage.repository:damageStore\""
+        }
+      ]
+    },
+    {
+      "namespace": "damage.repository:sequenceStore",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/damage.repository.ts",
+          "line": 36,
+          "operation": "createRecordStore",
+          "namespace": "damage.repository:sequenceStore",
+          "expression": "\"damage.repository:sequenceStore\""
+        }
+      ]
+    },
+    {
+      "namespace": "damage.repository:statusHistoryStore",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/damage.repository.ts",
+          "line": 35,
+          "operation": "createRecordStore",
+          "namespace": "damage.repository:statusHistoryStore",
+          "expression": "\"damage.repository:statusHistoryStore\""
+        }
+      ]
+    },
+    {
+      "namespace": "deposit-position.repository:store",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/deposit-position.repository.ts",
+          "line": 24,
+          "operation": "createRecordStore",
+          "namespace": "deposit-position.repository:store",
+          "expression": "\"deposit-position.repository:store\""
+        }
+      ]
+    },
+    {
+      "namespace": "document-version.repository:store",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/document-version.repository.ts",
+          "line": 27,
+          "operation": "createRecordStore",
+          "namespace": "document-version.repository:store",
+          "expression": "\"document-version.repository:store\""
+        }
+      ]
+    },
+    {
+      "namespace": "document.repository:store",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/document.repository.ts",
+          "line": 51,
+          "operation": "createRecordStore",
+          "namespace": "document.repository:store",
+          "expression": "\"document.repository:store\""
+        }
+      ]
+    },
+    {
+      "namespace": "driver.repository:driverStore",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/driver.repository.ts",
+          "line": 28,
+          "operation": "createRecordStore",
+          "namespace": "driver.repository:driverStore",
+          "expression": "\"driver.repository:driverStore\""
+        }
+      ]
+    },
+    {
+      "namespace": "driver.repository:relationshipStore",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/driver.repository.ts",
+          "line": 29,
+          "operation": "createRecordStore",
+          "namespace": "driver.repository:relationshipStore",
+          "expression": "\"driver.repository:relationshipStore\""
+        }
+      ]
+    },
+    {
+      "namespace": "email-verification-token.repository:tokenStore",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/email-verification-token.repository.ts",
+          "line": 14,
+          "operation": "createRecordStore",
+          "namespace": "email-verification-token.repository:tokenStore",
+          "expression": "\"email-verification-token.repository:tokenStore\""
+        }
+      ]
+    },
+    {
+      "namespace": "entitlement-override.repository:store",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/entitlement-override.repository.ts",
+          "line": 18,
+          "operation": "createRecordStore",
+          "namespace": "entitlement-override.repository:store",
+          "expression": "\"entitlement-override.repository:store\""
+        }
+      ]
+    },
+    {
+      "namespace": "entitlement-restriction.repository:store",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/entitlement-restriction.repository.ts",
+          "line": 19,
+          "operation": "createRecordStore",
+          "namespace": "entitlement-restriction.repository:store",
+          "expression": "\"entitlement-restriction.repository:store\""
+        }
+      ]
+    },
+    {
+      "namespace": "entitlement-usage.repository:store",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/entitlement-usage.repository.ts",
+          "line": 21,
+          "operation": "createRecordStore",
+          "namespace": "entitlement-usage.repository:store",
+          "expression": "\"entitlement-usage.repository:store\""
+        }
+      ]
+    },
+    {
+      "namespace": "event-consumption.repository:store",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/event-consumption.repository.ts",
+          "line": 31,
+          "operation": "createRecordStore",
+          "namespace": "event-consumption.repository:store",
+          "expression": "\"event-consumption.repository:store\""
+        }
+      ]
+    },
+    {
+      "namespace": "expense.repository:store",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/expense.repository.ts",
+          "line": 31,
+          "operation": "createRecordStore",
+          "namespace": "expense.repository:store",
+          "expression": "\"expense.repository:store\""
+        }
+      ]
+    },
+    {
+      "namespace": "feature-flag.repository:store",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/feature-flag.repository.ts",
+          "line": 26,
+          "operation": "createRecordStore",
+          "namespace": "feature-flag.repository:store",
+          "expression": "\"feature-flag.repository:store\""
+        }
+      ]
+    },
+    {
+      "namespace": "feature.repository:keyIndex",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/feature.repository.ts",
+          "line": 151,
+          "operation": "createRecordStore",
+          "namespace": "feature.repository:keyIndex",
+          "expression": "\"feature.repository:keyIndex\""
+        }
+      ]
+    },
+    {
+      "namespace": "feature.repository:store",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/feature.repository.ts",
+          "line": 150,
+          "operation": "createRecordStore",
+          "namespace": "feature.repository:store",
+          "expression": "\"feature.repository:store\""
+        }
+      ]
+    },
+    {
+      "namespace": "file-access-record.repository:store",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/file-access-record.repository.ts",
+          "line": 27,
+          "operation": "createRecordStore",
+          "namespace": "file-access-record.repository:store",
+          "expression": "\"file-access-record.repository:store\""
+        }
+      ]
+    },
+    {
+      "namespace": "file-resource-link.repository:store",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/file-resource-link.repository.ts",
+          "line": 26,
+          "operation": "createRecordStore",
+          "namespace": "file-resource-link.repository:store",
+          "expression": "\"file-resource-link.repository:store\""
+        }
+      ]
+    },
+    {
+      "namespace": "file-scan-record.repository:store",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/file-scan-record.repository.ts",
+          "line": 27,
+          "operation": "createRecordStore",
+          "namespace": "file-scan-record.repository:store",
+          "expression": "\"file-scan-record.repository:store\""
+        }
+      ]
+    },
+    {
+      "namespace": "file-upload-session.repository:store",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/file-upload-session.repository.ts",
+          "line": 38,
+          "operation": "createRecordStore",
+          "namespace": "file-upload-session.repository:store",
+          "expression": "\"file-upload-session.repository:store\""
+        }
+      ]
+    },
+    {
+      "namespace": "file.repository:store",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/file.repository.ts",
+          "line": 65,
+          "operation": "createRecordStore",
+          "namespace": "file.repository:store",
+          "expression": "\"file.repository:store\""
+        }
+      ]
+    },
+    {
+      "namespace": "handover.repository:handoverStore",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/handover.repository.ts",
+          "line": 41,
+          "operation": "createRecordStore",
+          "namespace": "handover.repository:handoverStore",
+          "expression": "\"handover.repository:handoverStore\""
+        }
+      ]
+    },
+    {
+      "namespace": "handover.repository:sequenceStore",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/handover.repository.ts",
+          "line": 43,
+          "operation": "createRecordStore",
+          "namespace": "handover.repository:sequenceStore",
+          "expression": "\"handover.repository:sequenceStore\""
+        }
+      ]
+    },
+    {
+      "namespace": "handover.repository:statusHistoryStore",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/handover.repository.ts",
+          "line": 42,
+          "operation": "createRecordStore",
+          "namespace": "handover.repository:statusHistoryStore",
+          "expression": "\"handover.repository:statusHistoryStore\""
+        }
+      ]
+    },
+    {
+      "namespace": "idempotency.repository:store",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/idempotency.repository.ts",
+          "line": 36,
+          "operation": "createRecordStore",
+          "namespace": "idempotency.repository:store",
+          "expression": "\"idempotency.repository:store\""
+        }
+      ]
+    },
+    {
+      "namespace": "inspection-template.repository:templateStore",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/inspection-template.repository.ts",
+          "line": 17,
+          "operation": "createRecordStore",
+          "namespace": "inspection-template.repository:templateStore",
+          "expression": "\"inspection-template.repository:templateStore\""
+        }
+      ]
+    },
+    {
+      "namespace": "inspection.repository:comparisonStore",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/inspection.repository.ts",
+          "line": 45,
+          "operation": "createRecordStore",
+          "namespace": "inspection.repository:comparisonStore",
+          "expression": "\"inspection.repository:comparisonStore\""
+        }
+      ]
+    },
+    {
+      "namespace": "inspection.repository:correctionStore",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/inspection.repository.ts",
+          "line": 44,
+          "operation": "createRecordStore",
+          "namespace": "inspection.repository:correctionStore",
+          "expression": "\"inspection.repository:correctionStore\""
+        }
+      ]
+    },
+    {
+      "namespace": "inspection.repository:inspectionStore",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/inspection.repository.ts",
+          "line": 42,
+          "operation": "createRecordStore",
+          "namespace": "inspection.repository:inspectionStore",
+          "expression": "\"inspection.repository:inspectionStore\""
+        }
+      ]
+    },
+    {
+      "namespace": "inspection.repository:sequenceStore",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/inspection.repository.ts",
+          "line": 46,
+          "operation": "createRecordStore",
+          "namespace": "inspection.repository:sequenceStore",
+          "expression": "\"inspection.repository:sequenceStore\""
+        }
+      ]
+    },
+    {
+      "namespace": "inspection.repository:statusHistoryStore",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/inspection.repository.ts",
+          "line": 43,
+          "operation": "createRecordStore",
+          "namespace": "inspection.repository:statusHistoryStore",
+          "expression": "\"inspection.repository:statusHistoryStore\""
+        }
+      ]
+    },
+    {
+      "namespace": "journal-entry.repository:store",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/journal-entry.repository.ts",
+          "line": 29,
+          "operation": "createRecordStore",
+          "namespace": "journal-entry.repository:store",
+          "expression": "\"journal-entry.repository:store\""
+        }
+      ]
+    },
+    {
+      "namespace": "journal-transaction.repository:sequences",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/journal-transaction.repository.ts",
+          "line": 24,
+          "operation": "createRecordStore",
+          "namespace": "journal-transaction.repository:sequences",
+          "expression": "\"journal-transaction.repository:sequences\""
+        }
+      ]
+    },
+    {
+      "namespace": "journal-transaction.repository:store",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/journal-transaction.repository.ts",
+          "line": 23,
+          "operation": "createRecordStore",
+          "namespace": "journal-transaction.repository:store",
+          "expression": "\"journal-transaction.repository:store\""
+        }
+      ]
+    },
+    {
+      "namespace": "lead.repository:leads",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/lead.repository.ts",
+          "line": 19,
+          "operation": "createRecordStore",
+          "namespace": "lead.repository:leads",
+          "expression": "\"lead.repository:leads\""
+        }
+      ]
+    },
+    {
+      "namespace": "ledger-account.repository:store",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/ledger-account.repository.ts",
+          "line": 263,
+          "operation": "createRecordStore",
+          "namespace": "ledger-account.repository:store",
+          "expression": "\"ledger-account.repository:store\""
+        }
+      ]
+    },
+    {
+      "namespace": "maintenance-schedule.repository:store",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/maintenance-schedule.repository.ts",
+          "line": 25,
+          "operation": "createRecordStore",
+          "namespace": "maintenance-schedule.repository:store",
+          "expression": "\"maintenance-schedule.repository:store\""
+        }
+      ]
+    },
+    {
+      "namespace": "maintenance.repository:counters",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/maintenance.repository.ts",
+          "line": 48,
+          "operation": "createRecordStore",
+          "namespace": "maintenance.repository:counters",
+          "expression": "\"maintenance.repository:counters\""
+        }
+      ]
+    },
+    {
+      "namespace": "maintenance.repository:workOrders",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/maintenance.repository.ts",
+          "line": 47,
+          "operation": "createRecordStore",
+          "namespace": "maintenance.repository:workOrders",
+          "expression": "\"maintenance.repository:workOrders\""
+        }
+      ]
+    },
+    {
+      "namespace": "media-asset.repository:store",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/media-asset.repository.ts",
+          "line": 51,
+          "operation": "createRecordStore",
+          "namespace": "media-asset.repository:store",
+          "expression": "\"media-asset.repository:store\""
+        }
+      ]
+    },
+    {
+      "namespace": "media-derivative.repository:store",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/media-derivative.repository.ts",
+          "line": 49,
+          "operation": "createRecordStore",
+          "namespace": "media-derivative.repository:store",
+          "expression": "\"media-derivative.repository:store\""
+        }
+      ]
+    },
+    {
+      "namespace": "media-processing-request.repository:store",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/media-processing-request.repository.ts",
+          "line": 38,
+          "operation": "createRecordStore",
+          "namespace": "media-processing-request.repository:store",
+          "expression": "\"media-processing-request.repository:store\""
+        }
+      ]
+    },
+    {
+      "namespace": "media-reconciliation.repository:store",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/media-reconciliation.repository.ts",
+          "line": 26,
+          "operation": "createRecordStore",
+          "namespace": "media-reconciliation.repository:store",
+          "expression": "\"media-reconciliation.repository:store\""
+        }
+      ]
+    },
+    {
+      "namespace": "notification-provider-config.repository:configs",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/notification-provider-config.repository.ts",
+          "line": 11,
+          "operation": "createRecordStore",
+          "namespace": "notification-provider-config.repository:configs",
+          "expression": "\"notification-provider-config.repository:configs\""
+        }
+      ]
+    },
+    {
+      "namespace": "notification-receipt.repository:receipts",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/notification-receipt.repository.ts",
+          "line": 12,
+          "operation": "createRecordStore",
+          "namespace": "notification-receipt.repository:receipts",
+          "expression": "\"notification-receipt.repository:receipts\""
+        }
+      ]
+    },
+    {
+      "namespace": "notification-suppression.repository:suppressions",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/notification-suppression.repository.ts",
+          "line": 14,
+          "operation": "createRecordStore",
+          "namespace": "notification-suppression.repository:suppressions",
+          "expression": "\"notification-suppression.repository:suppressions\""
+        }
+      ]
+    },
+    {
+      "namespace": "notification-template.repository:templates",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/notification-template.repository.ts",
+          "line": 15,
+          "operation": "createRecordStore",
+          "namespace": "notification-template.repository:templates",
+          "expression": "\"notification-template.repository:templates\""
+        }
+      ]
+    },
+    {
+      "namespace": "notification.repository:notifications",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/notification.repository.ts",
+          "line": 19,
+          "operation": "createRecordStore",
+          "namespace": "notification.repository:notifications",
+          "expression": "\"notification.repository:notifications\""
+        }
+      ]
+    },
+    {
+      "namespace": "operational-invoice.repository:historyStore",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/operational-invoice.repository.ts",
+          "line": 30,
+          "operation": "createRecordStore",
+          "namespace": "operational-invoice.repository:historyStore",
+          "expression": "\"operational-invoice.repository:historyStore\""
+        }
+      ]
+    },
+    {
+      "namespace": "operational-invoice.repository:store",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/operational-invoice.repository.ts",
+          "line": 29,
+          "operation": "createRecordStore",
+          "namespace": "operational-invoice.repository:store",
+          "expression": "\"operational-invoice.repository:store\""
+        }
+      ]
+    },
+    {
+      "namespace": "outbox.repository:store",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/outbox.repository.ts",
+          "line": 113,
+          "operation": "createRecordStore",
+          "namespace": "outbox.repository:store",
+          "expression": "\"outbox.repository:store\""
+        }
+      ]
+    },
+    {
+      "namespace": "owner-settlement-batch.repository:sequences",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/owner-settlement-batch.repository.ts",
+          "line": 22,
+          "operation": "createRecordStore",
+          "namespace": "owner-settlement-batch.repository:sequences",
+          "expression": "\"owner-settlement-batch.repository:sequences\""
+        }
+      ]
+    },
+    {
+      "namespace": "owner-settlement-batch.repository:store",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/owner-settlement-batch.repository.ts",
+          "line": 21,
+          "operation": "createRecordStore",
+          "namespace": "owner-settlement-batch.repository:store",
+          "expression": "\"owner-settlement-batch.repository:store\""
+        }
+      ]
+    },
+    {
+      "namespace": "owner-settlement-period.repository:sequences",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/owner-settlement-period.repository.ts",
+          "line": 24,
+          "operation": "createRecordStore",
+          "namespace": "owner-settlement-period.repository:sequences",
+          "expression": "\"owner-settlement-period.repository:sequences\""
+        }
+      ]
+    },
+    {
+      "namespace": "owner-settlement-period.repository:store",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/owner-settlement-period.repository.ts",
+          "line": 23,
+          "operation": "createRecordStore",
+          "namespace": "owner-settlement-period.repository:store",
+          "expression": "\"owner-settlement-period.repository:store\""
+        }
+      ]
+    },
+    {
+      "namespace": "owner-settlement.repository:adjustmentLines",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/owner-settlement.repository.ts",
+          "line": 40,
+          "operation": "createRecordStore",
+          "namespace": "owner-settlement.repository:adjustmentLines",
+          "expression": "\"owner-settlement.repository:adjustmentLines\""
+        }
+      ]
+    },
+    {
+      "namespace": "owner-settlement.repository:expenseLines",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/owner-settlement.repository.ts",
+          "line": 39,
+          "operation": "createRecordStore",
+          "namespace": "owner-settlement.repository:expenseLines",
+          "expression": "\"owner-settlement.repository:expenseLines\""
+        }
+      ]
+    },
+    {
+      "namespace": "owner-settlement.repository:payables",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/owner-settlement.repository.ts",
+          "line": 41,
+          "operation": "createRecordStore",
+          "namespace": "owner-settlement.repository:payables",
+          "expression": "\"owner-settlement.repository:payables\""
+        }
+      ]
+    },
+    {
+      "namespace": "owner-settlement.repository:rentalLines",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/owner-settlement.repository.ts",
+          "line": 38,
+          "operation": "createRecordStore",
+          "namespace": "owner-settlement.repository:rentalLines",
+          "expression": "\"owner-settlement.repository:rentalLines\""
+        }
+      ]
+    },
+    {
+      "namespace": "owner-settlement.repository:sequenceMap",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/owner-settlement.repository.ts",
+          "line": 42,
+          "operation": "createRecordStore",
+          "namespace": "owner-settlement.repository:sequenceMap",
+          "expression": "\"owner-settlement.repository:sequenceMap\""
+        }
+      ]
+    },
+    {
+      "namespace": "owner-settlement.repository:store",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/owner-settlement.repository.ts",
+          "line": 37,
+          "operation": "createRecordStore",
+          "namespace": "owner-settlement.repository:store",
+          "expression": "\"owner-settlement.repository:store\""
+        }
+      ]
+    },
+    {
+      "namespace": "party-document.repository:docStore",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/party-document.repository.ts",
+          "line": 27,
+          "operation": "createRecordStore",
+          "namespace": "party-document.repository:docStore",
+          "expression": "\"party-document.repository:docStore\""
+        }
+      ]
+    },
+    {
+      "namespace": "party-document.repository:historyStore",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/party-document.repository.ts",
+          "line": 28,
+          "operation": "createRecordStore",
+          "namespace": "party-document.repository:historyStore",
+          "expression": "\"party-document.repository:historyStore\""
+        }
+      ]
+    },
+    {
+      "namespace": "password-reset-token.repository:tokenStore",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/password-reset-token.repository.ts",
+          "line": 14,
+          "operation": "createRecordStore",
+          "namespace": "password-reset-token.repository:tokenStore",
+          "expression": "\"password-reset-token.repository:tokenStore\""
+        }
+      ]
+    },
+    {
+      "namespace": "payment-allocation.repository:store",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/payment-allocation.repository.ts",
+          "line": 17,
+          "operation": "createRecordStore",
+          "namespace": "payment-allocation.repository:store",
+          "expression": "\"payment-allocation.repository:store\""
+        }
+      ]
+    },
+    {
+      "namespace": "payment-attempt.repository:store",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/payment-attempt.repository.ts",
+          "line": 18,
+          "operation": "createRecordStore",
+          "namespace": "payment-attempt.repository:store",
+          "expression": "\"payment-attempt.repository:store\""
+        }
+      ]
+    },
+    {
+      "namespace": "payment-reconciliation.repository:store",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/payment-reconciliation.repository.ts",
+          "line": 17,
+          "operation": "createRecordStore",
+          "namespace": "payment-reconciliation.repository:store",
+          "expression": "\"payment-reconciliation.repository:store\""
+        }
+      ]
+    },
+    {
+      "namespace": "payment.repository:store",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/payment.repository.ts",
+          "line": 19,
+          "operation": "createRecordStore",
+          "namespace": "payment.repository:store",
+          "expression": "\"payment.repository:store\""
+        }
+      ]
+    },
+    {
+      "namespace": "plan-feature.repository:store",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/plan-feature.repository.ts",
+          "line": 18,
+          "operation": "createRecordStore",
+          "namespace": "plan-feature.repository:store",
+          "expression": "\"plan-feature.repository:store\""
+        }
+      ]
+    },
+    {
+      "namespace": "plan.repository:store",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/plan.repository.ts",
+          "line": 19,
+          "operation": "createRecordStore",
+          "namespace": "plan.repository:store",
+          "expression": "\"plan.repository:store\""
+        }
+      ]
+    },
+    {
+      "namespace": "platform-cohort.repository:store",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/platform-cohort.repository.ts",
+          "line": 15,
+          "operation": "createRecordStore",
+          "namespace": "platform-cohort.repository:store",
+          "expression": "\"platform-cohort.repository:store\""
+        }
+      ]
+    },
+    {
+      "namespace": "platform-membership.repository:memberships",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/platform-membership.repository.ts",
+          "line": 22,
+          "operation": "createRecordStore",
+          "namespace": "platform-membership.repository:memberships",
+          "expression": "\"platform-membership.repository:memberships\""
+        }
+      ]
+    },
+    {
+      "namespace": "platform-report.repository:savedReports",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/platform-report.repository.ts",
+          "line": 23,
+          "operation": "createRecordStore",
+          "namespace": "platform-report.repository:savedReports",
+          "expression": "\"platform-report.repository:savedReports\""
+        }
+      ]
+    },
+    {
+      "namespace": "platform-role.repository:roles",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/platform-role.repository.ts",
+          "line": 21,
+          "operation": "createRecordStore",
+          "namespace": "platform-role.repository:roles",
+          "expression": "\"platform-role.repository:roles\""
+        }
+      ]
+    },
+    {
+      "namespace": "platform-role.repository:staffAssignments",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/platform-role.repository.ts",
+          "line": 22,
+          "operation": "createRecordStore",
+          "namespace": "platform-role.repository:staffAssignments",
+          "expression": "\"platform-role.repository:staffAssignments\""
+        }
+      ]
+    },
+    {
+      "namespace": "platform-snapshot.repository:store",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/platform-snapshot.repository.ts",
+          "line": 20,
+          "operation": "createRecordStore",
+          "namespace": "platform-snapshot.repository:store",
+          "expression": "\"platform-snapshot.repository:store\""
+        }
+      ]
+    },
+    {
+      "namespace": "pricing-rule.repository:feeStore",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/pricing-rule.repository.ts",
+          "line": 27,
+          "operation": "createRecordStore",
+          "namespace": "pricing-rule.repository:feeStore",
+          "expression": "\"pricing-rule.repository:feeStore\""
+        }
+      ]
+    },
+    {
+      "namespace": "pricing-rule.repository:seasonalStore",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/pricing-rule.repository.ts",
+          "line": 25,
+          "operation": "createRecordStore",
+          "namespace": "pricing-rule.repository:seasonalStore",
+          "expression": "\"pricing-rule.repository:seasonalStore\""
+        }
+      ]
+    },
+    {
+      "namespace": "pricing-rule.repository:tierStore",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/pricing-rule.repository.ts",
+          "line": 26,
+          "operation": "createRecordStore",
+          "namespace": "pricing-rule.repository:tierStore",
+          "expression": "\"pricing-rule.repository:tierStore\""
+        }
+      ]
+    },
+    {
+      "namespace": "promo-code.repository:promoStore",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/promo-code.repository.ts",
+          "line": 19,
+          "operation": "createRecordStore",
+          "namespace": "promo-code.repository:promoStore",
+          "expression": "\"promo-code.repository:promoStore\""
+        }
+      ]
+    },
+    {
+      "namespace": "public-booking:checkout",
+      "locations": [
+        {
+          "file": "apps/api/src/modules/public-booking/application/public-booking.service.ts",
+          "line": 29,
+          "operation": "createRecordStore",
+          "namespace": "public-booking:checkout",
+          "expression": "\"public-booking:checkout\""
+        }
+      ]
+    },
+    {
+      "namespace": "rate-plan.repository:assignmentStore",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/rate-plan.repository.ts",
+          "line": 41,
+          "operation": "createRecordStore",
+          "namespace": "rate-plan.repository:assignmentStore",
+          "expression": "\"rate-plan.repository:assignmentStore\""
+        }
+      ]
+    },
+    {
+      "namespace": "rate-plan.repository:planStore",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/rate-plan.repository.ts",
+          "line": 39,
+          "operation": "createRecordStore",
+          "namespace": "rate-plan.repository:planStore",
+          "expression": "\"rate-plan.repository:planStore\""
+        }
+      ]
+    },
+    {
+      "namespace": "rate-plan.repository:rateStore",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/rate-plan.repository.ts",
+          "line": 40,
+          "operation": "createRecordStore",
+          "namespace": "rate-plan.repository:rateStore",
+          "expression": "\"rate-plan.repository:rateStore\""
+        }
+      ]
+    },
+    {
+      "namespace": "record-number-sequences",
+      "locations": [
+        {
+          "file": "packages/database/src/record-store.ts",
+          "line": 108,
+          "operation": "createRecordStore",
+          "namespace": "record-number-sequences",
+          "expression": "\"record-number-sequences\""
+        }
+      ]
+    },
+    {
+      "namespace": "refund-obligation.repository:store",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/refund-obligation.repository.ts",
+          "line": 24,
+          "operation": "createRecordStore",
+          "namespace": "refund-obligation.repository:store",
+          "expression": "\"refund-obligation.repository:store\""
+        }
+      ]
+    },
+    {
+      "namespace": "refund.repository:store",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/refund.repository.ts",
+          "line": 18,
+          "operation": "createRecordStore",
+          "namespace": "refund.repository:store",
+          "expression": "\"refund.repository:store\""
+        }
+      ]
+    },
+    {
+      "namespace": "rental.repository:extensionStore",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/rental.repository.ts",
+          "line": 65,
+          "operation": "createRecordStore",
+          "namespace": "rental.repository:extensionStore",
+          "expression": "\"rental.repository:extensionStore\""
+        }
+      ]
+    },
+    {
+      "namespace": "rental.repository:finalCalculationStore",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/rental.repository.ts",
+          "line": 66,
+          "operation": "createRecordStore",
+          "namespace": "rental.repository:finalCalculationStore",
+          "expression": "\"rental.repository:finalCalculationStore\""
+        }
+      ]
+    },
+    {
+      "namespace": "rental.repository:rentalStore",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/rental.repository.ts",
+          "line": 60,
+          "operation": "createRecordStore",
+          "namespace": "rental.repository:rentalStore",
+          "expression": "\"rental.repository:rentalStore\""
+        }
+      ]
+    },
+    {
+      "namespace": "rental.repository:returnRecordStore",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/rental.repository.ts",
+          "line": 64,
+          "operation": "createRecordStore",
+          "namespace": "rental.repository:returnRecordStore",
+          "expression": "\"rental.repository:returnRecordStore\""
+        }
+      ]
+    },
+    {
+      "namespace": "rental.repository:sequenceStore",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/rental.repository.ts",
+          "line": 63,
+          "operation": "createRecordStore",
+          "namespace": "rental.repository:sequenceStore",
+          "expression": "\"rental.repository:sequenceStore\""
+        }
+      ]
+    },
+    {
+      "namespace": "rental.repository:startSnapshotStore",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/rental.repository.ts",
+          "line": 61,
+          "operation": "createRecordStore",
+          "namespace": "rental.repository:startSnapshotStore",
+          "expression": "\"rental.repository:startSnapshotStore\""
+        }
+      ]
+    },
+    {
+      "namespace": "rental.repository:statusHistoryStore",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/rental.repository.ts",
+          "line": 62,
+          "operation": "createRecordStore",
+          "namespace": "rental.repository:statusHistoryStore",
+          "expression": "\"rental.repository:statusHistoryStore\""
+        }
+      ]
+    },
+    {
+      "namespace": "report-execution.repository:store",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/report-execution.repository.ts",
+          "line": 28,
+          "operation": "createRecordStore",
+          "namespace": "report-execution.repository:store",
+          "expression": "\"report-execution.repository:store\""
+        }
+      ]
+    },
+    {
+      "namespace": "report-schedule.repository:store",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/report-schedule.repository.ts",
+          "line": 18,
+          "operation": "createRecordStore",
+          "namespace": "report-schedule.repository:store",
+          "expression": "\"report-schedule.repository:store\""
+        }
+      ]
+    },
+    {
+      "namespace": "reporting-projection.repository:store",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/reporting-projection.repository.ts",
+          "line": 18,
+          "operation": "createRecordStore",
+          "namespace": "reporting-projection.repository:store",
+          "expression": "\"reporting-projection.repository:store\""
+        }
+      ]
+    },
+    {
+      "namespace": "role.repository:roles",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/role.repository.ts",
+          "line": 31,
+          "operation": "createRecordStore",
+          "namespace": "role.repository:roles",
+          "expression": "\"role.repository:roles\""
+        }
+      ]
+    },
+    {
+      "namespace": "saas-billing-invoice.repository:lineItemsStore",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/saas-billing-invoice.repository.ts",
+          "line": 23,
+          "operation": "createRecordStore",
+          "namespace": "saas-billing-invoice.repository:lineItemsStore",
+          "expression": "\"saas-billing-invoice.repository:lineItemsStore\""
+        }
+      ]
+    },
+    {
+      "namespace": "saas-billing-invoice.repository:store",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/saas-billing-invoice.repository.ts",
+          "line": 22,
+          "operation": "createRecordStore",
+          "namespace": "saas-billing-invoice.repository:store",
+          "expression": "\"saas-billing-invoice.repository:store\""
+        }
+      ]
+    },
+    {
+      "namespace": "sales-quote.repository:quotes",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/sales-quote.repository.ts",
+          "line": 21,
+          "operation": "createRecordStore",
+          "namespace": "sales-quote.repository:quotes",
+          "expression": "\"sales-quote.repository:quotes\""
+        }
+      ]
+    },
+    {
+      "namespace": "sales-quote.repository:versions",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/sales-quote.repository.ts",
+          "line": 22,
+          "operation": "createRecordStore",
+          "namespace": "sales-quote.repository:versions",
+          "expression": "\"sales-quote.repository:versions\""
+        }
+      ]
+    },
+    {
+      "namespace": "saved-report.repository:store",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/saved-report.repository.ts",
+          "line": 17,
+          "operation": "createRecordStore",
+          "namespace": "saved-report.repository:store",
+          "expression": "\"saved-report.repository:store\""
+        }
+      ]
+    },
+    {
+      "namespace": "service-provider.repository:providers",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/service-provider.repository.ts",
+          "line": 22,
+          "operation": "createRecordStore",
+          "namespace": "service-provider.repository:providers",
+          "expression": "\"service-provider.repository:providers\""
+        }
+      ]
+    },
+    {
+      "namespace": "storage-reconciliation.repository:store",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/storage-reconciliation.repository.ts",
+          "line": 25,
+          "operation": "createRecordStore",
+          "namespace": "storage-reconciliation.repository:store",
+          "expression": "\"storage-reconciliation.repository:store\""
+        }
+      ]
+    },
+    {
+      "namespace": "subscription.repository:store",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/subscription.repository.ts",
+          "line": 18,
+          "operation": "createRecordStore",
+          "namespace": "subscription.repository:store",
+          "expression": "\"subscription.repository:store\""
+        }
+      ]
+    },
+    {
+      "namespace": "support-access-session.repository:sessions",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/support-access-session.repository.ts",
+          "line": 23,
+          "operation": "createRecordStore",
+          "namespace": "support-access-session.repository:sessions",
+          "expression": "\"support-access-session.repository:sessions\""
+        }
+      ]
+    },
+    {
+      "namespace": "tenant-entitlement.repository:store",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/tenant-entitlement.repository.ts",
+          "line": 16,
+          "operation": "createRecordStore",
+          "namespace": "tenant-entitlement.repository:store",
+          "expression": "\"tenant-entitlement.repository:store\""
+        }
+      ]
+    },
+    {
+      "namespace": "tenant-membership-role.repository:assignments",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/tenant-membership-role.repository.ts",
+          "line": 21,
+          "operation": "createRecordStore",
+          "namespace": "tenant-membership-role.repository:assignments",
+          "expression": "\"tenant-membership-role.repository:assignments\""
+        }
+      ]
+    },
+    {
+      "namespace": "tenant-membership.repository:store",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/tenant-membership.repository.ts",
+          "line": 20,
+          "operation": "createRecordStore",
+          "namespace": "tenant-membership.repository:store",
+          "expression": "\"tenant-membership.repository:store\""
+        }
+      ]
+    },
+    {
+      "namespace": "tenant-settings.repository:store",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/tenant-settings.repository.ts",
+          "line": 13,
+          "operation": "createRecordStore",
+          "namespace": "tenant-settings.repository:store",
+          "expression": "\"tenant-settings.repository:store\""
+        }
+      ]
+    },
+    {
+      "namespace": "tenant-website.repository:domains",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/tenant-website.repository.ts",
+          "line": 107,
+          "operation": "createRecordStore",
+          "namespace": "tenant-website.repository:domains",
+          "expression": "\"tenant-website.repository:domains\""
+        }
+      ]
+    },
+    {
+      "namespace": "tenant-website.repository:pages",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/tenant-website.repository.ts",
+          "line": 61,
+          "operation": "createRecordStore",
+          "namespace": "tenant-website.repository:pages",
+          "expression": "\"tenant-website.repository:pages\""
+        }
+      ]
+    },
+    {
+      "namespace": "tenant-website.repository:snapshots",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/tenant-website.repository.ts",
+          "line": 157,
+          "operation": "createRecordStore",
+          "namespace": "tenant-website.repository:snapshots",
+          "expression": "\"tenant-website.repository:snapshots\""
+        }
+      ]
+    },
+    {
+      "namespace": "tenant-website.repository:websites",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/tenant-website.repository.ts",
+          "line": 12,
+          "operation": "createRecordStore",
+          "namespace": "tenant-website.repository:websites",
+          "expression": "\"tenant-website.repository:websites\""
+        }
+      ]
+    },
+    {
+      "namespace": "tenant.repository:store",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/tenant.repository.ts",
+          "line": 20,
+          "operation": "createRecordStore",
+          "namespace": "tenant.repository:store",
+          "expression": "\"tenant.repository:store\""
+        }
+      ]
+    },
+    {
+      "namespace": "user.repository:membershipStore",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/user.repository.ts",
+          "line": 22,
+          "operation": "createRecordStore",
+          "namespace": "user.repository:membershipStore",
+          "expression": "\"user.repository:membershipStore\""
+        }
+      ]
+    },
+    {
+      "namespace": "user.repository:userStore",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/user.repository.ts",
+          "line": 21,
+          "operation": "createRecordStore",
+          "namespace": "user.repository:userStore",
+          "expression": "\"user.repository:userStore\""
+        }
+      ]
+    },
+    {
+      "namespace": "vehicle-allocation.repository:allocationStore",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/vehicle-allocation.repository.ts",
+          "line": 55,
+          "operation": "createRecordStore",
+          "namespace": "vehicle-allocation.repository:allocationStore",
+          "expression": "\"vehicle-allocation.repository:allocationStore\""
+        }
+      ]
+    },
+    {
+      "namespace": "vehicle-allocation.repository:holdStore",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/vehicle-allocation.repository.ts",
+          "line": 56,
+          "operation": "createRecordStore",
+          "namespace": "vehicle-allocation.repository:holdStore",
+          "expression": "\"vehicle-allocation.repository:holdStore\""
+        }
+      ]
+    },
+    {
+      "namespace": "vehicle-block.repository:blockStore",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/vehicle-block.repository.ts",
+          "line": 29,
+          "operation": "createRecordStore",
+          "namespace": "vehicle-block.repository:blockStore",
+          "expression": "\"vehicle-block.repository:blockStore\""
+        }
+      ]
+    },
+    {
+      "namespace": "vehicle-category.repository:categoryStore",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/vehicle-category.repository.ts",
+          "line": 15,
+          "operation": "createRecordStore",
+          "namespace": "vehicle-category.repository:categoryStore",
+          "expression": "\"vehicle-category.repository:categoryStore\""
+        }
+      ]
+    },
+    {
+      "namespace": "vehicle-document.repository:documentStore",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/vehicle-document.repository.ts",
+          "line": 17,
+          "operation": "createRecordStore",
+          "namespace": "vehicle-document.repository:documentStore",
+          "expression": "\"vehicle-document.repository:documentStore\""
+        }
+      ]
+    },
+    {
+      "namespace": "vehicle-media.repository:store",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/vehicle-media.repository.ts",
+          "line": 29,
+          "operation": "createRecordStore",
+          "namespace": "vehicle-media.repository:store",
+          "expression": "\"vehicle-media.repository:store\""
+        }
+      ]
+    },
+    {
+      "namespace": "vehicle-owner.repository:ownerStore",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/vehicle-owner.repository.ts",
+          "line": 21,
+          "operation": "createRecordStore",
+          "namespace": "vehicle-owner.repository:ownerStore",
+          "expression": "\"vehicle-owner.repository:ownerStore\""
+        }
+      ]
+    },
+    {
+      "namespace": "vehicle-ownership.repository:ownershipStore",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/vehicle-ownership.repository.ts",
+          "line": 30,
+          "operation": "createRecordStore",
+          "namespace": "vehicle-ownership.repository:ownershipStore",
+          "expression": "\"vehicle-ownership.repository:ownershipStore\""
+        }
+      ]
+    },
+    {
+      "namespace": "vehicle.repository:fuelStore",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/vehicle.repository.ts",
+          "line": 36,
+          "operation": "createRecordStore",
+          "namespace": "vehicle.repository:fuelStore",
+          "expression": "\"vehicle.repository:fuelStore\""
+        }
+      ]
+    },
+    {
+      "namespace": "vehicle.repository:mileageStore",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/vehicle.repository.ts",
+          "line": 35,
+          "operation": "createRecordStore",
+          "namespace": "vehicle.repository:mileageStore",
+          "expression": "\"vehicle.repository:mileageStore\""
+        }
+      ]
+    },
+    {
+      "namespace": "vehicle.repository:statusHistoryStore",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/vehicle.repository.ts",
+          "line": 37,
+          "operation": "createRecordStore",
+          "namespace": "vehicle.repository:statusHistoryStore",
+          "expression": "\"vehicle.repository:statusHistoryStore\""
+        }
+      ]
+    },
+    {
+      "namespace": "vehicle.repository:vehicleStore",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/vehicle.repository.ts",
+          "line": 34,
+          "operation": "createRecordStore",
+          "namespace": "vehicle.repository:vehicleStore",
+          "expression": "\"vehicle.repository:vehicleStore\""
+        }
+      ]
+    },
+    {
+      "namespace": "webhook.repository:store",
+      "locations": [
+        {
+          "file": "packages/database/src/repositories/webhook.repository.ts",
+          "line": 29,
+          "operation": "createRecordStore",
+          "namespace": "webhook.repository:store",
+          "expression": "\"webhook.repository:store\""
+        }
+      ]
+    }
+  ],
+  "unresolvedCalls": [],
+  "normalizedCutoverComplete": false,
+  "workflowCertification": "NOT_ASSESSED",
+  "launchCertification": "NOT_ASSESSED"
+}

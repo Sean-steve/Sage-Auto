@@ -1,0 +1,46 @@
+{
+  "targetDatabase": "sage_normalized_backfill_1794383379860_test",
+  "tenantId": "e9fd80e8-a12f-4b54-b287-20af71e6fc50",
+  "counts": {
+    "tenants": 1,
+    "customers": 1,
+    "vehicles": 1,
+    "bookings": 1,
+    "rentals": 1,
+    "invoices": 1,
+    "invoice_lines": 1,
+    "payments": 2,
+    "deposits": 1,
+    "refunds": 1,
+    "allocations": 2,
+    "source_archive": 12
+  },
+  "financial": {
+    "total": "4060.0000",
+    "amount_outstanding": "0.0000",
+    "held_amount": "0.0000",
+    "refunded_amount": "1000.0000",
+    "state": "COMPLETED",
+    "availability_status": "AVAILABLE"
+  },
+  "sourceDigest": "5a5d9e70b4c2c9a6738344f1c0e5b4fe128559d43758cbe036469917908c8fc5",
+  "sourceUnchanged": true,
+  "runtimeCutover": false,
+  "schemaTestExitCode": 0,
+  "chronologyRegression": [
+    {
+      "name": "rentals",
+      "code": 0,
+      "database": "sage_final_rentals_1794382938865"
+    }
+  ],
+  "typecheck": "PASS",
+  "build": "PASS",
+  "uiCompany": "Paid UI Certification V5 20261110",
+  "invoice": "INV-2026-001003",
+  "refund": "REF-2026-001003",
+  "fullStep2Certified": false,
+  "compatibilityTableRls": false,
+  "v5ApiRestartAndBrowserReload": "PASS",
+  "diffCheck": "PASS"
+}

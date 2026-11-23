@@ -115,4 +115,4 @@ for file in "${files[@]}"; do
   ((count+=1))
 done
 echo "Verified $count versioned SQL migrations against live PostgreSQL."
-echo "NOTE: The existing application repositories still use SQLite; schema migration is not application data integration."
+echo "Schema migrations verified. Application persistence requires RECORD_STORE_BACKEND=postgres and the same DATABASE_URL; this command does not certify workflows."

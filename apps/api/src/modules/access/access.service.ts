@@ -5,239 +5,345 @@ import { TENANT_SYSTEM_ROLES, PLATFORM_ROLES, accessSections } from '@carhire/co
 import type { AuthorizationModule } from '../authorization/authorization.module';
 import type { TenancyModule } from '../tenancy/tenancy.module';
 import type { IEmailDeliveryPort } from '../identity/domain/ports';
-
-export const fail = (message:string,statusCode=400):never => {throw Object.assign(new Error(message),{statusCode});};
-const now=()=>new Date().toISOString();
-const digest=(value:string)=>createHash('sha256').update(value).digest('hex');
-export type AccountState={intent?:'company'|'renter';site?:string;name?:string;companyName?:string;phone?:string;completedAt?:string};
-type Invitation={id:string;scope:'platform'|'tenant';tenantId?:string;email:string;role:string;linkedRecordId?:string;createdBy:string;tokenHash:string;expiresAt:string;status:'PENDING'|'ACCEPTED'|'REVOKED';delivery:'PENDING'|'SENT'|'FAILED';acceptedBy?:string;provisionedByPlatform?:boolean};
-type Link={userId:string;tenantId:string;kind:'RENTER'|'DRIVER'|'VEHICLE_OWNER';recordId?:string;phone?:string};
+export const fail = (message: string, statusCode = 400): never => { throw Object.assign(new Error(message), { statusCode }); };
+const now = () => new Date().toISOString();
+const digest = (value: string) => createHash('sha256').update(value).digest('hex');
+export type AccountState = {
+    intent?: 'company' | 'renter';
+    site?: string;
+    name?: string;
+    companyName?: string;
+    phone?: string;
+    completedAt?: string;
+};
+type Invitation = {
+    id: string;
+    scope: 'platform' | 'tenant';
+    tenantId?: string;
+    email: string;
+    role: string;
+    linkedRecordId?: string;
+    createdBy: string;
+    tokenHash: string;
+    expiresAt: string;
+    status: 'PENDING' | 'ACCEPTED' | 'REVOKED';
+    delivery: 'PENDING' | 'SENT' | 'FAILED';
+    acceptedBy?: string;
+    provisionedByPlatform?: boolean;
+};
+type Link = {
+    userId: string;
+    tenantId: string;
+    kind: 'RENTER' | 'DRIVER' | 'VEHICLE_OWNER';
+    recordId?: string;
+    phone?: string;
+};
 export class AccessService {
-  readonly accounts=createRecordStore<string,AccountState>('access:accounts');
-  readonly invitations=createRecordStore<string,Invitation>('access:invitations');
-  readonly links=createRecordStore<string,Link>('access:links');
-  readonly users=new UserRepository(); readonly tenants=new TenantRepository(); readonly memberships=new TenantMembershipRepository();
-  constructor(readonly authorization:AuthorizationModule,readonly tenancy:TenancyModule,readonly email:IEmailDeliveryPort) {}
-  async user(id:string,verified=false) {
-    const user=await this.users.findById(id);
-    if(!user || user.status!=='ACTIVE') return fail('Active account required',401);
-    if(verified && !user.emailVerified && !user.emailVerifiedAt) return fail('Verify your email before continuing',403);
-    return user;
-  }
-  async context(userId:string) {
-    const user=await this.user(userId); const portals:any[]=[];
-    const platform=await this.authorization.platformMembershipRepository.findByUserId(userId);
-    if(platform?.status==='ACTIVE' && user.isPlatformStaff) {
-      const roles=await this.authorization.platformRoleRepository.getRolesForStaff(platform.id);
-      const permissions=await this.authorization.platformRoleRepository.getPermissionsForStaff(platform.id);
-      portals.push({id:'platform',kind:'platform',name:'Car Hire OS',roles:roles.map(r=>r.code),permissions,sections:accessSections(roles.map(r=>r.code),permissions)});
+    readonly accounts = createRecordStore<string, AccountState>('access:accounts');
+    readonly invitations = createRecordStore<string, Invitation>('access:invitations');
+    readonly links = createRecordStore<string, Link>('access:links');
+    readonly users = new UserRepository();
+    readonly tenants = new TenantRepository();
+    readonly memberships = new TenantMembershipRepository();
+    constructor(readonly authorization: AuthorizationModule, readonly tenancy: TenancyModule, readonly email: IEmailDeliveryPort) { }
+    async user(id: string, verified = false) {
+        const user = await this.users.findById(id);
+        if (!user || user.status !== 'ACTIVE')
+            return fail('Active account required', 401);
+        if (verified && !user.emailVerified && !user.emailVerifiedAt)
+            return fail('Verify your email before continuing', 403);
+        return user;
     }
-    for(const membership of await this.memberships.listByUserId(userId)) {
-      if(membership.status!=='ACTIVE') continue;
-      try {
-        const context=await this.tenancy.resolverService.resolveContext(userId,membership.tenantId);
-        portals.push({id:membership.tenantId,kind:'tenant',name:context.tenantName,tenantId:membership.tenantId,roles:context.roles,permissions:context.permissions,sections:accessSections(context.roles,context.permissions)});
-      } catch { /* An inactive company is never an accessible portal. */ }
+    async context(userId: string) {
+        const user = await this.user(userId);
+        const portals: any[] = [];
+        const platform = await this.authorization.platformMembershipRepository.findByUserId(userId);
+        if (platform?.status === 'ACTIVE' && user.isPlatformStaff) {
+            const roles = await this.authorization.platformRoleRepository.getRolesForStaff(platform.id);
+            const permissions = await this.authorization.platformRoleRepository.getPermissionsForStaff(platform.id);
+            portals.push({ id: 'platform', kind: 'platform', name: 'Car Hire OS', roles: roles.map(r => r.code), permissions, sections: accessSections(roles.map(r => r.code), permissions) });
+        }
+        for (const membership of await this.memberships.listByUserId(userId)) {
+            if (membership.status !== 'ACTIVE')
+                continue;
+            try {
+                const context = await this.tenancy.resolverService.resolveContext(userId, membership.tenantId);
+                portals.push({ id: membership.tenantId, kind: 'tenant', name: context.tenantName, tenantId: membership.tenantId, roles: context.roles, permissions: context.permissions, sections: accessSections(context.roles, context.permissions) });
+            }
+            catch { /* An inactive company is never an accessible portal. */ }
+        }
+        for (const link of (await this.links.values()))
+            if (link.userId === userId && link.kind === 'RENTER') {
+                const tenant = await this.tenants.findById(link.tenantId);
+                const website = await new InMemoryTenantWebsiteRepository().findByTenantId(link.tenantId);
+                if (tenant?.status === 'ACTIVE')
+                    portals.push({ id: `renter:${tenant.id}`, tenantId: tenant.id, kind: 'renter', site: website?.subdomain || tenant.slug, name: tenant.name, roles: ['RENTER'], permissions: [], sections: accessSections(['RENTER'], []) });
+            }
+        return { reviewMode: process.env.ACCESS_REVIEW_MODE === 'true' && !['production', 'staging'].includes(process.env.NODE_ENV || ''), user: { id: user.id, email: user.email, fullName: user.fullName, emailVerified: Boolean(user.emailVerified || user.emailVerifiedAt) }, onboarding: (await this.accounts.get(userId)) || {}, portals };
     }
-    for(const link of this.links.values()) if(link.userId===userId && link.kind==='RENTER') {
-      const tenant=await this.tenants.findById(link.tenantId);
-      const website=await new InMemoryTenantWebsiteRepository().findByTenantId(link.tenantId);
-      if(tenant?.status==='ACTIVE') portals.push({id:`renter:${tenant.id}`,tenantId:tenant.id,kind:'renter',site:website?.subdomain||tenant.slug,name:tenant.name,roles:['RENTER'],permissions:[],sections:accessSections(['RENTER'],[])});
+    async portal(userId: string, id: string) {
+        await this.user(userId, true);
+        return (await this.context(userId)).portals.find(p => p.id === id) || fail('This portal is not available to your account', 403);
     }
-    return {reviewMode:process.env.ACCESS_REVIEW_MODE==='true' && !['production','staging'].includes(process.env.NODE_ENV||''),user:{id:user.id,email:user.email,fullName:user.fullName,emailVerified:Boolean(user.emailVerified||user.emailVerifiedAt)},onboarding:this.accounts.get(userId)||{},portals};
-  }
-  async portal(userId:string,id:string) {
-    await this.user(userId,true);
-    return (await this.context(userId)).portals.find(p=>p.id===id) || fail('This portal is not available to your account',403);
-  }
-  /**
-   * Authoritative independent vehicle-owner identity: server verified membership,
-   * active external-owner role, currently linked record and tenant-bound active
-   * owner profile. Neither request owner IDs nor matching emails confer access.
-   */
-  async vehicleOwnerSelf(userId:string,tenantId:string) {
-    if(!tenantId) return fail('Select a rental company workspace',400);
-    const portal=await this.portal(userId,tenantId);
-    if(portal.kind!=='tenant'||portal.tenantId!==tenantId||!portal.roles.includes('VEHICLE_OWNER')) {
-      return fail('An active Vehicle Owner workspace is required',403);
+    /**
+     * Authoritative independent vehicle-owner identity: server verified membership,
+     * active external-owner role, currently linked record and tenant-bound active
+     * owner profile. Neither request owner IDs nor matching emails confer access.
+     */
+    async vehicleOwnerSelf(userId: string, tenantId: string) {
+        if (!tenantId)
+            return fail('Select a rental company workspace', 400);
+        const portal = await this.portal(userId, tenantId);
+        if (portal.kind !== 'tenant' || portal.tenantId !== tenantId || !portal.roles.includes('VEHICLE_OWNER')) {
+            return fail('An active Vehicle Owner workspace is required', 403);
+        }
+        const linked = (await this.links.get(`${userId}:${tenantId}:VEHICLE_OWNER`));
+        if (!linked?.recordId)
+            return fail('Your company has not connected an owner record to this account', 403);
+        let owner;
+        try {
+            owner = await new VehicleOwnerRepository().findById(linked.recordId, tenantId);
+        }
+        catch {
+            return fail('Your owner record is not available in this company', 403);
+        }
+        if (!owner || owner.status !== 'ACTIVE')
+            return fail('A linked active owner profile is required', 403);
+        const tenant = await this.tenants.findById(tenantId);
+        if (!tenant || tenant.status !== 'ACTIVE')
+            return fail('Rental company is not active', 403);
+        return { tenantId, owner, tenant };
     }
-    const linked=this.links.get(`${userId}:${tenantId}:VEHICLE_OWNER`);
-    if(!linked?.recordId) return fail('Your company has not connected an owner record to this account',403);
-    let owner;
-    try { owner=await new VehicleOwnerRepository().findById(linked.recordId,tenantId); }
-    catch {return fail('Your owner record is not available in this company',403);}
-    if(!owner || owner.status!=='ACTIVE')return fail('A linked active owner profile is required',403);
-    const tenant=await this.tenants.findById(tenantId);
-    if(!tenant||tenant.status!=='ACTIVE')return fail('Rental company is not active',403);
-    return {tenantId,owner,tenant};
-  }
-
-  async saveProfile(userId:string,data:AccountState) {
-    await this.user(userId);
-    const saved={...this.accounts.get(userId),...data}; this.accounts.set(userId,saved); return saved;
-  }
-  async complete(userId:string) {
-    return withRecordTransaction(()=>this.completeRecords(userId));
-  }
-  private async completeRecords(userId:string) {
-    const user=await this.user(userId,true), state=this.accounts.get(userId)||{};
-    if(state.intent==='renter') {
-      const website=await new InMemoryTenantWebsiteRepository().findBySubdomain(state.site||'');
-      const tenant=website?await this.tenants.findById(website.tenantId):await this.tenants.findBySlug(state.site||'');
-      if(!tenant || tenant.status!=='ACTIVE') return fail('Rental company not found',404);
-      const key=`${userId}:${tenant.id}:RENTER`;
-      if(!this.links.has(key)) this.links.set(key,{userId,tenantId:tenant.id,kind:'RENTER',phone:state.phone});
-    } else if(state.intent==='company') {
-      // A retry resumes the existing owned workspace instead of provisioning another.
-      const existing=(await this.memberships.listByUserId(userId)).find(m=>m.role==='COMPANY_OWNER'&&m.status==='ACTIVE');
-      if(!existing) await this.tenancy.provisioningService.provisionTenant(userId,{name:state.companyName||'',slug:(state.companyName||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')});
-    } else return fail('Choose a company or renter account first');
-    this.accounts.set(userId,{...state,completedAt:now()}); return this.context(userId);
-  }
-  async canInvite(userId:string,scope:'platform'|'tenant',tenantId?:string,role?:string) {
-    const portal=await this.portal(userId,scope==='platform'?'platform':tenantId||'');
-    if(scope==='platform') {
-      if(!portal.roles.some((r:string)=>['PLATFORM_OWNER','PLATFORM_ADMIN'].includes(r))) return fail('Staff administration access required',403);
-      if(role==='PLATFORM_OWNER') return fail('Platform ownership cannot be granted by invitation',403);
-      if(role && !PLATFORM_ROLES[role]) return fail('Unknown platform role');
-    } else {
-      if(!portal.roles.some((r:string)=>['COMPANY_OWNER','TENANT_ADMIN'].includes(r))) return fail('Company administrator access required',403);
-      if(role && !TENANT_SYSTEM_ROLES[role]) return fail('Unknown company role');
-      if(role==='COMPANY_OWNER' && !portal.roles.includes('COMPANY_OWNER')) return fail('Only a company owner can invite another owner',403);
+    async saveProfile(userId: string, data: AccountState) {
+        await this.user(userId);
+        const saved = { ...(await this.accounts.get(userId)), ...data };
+        (await this.accounts.set(userId, saved));
+        return saved;
     }
-    return portal;
-  }
-  async validateLink(tenantId:string,role:string,recordId?:string|null) {
-    if(!recordId) return;
-    if(!['DRIVER','VEHICLE_OWNER'].includes(role)) return fail('Only drivers and vehicle owners can have a linked record');
-    let record;
-    try {record=role==='DRIVER'?await new DriverRepository().findById(recordId,tenantId):await new VehicleOwnerRepository().findById(recordId,tenantId);}
-    catch(error) {if(error instanceof CrossTenantViolationError) return fail('Linked record not found in this company',404);throw error;}
-    if(!record) return fail('Linked record not found in this company',404);
-  }
-  async invite(userId:string,data:{scope:'platform'|'tenant';tenantId?:string;email:string;role:string;linkedRecordId?:string}) {
-    await this.canInvite(userId,data.scope,data.tenantId,data.role);
-    await this.validateLink(data.tenantId||'',data.role,data.linkedRecordId);
-    const invitation:Invitation={...data,email:data.email.trim().toLowerCase(),id:crypto.randomUUID(),createdBy:userId,tokenHash:'',expiresAt:now(),status:'PENDING',delivery:'PENDING'};
-    this.invitations.set(invitation.id,invitation); return this.deliver(invitation);
-  }
-  /**
-   * Only a verified platform provisioner may bootstrap the FIRST owner of a
-   * newly provisioned, unclaimed tenant. Normal tenant invitations still
-   * require an existing company owner and cannot use this exception.
-   */
-  async requireProvisioningAuthority(userId:string,tenantId:string) {
-    const portal=await this.portal(userId,'platform');
-    if(!portal.permissions.includes('*')&&!portal.permissions.includes('platform.tenant.provision')) {
-      return fail('Tenant provisioning permission required',403);
+    async complete(userId: string) {
+        return withRecordTransaction(() => this.completeRecords(userId));
     }
-    const tenant=await this.tenants.findById(tenantId);
-    if(!tenant || tenant.status!=='ACTIVE') return fail('Provisioned company is not active',403);
-    const memberships=await this.memberships.listByTenantId(tenantId);
-    if(memberships.length>0) return fail('Initial owner invitation is only allowed before company membership activation',409);
-  }
-  async inviteProvisionedOwner(userId:string,tenantId:string,email:string) {
-    await this.requireProvisioningAuthority(userId,tenantId);
-    const normalized=email?.trim().toLowerCase();
-    if(!normalized || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized))return fail('A valid nominated company owner email is required');
-    if([...this.invitations.values()].some(i=>i.provisionedByPlatform&&i.tenantId===tenantId&&i.status!=='REVOKED')) {
-      return fail('This company already has an initial owner invitation',409);
+    private async completeRecords(userId: string) {
+        const user = await this.user(userId, true), state = (await this.accounts.get(userId)) || {};
+        if (state.intent === 'renter') {
+            const website = await new InMemoryTenantWebsiteRepository().findBySubdomain(state.site || '');
+            const tenant = website ? await this.tenants.findById(website.tenantId) : await this.tenants.findBySlug(state.site || '');
+            if (!tenant || tenant.status !== 'ACTIVE')
+                return fail('Rental company not found', 404);
+            const key = `${userId}:${tenant.id}:RENTER`;
+            if (!(await this.links.has(key)))
+                (await this.links.set(key, { userId, tenantId: tenant.id, kind: 'RENTER', phone: state.phone }));
+        }
+        else if (state.intent === 'company') {
+            // A retry resumes the existing owned workspace instead of provisioning another.
+            const existing = (await this.memberships.listByUserId(userId)).find(m => m.role === 'COMPANY_OWNER' && m.status === 'ACTIVE');
+            if (!existing)
+                await this.tenancy.provisioningService.provisionTenant(userId, { name: state.companyName || '', slug: (state.companyName || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') });
+        }
+        else
+            return fail('Choose a company or renter account first');
+        (await this.accounts.set(userId, { ...state, completedAt: now() }));
+        return this.context(userId);
     }
-    if(!claimRecord('access:provisioned-owner-claims',tenantId,{email:normalized,createdBy:userId})) {
-      return fail('Initial company owner is already nominated',409);
+    async canInvite(userId: string, scope: 'platform' | 'tenant', tenantId?: string, role?: string) {
+        const portal = await this.portal(userId, scope === 'platform' ? 'platform' : tenantId || '');
+        if (scope === 'platform') {
+            if (!portal.roles.some((r: string) => ['PLATFORM_OWNER', 'PLATFORM_ADMIN'].includes(r)))
+                return fail('Staff administration access required', 403);
+            if (role === 'PLATFORM_OWNER')
+                return fail('Platform ownership cannot be granted by invitation', 403);
+            if (role && !PLATFORM_ROLES[role])
+                return fail('Unknown platform role');
+        }
+        else {
+            if (!portal.roles.some((r: string) => ['COMPANY_OWNER', 'TENANT_ADMIN'].includes(r)))
+                return fail('Company administrator access required', 403);
+            if (role && !TENANT_SYSTEM_ROLES[role])
+                return fail('Unknown company role');
+            if (role === 'COMPANY_OWNER' && !portal.roles.includes('COMPANY_OWNER'))
+                return fail('Only a company owner can invite another owner', 403);
+        }
+        return portal;
     }
-    const invitation:Invitation={id:crypto.randomUUID(),scope:'tenant',tenantId,email:normalized,role:'COMPANY_OWNER',createdBy:userId,
-      tokenHash:'',expiresAt:now(),status:'PENDING',delivery:'PENDING',provisionedByPlatform:true};
-    this.invitations.set(invitation.id,invitation);
-    return this.deliver(invitation);
-  }
-  async getProvisionedOwnerInvitation(userId:string,tenantId:string) {
-    const portal=await this.portal(userId,'platform');
-    if(!portal.permissions.includes('*')&&!portal.permissions.includes('platform.tenant.read')) {
-      return fail('Platform tenant read permission required',403);
+    async validateLink(tenantId: string, role: string, recordId?: string | null) {
+        if (!recordId)
+            return;
+        if (!['DRIVER', 'VEHICLE_OWNER'].includes(role))
+            return fail('Only drivers and vehicle owners can have a linked record');
+        let record;
+        try {
+            record = role === 'DRIVER' ? await new DriverRepository().findById(recordId, tenantId) : await new VehicleOwnerRepository().findById(recordId, tenantId);
+        }
+        catch (error) {
+            if (error instanceof CrossTenantViolationError)
+                return fail('Linked record not found in this company', 404);
+            throw error;
+        }
+        if (!record)
+            return fail('Linked record not found in this company', 404);
     }
-    const tenant=await this.tenants.findById(tenantId);
-    if(!tenant)return fail('Company not found',404);
-    const invite=[...this.invitations.values()].find(i=>i.provisionedByPlatform&&i.tenantId===tenantId);
-    return invite?{id:invite.id,status:invite.status,delivery:invite.delivery,email:invite.email,expiresAt:invite.expiresAt,acceptedBy:invite.acceptedBy}:{status:'NOT_ISSUED'};
-  }
-  async retryProvisionedOwnerInvitation(userId:string,tenantId:string) {
-    await this.requireProvisioningAuthority(userId,tenantId);
-    const pending=[...this.invitations.values()].find(i=>i.provisionedByPlatform&&i.tenantId===tenantId&&i.status==='PENDING');
-    if(!pending) return fail('No pending initial owner invitation exists',404);
-    return this.deliver(pending);
-  }
-    async deliver(invitation:Invitation) {
-    const token=randomBytes(32).toString('hex');
-    const updated={...invitation,tokenHash:digest(token),expiresAt:new Date(Date.now()+72*3600000).toISOString(),delivery:'PENDING' as const};
-    this.invitations.set(updated.id,updated);
-    try {
-      await this.email.sendInvitationEmail(updated.email,token);
-      const current=this.invitations.get(updated.id);
-      if(current?.tokenHash===updated.tokenHash) this.invitations.set(updated.id,{...current,delivery:'SENT'});
-    } catch(error) {const current=this.invitations.get(updated.id);if(current?.tokenHash===updated.tokenHash) this.invitations.set(updated.id,{...current,delivery:'FAILED'});throw error;}
-    return this.safe(this.invitations.get(updated.id)!);
-  }
-  safe(invitation:Invitation) {const {tokenHash,...safe}=invitation;return safe;}
-  async listInvitations(userId:string,scope:'platform'|'tenant',tenantId?:string) {
-    await this.canInvite(userId,scope,tenantId);
-    return [...this.invitations.values()].filter(i=>i.scope===scope&&i.tenantId===tenantId).map(i=>this.safe(i));
-  }
-  async changeInvitation(userId:string,id:string,action:'revoke'|'resend') {
-    let invitation=this.invitations.get(id) || fail('Invitation not found',404);
-    if(invitation.provisionedByPlatform) await this.requireProvisioningAuthority(userId,invitation.tenantId!);
-    else await this.canInvite(userId,invitation.scope,invitation.tenantId,invitation.role);
-    invitation=this.invitations.get(id) || fail('Invitation not found',404);
-    if(invitation.status!=='PENDING') return fail('Invitation is no longer pending',409);
-    if(action==='resend') return this.deliver(invitation);
-    this.invitations.set(id,{...invitation,status:'REVOKED'});return {status:'REVOKED'};
-  }
-  inspect(token:string) {
-    const invitation=[...this.invitations.values()].find(i=>i.tokenHash===digest(token));
-    if(!invitation||invitation.status!=='PENDING'||Date.parse(invitation.expiresAt)<=Date.now()) return fail('Invitation is invalid or expired',410);
-    return invitation;
-  }
-  async accept(userId:string,token:string) {
-    return withRecordTransaction(()=>this.acceptRecords(userId,token));
-  }
-  private async acceptRecords(userId:string,token:string) {
-    const user=await this.user(userId,true); const invitation=this.inspect(token);
-    if(user.email.trim().toLowerCase()!==invitation.email) return fail('Sign in with the invited email address',403);
-    // Recheck the inviter: revoked administrators cannot leave live privilege grants.
-    if(invitation.provisionedByPlatform) {
-      if(invitation.scope!=='tenant'||invitation.role!=='COMPANY_OWNER'||!invitation.tenantId) return fail('Invalid initial owner invitation',403);
-      await this.requireProvisioningAuthority(invitation.createdBy,invitation.tenantId);
-    } else await this.canInvite(invitation.createdBy,invitation.scope,invitation.tenantId,invitation.role);
-    // Re-read after authorization awaits: revoke/resend may have invalidated this token.
-    this.inspect(token);
-    const existing=invitation.scope==='platform'
-      ? await this.authorization.platformMembershipRepository.findByUserId(userId)
-      : await this.memberships.findByTenantAndUser(invitation.tenantId!,userId);
-    if(existing) return fail('This user already has a membership in this workspace',409);
-    this.inspect(token);
-    if(!claimRecord('access:invitation-claims',invitation.tokenHash,{userId})) return fail('Invitation already used; contact the administrator if onboarding was interrupted',409);
-    if(invitation.scope==='platform') {
-      const membership=await this.authorization.platformMembershipRepository.create({userId,role:invitation.role as any,status:'ACTIVE',email:user.email,name:user.fullName,permissions:[]});
-      await this.authorization.platformRoleRepository.assignRoleToStaff(membership.id,invitation.role,invitation.createdBy);
-      await this.users.setPlatformStaff(userId,true);
-    } else {
-      const tenantId=invitation.tenantId!;
-      const membership=await this.memberships.create({userId,tenantId,role:invitation.role,status:'ACTIVE'});
-      await this.authorization.membershipRoleRepository.assignRole(tenantId,membership.id,`sys-role-${invitation.role.toLowerCase()}`,invitation.createdBy);
-      if(['DRIVER','VEHICLE_OWNER'].includes(invitation.role)) this.links.set(`${userId}:${tenantId}:${invitation.role}`,{userId,tenantId,kind:invitation.role as Link['kind'],recordId:invitation.linkedRecordId});
+    async invite(userId: string, data: {
+        scope: 'platform' | 'tenant';
+        tenantId?: string;
+        email: string;
+        role: string;
+        linkedRecordId?: string;
+    }) {
+        await this.canInvite(userId, data.scope, data.tenantId, data.role);
+        await this.validateLink(data.tenantId || '', data.role, data.linkedRecordId);
+        const invitation: Invitation = { ...data, email: data.email.trim().toLowerCase(), id: crypto.randomUUID(), createdBy: userId, tokenHash: '', expiresAt: now(), status: 'PENDING', delivery: 'PENDING' };
+        (await this.invitations.set(invitation.id, invitation));
+        return this.deliver(invitation);
     }
-    this.invitations.set(invitation.id,{...invitation,status:'ACCEPTED',acceptedBy:userId});return this.context(userId);
-  }
-  async bootstrap(userId:string,secret:string) {
-    return withRecordTransaction(()=>this.bootstrapRecords(userId,secret));
-  }
-  private async bootstrapRecords(userId:string,secret:string) {
-    const user=await this.user(userId,true),expected=process.env.PLATFORM_SETUP_TOKEN;
-    if(!expected||expected.length<32||Buffer.byteLength(secret)!==Buffer.byteLength(expected)||!timingSafeEqual(Buffer.from(secret),Buffer.from(expected))) return fail('Platform setup is unavailable or the setup key is invalid',403);
-    if((await this.authorization.platformMembershipRepository.listAll()).some(m=>m.role==='PLATFORM_OWNER'&&m.status==='ACTIVE')) return fail('Platform ownership is already established',409);
-    if(!claimRecord('access:setup','platform-owner',{userId})) return fail('Platform setup has already been claimed',409);
-    const membership=await this.authorization.platformMembershipRepository.create({userId,role:'PLATFORM_OWNER',status:'ACTIVE',email:user.email,name:user.fullName,permissions:[]});
-    await this.authorization.platformRoleRepository.assignRoleToStaff(membership.id,'PLATFORM_OWNER',userId);
-    await this.users.setPlatformStaff(userId,true);return this.context(userId);
-  }
+    /**
+     * Only a verified platform provisioner may bootstrap the FIRST owner of a
+     * newly provisioned, unclaimed tenant. Normal tenant invitations still
+     * require an existing company owner and cannot use this exception.
+     */
+    async requireProvisioningAuthority(userId: string, tenantId: string) {
+        const portal = await this.portal(userId, 'platform');
+        if (!portal.permissions.includes('*') && !portal.permissions.includes('platform.tenant.provision')) {
+            return fail('Tenant provisioning permission required', 403);
+        }
+        const tenant = await this.tenants.findById(tenantId);
+        if (!tenant || tenant.status !== 'ACTIVE')
+            return fail('Provisioned company is not active', 403);
+        const memberships = await this.memberships.listByTenantId(tenantId);
+        if (memberships.length > 0)
+            return fail('Initial owner invitation is only allowed before company membership activation', 409);
+    }
+    async inviteProvisionedOwner(userId: string, tenantId: string, email: string) {
+        await this.requireProvisioningAuthority(userId, tenantId);
+        const normalized = email?.trim().toLowerCase();
+        if (!normalized || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized))
+            return fail('A valid nominated company owner email is required');
+        if ([...(await this.invitations.values())].some(i => i.provisionedByPlatform && i.tenantId === tenantId && i.status !== 'REVOKED')) {
+            return fail('This company already has an initial owner invitation', 409);
+        }
+        if (!(await claimRecord('access:provisioned-owner-claims', tenantId, { email: normalized, createdBy: userId }))) {
+            return fail('Initial company owner is already nominated', 409);
+        }
+        const invitation: Invitation = { id: crypto.randomUUID(), scope: 'tenant', tenantId, email: normalized, role: 'COMPANY_OWNER', createdBy: userId,
+            tokenHash: '', expiresAt: now(), status: 'PENDING', delivery: 'PENDING', provisionedByPlatform: true };
+        (await this.invitations.set(invitation.id, invitation));
+        return this.deliver(invitation);
+    }
+    async getProvisionedOwnerInvitation(userId: string, tenantId: string) {
+        const portal = await this.portal(userId, 'platform');
+        if (!portal.permissions.includes('*') && !portal.permissions.includes('platform.tenant.read')) {
+            return fail('Platform tenant read permission required', 403);
+        }
+        const tenant = await this.tenants.findById(tenantId);
+        if (!tenant)
+            return fail('Company not found', 404);
+        const invite = [...(await this.invitations.values())].find(i => i.provisionedByPlatform && i.tenantId === tenantId);
+        return invite ? { id: invite.id, status: invite.status, delivery: invite.delivery, email: invite.email, expiresAt: invite.expiresAt, acceptedBy: invite.acceptedBy } : { status: 'NOT_ISSUED' };
+    }
+    async retryProvisionedOwnerInvitation(userId: string, tenantId: string) {
+        await this.requireProvisioningAuthority(userId, tenantId);
+        const pending = [...(await this.invitations.values())].find(i => i.provisionedByPlatform && i.tenantId === tenantId && i.status === 'PENDING');
+        if (!pending)
+            return fail('No pending initial owner invitation exists', 404);
+        return this.deliver(pending);
+    }
+    async deliver(invitation: Invitation) {
+        const token = randomBytes(32).toString('hex');
+        const updated = { ...invitation, tokenHash: digest(token), expiresAt: new Date(Date.now() + 72 * 3600000).toISOString(), delivery: 'PENDING' as const };
+        (await this.invitations.set(updated.id, updated));
+        try {
+            await this.email.sendInvitationEmail(updated.email, token);
+            const current = (await this.invitations.get(updated.id));
+            if (current?.tokenHash === updated.tokenHash)
+                (await this.invitations.set(updated.id, { ...current, delivery: 'SENT' }));
+        }
+        catch (error) {
+            const current = (await this.invitations.get(updated.id));
+            if (current?.tokenHash === updated.tokenHash)
+                (await this.invitations.set(updated.id, { ...current, delivery: 'FAILED' }));
+            throw error;
+        }
+        return this.safe((await this.invitations.get(updated.id))!);
+    }
+    safe(invitation: Invitation) { const { tokenHash, ...safe } = invitation; return safe; }
+    async listInvitations(userId: string, scope: 'platform' | 'tenant', tenantId?: string) {
+        await this.canInvite(userId, scope, tenantId);
+        return [...(await this.invitations.values())].filter(i => i.scope === scope && i.tenantId === tenantId).map(i => this.safe(i));
+    }
+    async changeInvitation(userId: string, id: string, action: 'revoke' | 'resend') {
+        let invitation = (await this.invitations.get(id)) || fail('Invitation not found', 404);
+        if (invitation.provisionedByPlatform)
+            await this.requireProvisioningAuthority(userId, invitation.tenantId!);
+        else
+            await this.canInvite(userId, invitation.scope, invitation.tenantId, invitation.role);
+        invitation = (await this.invitations.get(id)) || fail('Invitation not found', 404);
+        if (invitation.status !== 'PENDING')
+            return fail('Invitation is no longer pending', 409);
+        if (action === 'resend')
+            return this.deliver(invitation);
+        (await this.invitations.set(id, { ...invitation, status: 'REVOKED' }));
+        return { status: 'REVOKED' };
+    }
+    async inspect(token: string) {
+        const invitation = [...(await this.invitations.values())].find(i => i.tokenHash === digest(token));
+        if (!invitation || invitation.status !== 'PENDING' || Date.parse(invitation.expiresAt) <= Date.now())
+            return fail('Invitation is invalid or expired', 410);
+        return invitation;
+    }
+    async accept(userId: string, token: string) {
+        return withRecordTransaction(() => this.acceptRecords(userId, token));
+    }
+    private async acceptRecords(userId: string, token: string) {
+        const user = await this.user(userId, true);
+        const invitation = (await this.inspect(token));
+        if (user.email.trim().toLowerCase() !== invitation.email)
+            return fail('Sign in with the invited email address', 403);
+        // Recheck the inviter: revoked administrators cannot leave live privilege grants.
+        if (invitation.provisionedByPlatform) {
+            if (invitation.scope !== 'tenant' || invitation.role !== 'COMPANY_OWNER' || !invitation.tenantId)
+                return fail('Invalid initial owner invitation', 403);
+            await this.requireProvisioningAuthority(invitation.createdBy, invitation.tenantId);
+        }
+        else
+            await this.canInvite(invitation.createdBy, invitation.scope, invitation.tenantId, invitation.role);
+        // Re-read after authorization awaits: revoke/resend may have invalidated this token.
+        (await this.inspect(token));
+        const existing = invitation.scope === 'platform'
+            ? await this.authorization.platformMembershipRepository.findByUserId(userId)
+            : await this.memberships.findByTenantAndUser(invitation.tenantId!, userId);
+        if (existing)
+            return fail('This user already has a membership in this workspace', 409);
+        (await this.inspect(token));
+        if (!(await claimRecord('access:invitation-claims', invitation.tokenHash, { userId })))
+            return fail('Invitation already used; contact the administrator if onboarding was interrupted', 409);
+        if (invitation.scope === 'platform') {
+            const membership = await this.authorization.platformMembershipRepository.create({ userId, role: invitation.role as any, status: 'ACTIVE', email: user.email, name: user.fullName, permissions: [] });
+            await this.authorization.platformRoleRepository.assignRoleToStaff(membership.id, invitation.role, invitation.createdBy);
+            await this.users.setPlatformStaff(userId, true);
+        }
+        else {
+            const tenantId = invitation.tenantId!;
+            const membership = await this.memberships.create({ userId, tenantId, role: invitation.role, status: 'ACTIVE' });
+            await this.authorization.membershipRoleRepository.assignRole(tenantId, membership.id, `sys-role-${invitation.role.toLowerCase()}`, invitation.createdBy);
+            if (['DRIVER', 'VEHICLE_OWNER'].includes(invitation.role))
+                (await this.links.set(`${userId}:${tenantId}:${invitation.role}`, { userId, tenantId, kind: invitation.role as Link['kind'], recordId: invitation.linkedRecordId }));
+        }
+        (await this.invitations.set(invitation.id, { ...invitation, status: 'ACCEPTED', acceptedBy: userId }));
+        return this.context(userId);
+    }
+    async bootstrap(userId: string, secret: string) {
+        return withRecordTransaction(() => this.bootstrapRecords(userId, secret));
+    }
+    private async bootstrapRecords(userId: string, secret: string) {
+        const user = await this.user(userId, true), expected = process.env.PLATFORM_SETUP_TOKEN;
+        if (!expected || expected.length < 32 || Buffer.byteLength(secret) !== Buffer.byteLength(expected) || !timingSafeEqual(Buffer.from(secret), Buffer.from(expected)))
+            return fail('Platform setup is unavailable or the setup key is invalid', 403);
+        if ((await this.authorization.platformMembershipRepository.listAll()).some(m => m.role === 'PLATFORM_OWNER' && m.status === 'ACTIVE'))
+            return fail('Platform ownership is already established', 409);
+        if (!(await claimRecord('access:setup', 'platform-owner', { userId })))
+            return fail('Platform setup has already been claimed', 409);
+        const membership = await this.authorization.platformMembershipRepository.create({ userId, role: 'PLATFORM_OWNER', status: 'ACTIVE', email: user.email, name: user.fullName, permissions: [] });
+        await this.authorization.platformRoleRepository.assignRoleToStaff(membership.id, 'PLATFORM_OWNER', userId);
+        await this.users.setPlatformStaff(userId, true);
+        return this.context(userId);
+    }
 }

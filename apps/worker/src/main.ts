@@ -16,7 +16,7 @@ export async function bootstrap(): Promise<{ manager: WorkerManager; healthServe
     throw new Error("Local payment simulation cannot run in production or staging.");
   }
   console.log(`[Worker] Local payment simulation: ${localPayments?"ENABLED (SIMULATED MONEY ONLY)":"DISABLED"}`);
-  if(localPayments)console.log(`[Worker] Local SQLite path: ${process.env.SQLITE_PATH||"<unset>"} (must match API SQLite path)`);
+  console.log(`[Worker] Persistence backend: ${process.env.RECORD_STORE_BACKEND || "test storage"} (must match the API database)`);
   const manager = new WorkerManager();
   await manager.start();
 

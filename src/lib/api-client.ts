@@ -648,6 +648,7 @@ class ApiClient {
       return this.get<any[]>(`/payments/refunds${q ? `?${q}` : ''}`);
     },
     requestRefund: (dto: any) => this.post('/payments/refunds', dto),
+    confirmOfflineRefund: (id: string, dto: {reference:string;confirmed:boolean}) => this.post(`/payments/refunds/${id}/confirm-offline`, dto),
     approveAndExecuteRefund: (id: string) => this.post(`/payments/refunds/${id}/approve-and-execute`),
 
     runReconciliation: () => this.post<any[]>('/payments/reconciliation/scan', {}),

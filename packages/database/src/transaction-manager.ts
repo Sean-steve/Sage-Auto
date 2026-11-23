@@ -1,3 +1,4 @@
+import {withRecordTransaction, queryRecordTransaction, bindRecordTransactionTenant} from "./record-store";
 // ============================================================================
 // CAR HIRE OS — TRANSACTION MANAGER & RLS TENANT CONTEXT (DEV-004, DEV-009)
 // Provides transaction-scoped isolation using PostgreSQL SET LOCAL
@@ -29,17 +30,17 @@ export class TransactionManager {
       executor: {
         async query<R = unknown>(sql: string, params?: unknown[]): Promise<R[]> {
           // Transactional query executor
-          return [] as R[];
+          return (await queryRecordTransaction(sql, params)).rows as R[];
         },
         async execute(sql: string, params?: unknown[]): Promise<number> {
           // Transactional execute
-          return 1;
+          return (await queryRecordTransaction(sql, params)).rowCount ?? 0;
         },
       },
     };
 
     try {
-      return await callback(txContext);
+      return await withRecordTransaction(() => callback(txContext));
     } catch (error) {
       throw mapDatabaseError(error, "Transaction execution failed");
     }
@@ -59,8 +60,15 @@ export class TransactionManager {
     }
 
     return this.run(async (tx) => {
+<<<<<<< Updated upstream
       // This test-only executor is not an actual SQL session. Native PG uses set_config inside BEGIN.
       await tx.executor.execute(`SET LOCAL app.current_tenant_id = $1`, [tenantId]);
+=======
+      // Execute SET LOCAL app.current_tenant_id inside the active transaction
+      if (process.env.RECORD_STORE_BACKEND === "postgres") {
+        await bindRecordTransactionTenant(tenantId);
+      }
+>>>>>>> Stashed changes
       tx.tenantId = tenantId;
 
       const result = await callback(tx);
