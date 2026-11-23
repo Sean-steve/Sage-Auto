@@ -25,16 +25,9 @@
     "@carhire/constants": "workspace:*",
     "@carhire/types": "workspace:*",
     "@carhire/utils": "workspace:*",
-<<<<<<< Updated upstream
     "pg": "^8.16.3"
   },
   "devDependencies": {
     "@types/pg": "^8.15.5"
-=======
-    "pg": "^8.23.1"
-  },
-  "devDependencies": {
-    "@types/pg": "^8.23.1"
->>>>>>> Stashed changes
   }
 }
