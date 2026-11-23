@@ -85,6 +85,14 @@ jobs:
         run: pnpm test:ux-d6
       - name: Check real Redis BullMQ readiness and existing schema doctor
         run: pnpm local:doctor && pnpm local:worker:smoke
+      - name: Prevent unsafe PostgreSQL compatibility-store merge (P0)
+        run: |
+          # Native business tables are isolated, but the new local compatibility
+          # table lacks a tenant ID and FORCE RLS. Do not certify or merge.
+          if [ "$(psql "$DATABASE_URL" -XqAt -c "SELECT COUNT(*) FROM pg_class WHERE relname='application_records' AND relrowsecurity AND relforcerowsecurity")" != "1" ]; then
+            echo "::error::Unsafe application_records table has no FORCE RLS. PostgreSQL cutover blocked."
+            exit 1
+          fi
       - name: Require the expected NO-GO for incomplete application-wide PostgreSQL cutover
         run: |
           if node scripts/phase5-local-doctor.mjs --require-production-backend; then
