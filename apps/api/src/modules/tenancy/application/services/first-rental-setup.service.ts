@@ -102,7 +102,10 @@ function domainReaders(): FirstRentalReaders {
 export class FirstRentalSetupService {
   constructor(
     private readonly readers: FirstRentalReaders = domainReaders(),
-    private readonly saved: Pick<Map<string, SavedSetup>, "get" | "set"> =
+    private readonly saved: {
+      get(key: string): SavedSetup | undefined | Promise<SavedSetup | undefined>;
+      set(key: string, value: SavedSetup): unknown;
+    } =
       createRecordStore<string, SavedSetup>("tenant:first-rental-setup:v1"),
   ) {}
 
@@ -111,7 +114,7 @@ export class FirstRentalSetupService {
 
     // A completed first handover is a durable milestone. Once observed, avoid
     // re-reading six domain repositories on every login or overview refresh.
-    const terminal = this.saved.get(tenantId);
+    const terminal = await this.saved.get(tenantId);
     if (terminal?.completedAt) {
       const observed = new Set(terminal.observedSteps);
       const steps = FIRST_RENTAL_STEP_IDS.map(id => ({ id, ...STEP_METADATA[id], complete: observed.has(id) }));
@@ -134,7 +137,7 @@ export class FirstRentalSetupService {
     ]);
 
     const calculatedAt = new Date().toISOString();
-    const latest = this.saved.get(tenantId);
+    const latest = await this.saved.get(tenantId);
     const observed = new Set<FirstRentalStepId>(latest?.observedSteps || []);
     FIRST_RENTAL_STEP_IDS.forEach((id, index) => { if (checks[index]) observed.add(id); });
 
@@ -151,7 +154,7 @@ export class FirstRentalSetupService {
     if (!latest ||
       latest.completedAt !== completedAt ||
       updated.observedSteps.some(id => !latest.observedSteps.includes(id))) {
-      this.saved.set(tenantId, updated);
+      await this.saved.set(tenantId, updated);
     }
 
     const state: FirstRentalState = completedAt ? "COMPLETED"
@@ -169,13 +172,13 @@ export class FirstRentalSetupService {
   }
 
   // Caller must enforce company ownership / tenant administration.
-  changeVisibility(tenantId: string, action: FirstRentalVisibilityAction): boolean {
+  async changeVisibility(tenantId: string, action: FirstRentalVisibilityAction): Promise<boolean> {
     if (!tenantId) throw Object.assign(new Error("Verified tenant context required"), { statusCode: 403 });
-    const current = this.saved.get(tenantId);
+    const current = await this.saved.get(tenantId);
     if (current?.completedAt) return false; // Completion cannot be undone.
     const nextDismissedAt = action === "DISMISS" ? (current?.dismissedAt || new Date().toISOString()) : undefined;
     if (current?.dismissedAt === nextDismissedAt) return false;
-    this.saved.set(tenantId, {
+    await this.saved.set(tenantId, {
       tenantId, observedSteps: current?.observedSteps || [],
       completedAt: current?.completedAt,
       dismissedAt: nextDismissedAt, updatedAt: new Date().toISOString(),
