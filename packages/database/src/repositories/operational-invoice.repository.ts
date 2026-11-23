@@ -79,6 +79,11 @@ export class OperationalInvoiceRepository implements IOperationalInvoiceReposito
                 continue;
             if (filter?.status && inv.status !== filter.status)
                 continue;
+            if (filter?.search) {
+                const q = filter.search.trim().toLowerCase();
+                if (!inv.invoiceNumber.toLowerCase().includes(q) &&
+                    !String(inv.billingSnapshot?.customerName || "").toLowerCase().includes(q)) continue;
+            }
             if (filter?.overdueOnly) {
                 const isOverdue = inv.status !== "PAID" &&
                     inv.status !== "VOIDED" &&
@@ -89,7 +94,9 @@ export class OperationalInvoiceRepository implements IOperationalInvoiceReposito
             }
             results.push(JSON.parse(JSON.stringify(inv)));
         }
-        return results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        const limit = Number(filter?.limit);
+        return Number.isFinite(limit) && limit >= 1 ? results.slice(0, Math.min(50, Math.floor(limit))) : results;
     }
     async create(data: Omit<OperationalInvoice, "id" | "invoiceNumber" | "version" | "createdAt" | "updatedAt"> & {
         invoiceNumber?: string;
