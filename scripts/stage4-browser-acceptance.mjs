@@ -12,11 +12,7 @@
  * NOT payment-provider E2E, settlement money movement, or live environment test.
  */
 import assert from 'node:assert/strict';
-<<<<<<< Updated upstream
 import { readFileSync, mkdtempSync, existsSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
-=======
-import { readFileSync, writeFileSync, mkdirSync, mkdtempSync, existsSync, rmSync } from 'node:fs';
->>>>>>> Stashed changes
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawn, execFileSync } from 'node:child_process';
